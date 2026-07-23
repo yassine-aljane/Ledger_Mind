@@ -4,7 +4,7 @@ Assistant fiscal pour freelances et créateurs — comprendre, calculer et provi
 
 ## Développement
 
-Prérequis : [Node.js](https://nodejs.org/) (ou [Bun](https://bun.sh/)).
+Prérequis : [Node.js](https://nodejs.org/).
 
 ```sh
 git clone <this-repository-url>
