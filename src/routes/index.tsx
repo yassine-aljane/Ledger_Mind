@@ -1,24 +1,74 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "LedgerMind — commencez par l'essentiel" },
+      {
+        name: "description",
+        content: "Freelance ou créateur ? En 2 minutes, on clarifie votre situation fiscale.",
+      },
+      { property: "og:title", content: "LedgerMind — commencez par l'essentiel" },
+      {
+        property: "og:description",
+        content: "Freelance ou créateur ? En 2 minutes, on clarifie votre situation fiscale.",
+      },
+    ],
+  }),
+  component: Gate,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Gate() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="min-h-screen flex flex-col">
+      <header className="px-6 h-16 flex items-center max-w-7xl mx-auto w-full">
+        <div className="flex items-center gap-2">
+          <div className="size-6 rounded-full bg-teal-dark" />
+          <span className="font-semibold tracking-tight uppercase text-sm">LedgerMind</span>
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-6">
+        <section className="max-w-2xl w-full text-center animate-slide-up">
+          <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-teal-dark mb-6">
+            Étape 01 · Statut administratif
+          </p>
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter text-balance leading-[1.02]">
+            Commençons par <span className="italic font-normal">l'essentiel.</span>
+          </h1>
+          <p className="mt-8 text-lg text-ink/60 text-pretty max-w-lg mx-auto">
+            Pour bien vous accompagner, on a besoin de connaître votre situation. Avez-vous déjà un{" "}
+            <span className="font-semibold text-ink">numéro SIRET</span> ?
+          </p>
+
+          <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              to="/onboarding/verification"
+              className="px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
+            >
+              Oui, j'ai mon SIRET
+            </Link>
+            <Link
+              to="/onboarding/diagnostic"
+              className="px-10 py-5 bg-background border border-border rounded-xl font-semibold hover:border-ink transition-colors"
+            >
+              Non, pas encore
+            </Link>
+          </div>
+
+          <p className="mt-16 text-xs text-ink/40 italic max-w-md mx-auto leading-relaxed">
+            Le SIRET est le numéro qui identifie officiellement votre activité auprès de
+            l'administration française. Vous l'avez si vous êtes déclaré en auto-entrepreneur,
+            micro-entreprise ou tout autre statut.
+          </p>
+        </section>
+      </main>
+
+      <footer className="px-6 py-8 max-w-7xl mx-auto w-full">
+        <p className="text-[11px] uppercase tracking-widest text-ink/40 font-mono">
+          © 2026 LedgerMind — l'assistant fiscal qui parle humain.
+        </p>
+      </footer>
     </div>
   );
 }
