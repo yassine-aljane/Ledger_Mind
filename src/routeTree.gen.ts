@@ -9,38 +9,214 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SimulateurRouteImport } from './routes/simulateur'
+import { Route as ParametresRouteImport } from './routes/parametres'
+import { Route as HistoriqueRouteImport } from './routes/historique'
+import { Route as EducationRouteImport } from './routes/education'
+import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OnboardingVerificationRouteImport } from './routes/onboarding.verification'
+import { Route as OnboardingProfilRouteImport } from './routes/onboarding.profil'
+import { Route as OnboardingDiagnosticRouteImport } from './routes/onboarding.diagnostic'
+import { Route as OnboardingDiagnosticResultatRouteImport } from './routes/onboarding.diagnostic.resultat'
 
+const SimulateurRoute = SimulateurRouteImport.update({
+  id: '/simulateur',
+  path: '/simulateur',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParametresRoute = ParametresRouteImport.update({
+  id: '/parametres',
+  path: '/parametres',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoriqueRoute = HistoriqueRouteImport.update({
+  id: '/historique',
+  path: '/historique',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EducationRoute = EducationRouteImport.update({
+  id: '/education',
+  path: '/education',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingVerificationRoute = OnboardingVerificationRouteImport.update({
+  id: '/onboarding/verification',
+  path: '/onboarding/verification',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingProfilRoute = OnboardingProfilRouteImport.update({
+  id: '/onboarding/profil',
+  path: '/onboarding/profil',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingDiagnosticRoute = OnboardingDiagnosticRouteImport.update({
+  id: '/onboarding/diagnostic',
+  path: '/onboarding/diagnostic',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingDiagnosticResultatRoute =
+  OnboardingDiagnosticResultatRouteImport.update({
+    id: '/resultat',
+    path: '/resultat',
+    getParentRoute: () => OnboardingDiagnosticRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
+  '/education': typeof EducationRoute
+  '/historique': typeof HistoriqueRoute
+  '/parametres': typeof ParametresRoute
+  '/simulateur': typeof SimulateurRoute
+  '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
+  '/onboarding/profil': typeof OnboardingProfilRoute
+  '/onboarding/verification': typeof OnboardingVerificationRoute
+  '/onboarding/diagnostic/resultat': typeof OnboardingDiagnosticResultatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
+  '/education': typeof EducationRoute
+  '/historique': typeof HistoriqueRoute
+  '/parametres': typeof ParametresRoute
+  '/simulateur': typeof SimulateurRoute
+  '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
+  '/onboarding/profil': typeof OnboardingProfilRoute
+  '/onboarding/verification': typeof OnboardingVerificationRoute
+  '/onboarding/diagnostic/resultat': typeof OnboardingDiagnosticResultatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
+  '/education': typeof EducationRoute
+  '/historique': typeof HistoriqueRoute
+  '/parametres': typeof ParametresRoute
+  '/simulateur': typeof SimulateurRoute
+  '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
+  '/onboarding/profil': typeof OnboardingProfilRoute
+  '/onboarding/verification': typeof OnboardingVerificationRoute
+  '/onboarding/diagnostic/resultat': typeof OnboardingDiagnosticResultatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/documents'
+    | '/education'
+    | '/historique'
+    | '/parametres'
+    | '/simulateur'
+    | '/onboarding/diagnostic'
+    | '/onboarding/profil'
+    | '/onboarding/verification'
+    | '/onboarding/diagnostic/resultat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/documents'
+    | '/education'
+    | '/historique'
+    | '/parametres'
+    | '/simulateur'
+    | '/onboarding/diagnostic'
+    | '/onboarding/profil'
+    | '/onboarding/verification'
+    | '/onboarding/diagnostic/resultat'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/documents'
+    | '/education'
+    | '/historique'
+    | '/parametres'
+    | '/simulateur'
+    | '/onboarding/diagnostic'
+    | '/onboarding/profil'
+    | '/onboarding/verification'
+    | '/onboarding/diagnostic/resultat'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRoute
+  DocumentsRoute: typeof DocumentsRoute
+  EducationRoute: typeof EducationRoute
+  HistoriqueRoute: typeof HistoriqueRoute
+  ParametresRoute: typeof ParametresRoute
+  SimulateurRoute: typeof SimulateurRoute
+  OnboardingDiagnosticRoute: typeof OnboardingDiagnosticRouteWithChildren
+  OnboardingProfilRoute: typeof OnboardingProfilRoute
+  OnboardingVerificationRoute: typeof OnboardingVerificationRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/simulateur': {
+      id: '/simulateur'
+      path: '/simulateur'
+      fullPath: '/simulateur'
+      preLoaderRoute: typeof SimulateurRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parametres': {
+      id: '/parametres'
+      path: '/parametres'
+      fullPath: '/parametres'
+      preLoaderRoute: typeof ParametresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/historique': {
+      id: '/historique'
+      path: '/historique'
+      fullPath: '/historique'
+      preLoaderRoute: typeof HistoriqueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/education': {
+      id: '/education'
+      path: '/education'
+      fullPath: '/education'
+      preLoaderRoute: typeof EducationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +224,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/verification': {
+      id: '/onboarding/verification'
+      path: '/onboarding/verification'
+      fullPath: '/onboarding/verification'
+      preLoaderRoute: typeof OnboardingVerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/profil': {
+      id: '/onboarding/profil'
+      path: '/onboarding/profil'
+      fullPath: '/onboarding/profil'
+      preLoaderRoute: typeof OnboardingProfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/diagnostic': {
+      id: '/onboarding/diagnostic'
+      path: '/onboarding/diagnostic'
+      fullPath: '/onboarding/diagnostic'
+      preLoaderRoute: typeof OnboardingDiagnosticRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/diagnostic/resultat': {
+      id: '/onboarding/diagnostic/resultat'
+      path: '/resultat'
+      fullPath: '/onboarding/diagnostic/resultat'
+      preLoaderRoute: typeof OnboardingDiagnosticResultatRouteImport
+      parentRoute: typeof OnboardingDiagnosticRoute
+    }
   }
 }
 
+interface OnboardingDiagnosticRouteChildren {
+  OnboardingDiagnosticResultatRoute: typeof OnboardingDiagnosticResultatRoute
+}
+
+const OnboardingDiagnosticRouteChildren: OnboardingDiagnosticRouteChildren = {
+  OnboardingDiagnosticResultatRoute: OnboardingDiagnosticResultatRoute,
+}
+
+const OnboardingDiagnosticRouteWithChildren =
+  OnboardingDiagnosticRoute._addFileChildren(OnboardingDiagnosticRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRoute,
+  DocumentsRoute: DocumentsRoute,
+  EducationRoute: EducationRoute,
+  HistoriqueRoute: HistoriqueRoute,
+  ParametresRoute: ParametresRoute,
+  SimulateurRoute: SimulateurRoute,
+  OnboardingDiagnosticRoute: OnboardingDiagnosticRouteWithChildren,
+  OnboardingProfilRoute: OnboardingProfilRoute,
+  OnboardingVerificationRoute: OnboardingVerificationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
