@@ -9,41 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SimulateurRouteImport } from './routes/simulateur'
-import { Route as ParametresRouteImport } from './routes/parametres'
-import { Route as HistoriqueRouteImport } from './routes/historique'
-import { Route as EducationRouteImport } from './routes/education'
-import { Route as DocumentsRouteImport } from './routes/documents'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as OnboardingVerificationRouteImport } from './routes/onboarding.verification'
-import { Route as OnboardingProfilRouteImport } from './routes/onboarding.profil'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as EducationRouteImport } from './routes/education'
+import { Route as HistoriqueRouteImport } from './routes/historique'
+import { Route as ParametresRouteImport } from './routes/parametres'
+import { Route as SimulateurRouteImport } from './routes/simulateur'
 import { Route as OnboardingDiagnosticRouteImport } from './routes/onboarding.diagnostic'
+import { Route as OnboardingProfilRouteImport } from './routes/onboarding.profil'
+import { Route as OnboardingVerificationRouteImport } from './routes/onboarding.verification'
 import { Route as OnboardingDiagnosticResultatRouteImport } from './routes/onboarding.diagnostic.resultat'
 
-const SimulateurRoute = SimulateurRouteImport.update({
-  id: '/simulateur',
-  path: '/simulateur',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ParametresRoute = ParametresRouteImport.update({
-  id: '/parametres',
-  path: '/parametres',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HistoriqueRoute = HistoriqueRouteImport.update({
-  id: '/historique',
-  path: '/historique',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EducationRoute = EducationRouteImport.update({
-  id: '/education',
-  path: '/education',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentsRoute = DocumentsRouteImport.update({
-  id: '/documents',
-  path: '/documents',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -51,14 +31,34 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OnboardingVerificationRoute = OnboardingVerificationRouteImport.update({
-  id: '/onboarding/verification',
-  path: '/onboarding/verification',
+const EducationRoute = EducationRouteImport.update({
+  id: '/education',
+  path: '/education',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoriqueRoute = HistoriqueRouteImport.update({
+  id: '/historique',
+  path: '/historique',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParametresRoute = ParametresRouteImport.update({
+  id: '/parametres',
+  path: '/parametres',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SimulateurRoute = SimulateurRouteImport.update({
+  id: '/simulateur',
+  path: '/simulateur',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingDiagnosticRoute = OnboardingDiagnosticRouteImport.update({
+  id: '/onboarding/diagnostic',
+  path: '/onboarding/diagnostic',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingProfilRoute = OnboardingProfilRouteImport.update({
@@ -66,9 +66,9 @@ const OnboardingProfilRoute = OnboardingProfilRouteImport.update({
   path: '/onboarding/profil',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OnboardingDiagnosticRoute = OnboardingDiagnosticRouteImport.update({
-  id: '/onboarding/diagnostic',
-  path: '/onboarding/diagnostic',
+const OnboardingVerificationRoute = OnboardingVerificationRouteImport.update({
+  id: '/onboarding/verification',
+  path: '/onboarding/verification',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingDiagnosticResultatRoute =
@@ -175,39 +175,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/simulateur': {
-      id: '/simulateur'
-      path: '/simulateur'
-      fullPath: '/simulateur'
-      preLoaderRoute: typeof SimulateurRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/parametres': {
-      id: '/parametres'
-      path: '/parametres'
-      fullPath: '/parametres'
-      preLoaderRoute: typeof ParametresRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/historique': {
-      id: '/historique'
-      path: '/historique'
-      fullPath: '/historique'
-      preLoaderRoute: typeof HistoriqueRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/education': {
-      id: '/education'
-      path: '/education'
-      fullPath: '/education'
-      preLoaderRoute: typeof EducationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documents': {
-      id: '/documents'
-      path: '/documents'
-      fullPath: '/documents'
-      preLoaderRoute: typeof DocumentsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -217,18 +189,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/onboarding/verification': {
-      id: '/onboarding/verification'
-      path: '/onboarding/verification'
-      fullPath: '/onboarding/verification'
-      preLoaderRoute: typeof OnboardingVerificationRouteImport
+    '/education': {
+      id: '/education'
+      path: '/education'
+      fullPath: '/education'
+      preLoaderRoute: typeof EducationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/historique': {
+      id: '/historique'
+      path: '/historique'
+      fullPath: '/historique'
+      preLoaderRoute: typeof HistoriqueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parametres': {
+      id: '/parametres'
+      path: '/parametres'
+      fullPath: '/parametres'
+      preLoaderRoute: typeof ParametresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/simulateur': {
+      id: '/simulateur'
+      path: '/simulateur'
+      fullPath: '/simulateur'
+      preLoaderRoute: typeof SimulateurRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/diagnostic': {
+      id: '/onboarding/diagnostic'
+      path: '/onboarding/diagnostic'
+      fullPath: '/onboarding/diagnostic'
+      preLoaderRoute: typeof OnboardingDiagnosticRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding/profil': {
@@ -238,11 +238,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingProfilRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/onboarding/diagnostic': {
-      id: '/onboarding/diagnostic'
-      path: '/onboarding/diagnostic'
-      fullPath: '/onboarding/diagnostic'
-      preLoaderRoute: typeof OnboardingDiagnosticRouteImport
+    '/onboarding/verification': {
+      id: '/onboarding/verification'
+      path: '/onboarding/verification'
+      fullPath: '/onboarding/verification'
+      preLoaderRoute: typeof OnboardingVerificationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding/diagnostic/resultat': {
@@ -281,3 +281,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
