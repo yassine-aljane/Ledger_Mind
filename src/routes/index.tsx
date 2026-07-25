@@ -37,6 +37,8 @@ function useSessionGuard() {
 }
 
 function Gate() {
+  const ready = useSessionGuard();
+  if (!ready) return null;
   return (
     <div className="min-h-screen flex flex-col">
       <header className="px-6 h-16 flex items-center max-w-7xl mx-auto w-full">
