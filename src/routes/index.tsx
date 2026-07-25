@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -18,7 +19,26 @@ export const Route = createFileRoute("/")({
   component: Gate,
 });
 
+function useSessionGuard() {
+  const navigate = useNavigate();
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("lm.session")) {
+        navigate({ to: "/auth", replace: true });
+        return;
+      }
+    } catch {
+      /* noop */
+    }
+    setReady(true);
+  }, [navigate]);
+  return ready;
+}
+
 function Gate() {
+  const ready = useSessionGuard();
+  if (!ready) return null;
   return (
     <div className="min-h-screen flex flex-col">
       <header className="px-6 h-16 flex items-center max-w-7xl mx-auto w-full">
