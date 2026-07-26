@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { LogoutBubble } from "@/components/lm/AppShell";
 import { fetchDiagnosticResult, type DiagnosticResult } from "@/lib/api-mock";
 
 export const Route = createFileRoute("/onboarding/diagnostic/resultat")({
@@ -28,6 +29,9 @@ function ResultatPage() {
 
   return (
     <div className="min-h-screen px-6 py-16 max-w-6xl mx-auto">
+      <div className="flex justify-end mb-6">
+        <LogoutBubble />
+      </div>
       <header className="mb-16 animate-slide-up">
         <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-teal-dark mb-4">
           Résultat de votre diagnostic

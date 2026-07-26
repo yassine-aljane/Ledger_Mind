@@ -1,17 +1,17 @@
+<<<<<<< HEAD:src/routes/index.tsx
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+=======
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { LogoutBubble } from "@/components/lm/AppShell";
+>>>>>>> 432de77 (fix(onboarding): resolve agent infinite loop and add human-in-the-loop validation):frontend/src/routes/onboarding.index.tsx
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/onboarding/")({
   head: () => ({
     meta: [
       { title: "LedgerMind — commencez par l'essentiel" },
       {
         name: "description",
-        content: "Freelance ou créateur ? En 2 minutes, on clarifie votre situation fiscale.",
-      },
-      { property: "og:title", content: "LedgerMind — commencez par l'essentiel" },
-      {
-        property: "og:description",
         content: "Freelance ou créateur ? En 2 minutes, on clarifie votre situation fiscale.",
       },
     ],
@@ -41,11 +41,12 @@ function Gate() {
   if (!ready) return null;
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="px-6 h-16 flex items-center max-w-7xl mx-auto w-full">
-        <div className="flex items-center gap-2">
+      <header className="px-6 h-16 flex items-center justify-between max-w-7xl mx-auto w-full">
+        <Link to="/" className="flex items-center gap-2">
           <div className="size-6 rounded-full bg-teal-dark" />
           <span className="font-semibold tracking-tight uppercase text-sm">LedgerMind</span>
-        </div>
+        </Link>
+        <LogoutBubble />
       </header>
 
       <main className="flex-1 flex items-center justify-center px-6">

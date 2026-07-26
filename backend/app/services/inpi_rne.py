@@ -1,47 +1,31 @@
 import httpx
 
-from app.core.http_client import get_http_client
-
-_BASE = "https://recherche-entreprises.api.gouv.fr"
+from app.services.recherche import fetch_company_by_siren
 
 
-async def fetch_rne(siren: str) -> dict:
+async def fetch_rne(siren: str, company_data: dict | None = None) -> dict:
     """Retourne les données RNE/INPI pour un SIREN via l'API recherche-entreprises (sans auth).
     
     L'API agrège les données INSEE + RNE donc nous pouvons extraire les infos
     de forme juridique, statut de radiation, et activité déclarée.
     """
     siren = siren.replace(" ", "")
-    client = get_http_client()
 
-    try:
-        resp = await client.get(
-            f"{_BASE}/search",
-            params={"q": siren, "page": 1, "per_page": 1},
-        )
-    except httpx.HTTPError as e:
-        return {"found": False, "error": str(e)}
+    if company_data is None:
+        try:
+            company_data = await fetch_company_by_siren(siren)
+        except httpx.HTTPError as e:
+            return {"found": False, "error": str(e)}
 
-    if resp.status_code != 200:
+    if not company_data:
         return {"found": False}
 
-    data = resp.json()
-    results = data.get("results", [])
-
-    if not results:
-        return {"found": False}
-
-    company = results[0]
-
-    if company.get("siren") != siren:
-        return {"found": False}
-
-    etat = company.get("etat_administratif")
+    etat = company_data.get("etat_administratif")
     # "A" = actif, "F" = fermé/radié
     radiee = etat == "F"
 
-    complements = company.get("complements", {})
-    nature_juridique = company.get("nature_juridique")
+    complements = company_data.get("complements", {})
+    nature_juridique = company_data.get("nature_juridique")
 
     # Map nature_juridique code to a readable label when possible
     forme_juridique = _map_nature_juridique(nature_juridique)
@@ -51,8 +35,8 @@ async def fetch_rne(siren: str) -> dict:
         "siren": siren,
         "forme_juridique": forme_juridique,
         "nature_juridique_code": nature_juridique,
-        "date_immatriculation": company.get("date_creation"),
-        "activite_declaree": company.get("activite_principale"),
+        "date_immatriculation": company_data.get("date_creation"),
+        "activite_declaree": company_data.get("activite_principale"),
         "etat_administratif": etat,
         "radiee": radiee,
         "est_association": complements.get("est_association", False),

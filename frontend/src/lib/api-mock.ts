@@ -1,28 +1,60 @@
-// Mock API layer. Replace with FastAPI calls later.
-// No fiscal logic here — pure static/mock data.
+// API layer — real HTTP calls to the FastAPI backend.
+// Diagnostic/dashboard helpers below use static mock data until those endpoints are wired.
 
 export type SiretVerification = {
+  status: "verified" | "not_verified";
   siret: string;
-  denomination: string;
-  regime: string;
-  activite: string;
-  statut: "actif" | "inactif";
+  denomination: string | null;
+  legal_form: string | null;
+  ape_code: string | null;
+  activity_declared: string | null;
+  creation_date: string | null;
+  administrative_status: "actif" | "inactif" | null;
+  mismatches: {
+    field: string;
+    sirene_value: string | null;
+    rne_value: string | null;
+    note: string;
+  }[];
+  explanation: string;
+  next_action: string | null;
 };
 
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
+
 export async function verifySiret(siret: string): Promise<SiretVerification> {
-  await sleep(1200);
-  return {
-    siret: siret.replace(/\s/g, ""),
-    denomination: "ALEXANDRE MARTIN — EI",
-    regime: "Micro-entreprise (BNC)",
-    activite: "Programmation informatique (62.01Z)",
-    statut: "actif",
-  };
+  const response = await fetch(`${API_BASE}/api/verification/siret`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ siret: siret.replace(/\s/g, "") }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Verification failed: ${errorText}`);
+  }
+
+  return await response.json();
 }
 
-export async function ocrExtractSiret(_file: File): Promise<string> {
-  await sleep(1400);
-  return "832 174 902 00019";
+export async function ocrExtractSiret(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await fetch(`${API_BASE}/api/verification/ocr-siret`, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Erreur inconnue." }));
+    throw new Error(err.detail ?? `Erreur ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.siret as string;
 }
 
 // -------- Diagnostic chatbot (branch B) --------
@@ -161,44 +193,61 @@ export async function fetchDiagnosticResult(): Promise<DiagnosticResult> {
   };
 }
 
-// -------- Profile chatbot (branch A) --------
+// -------- Onboarding agent (branch A) --------
 
-const profileScript: DiagnosticQuestion[] = [
-  {
-    step: 1,
-    total: 4,
-    question: "Parfait, votre SIRET est vérifié. Quel type d'activité exercez-vous principalement ?",
-    quickReplies: ["Créateur de contenu", "Freelance / chef de projet", "Consulting", "Autre"],
-  },
-  {
-    step: 2,
-    total: 4,
-    question: "Quelles sont vos sources de revenus principales ?",
-    quickReplies: [
-      "Sponsoring",
-      "Affiliation",
-      "Plateformes étrangères",
-      "Prestations facturées",
-      "Cadeaux en nature",
-    ],
-  },
-  {
-    step: 3,
-    total: 4,
-    question: "Dans quelles devises êtes-vous payé ?",
-    quickReplies: ["EUR uniquement", "EUR + USD", "EUR + plusieurs devises"],
-  },
-  {
-    step: 4,
-    total: 4,
-    question: "Émettez-vous déjà des factures pour vos prestations ?",
-    quickReplies: ["Oui, régulièrement", "Parfois", "Pas encore"],
-  },
-];
+export type InfluencerProfile = {
+  activity_types: string[];
+  revenue_sources: string[];
+  currencies: string[];
+  estimated_monthly_revenue: string | null;
+  revenue_variability: "stable" | "spiky" | "unknown" | null;
+  invoices_already_issued: boolean | null;
+  first_income_date: string | null;
+  has_recurring_contracts: boolean | null;
+  in_kind_gifts: boolean | null;
+  international_clients: boolean | null;
+};
 
-export async function nextProfileQuestion(step: number): Promise<DiagnosticQuestion | null> {
-  await sleep(500);
-  return profileScript[step] ?? null;
+export const emptyInfluencerProfile: InfluencerProfile = {
+  activity_types: [],
+  revenue_sources: [],
+  currencies: [],
+  estimated_monthly_revenue: null,
+  revenue_variability: null,
+  invoices_already_issued: null,
+  first_income_date: null,
+  has_recurring_contracts: null,
+  in_kind_gifts: null,
+  international_clients: null,
+};
+
+export type OnboardingTurnResult = {
+  profile: InfluencerProfile;
+  next_question: string | null;
+  quick_replies: string[];
+  is_done: boolean;
+  completeness: number;
+};
+
+export async function nextOnboardingTurn(
+  profile: InfluencerProfile,
+  lastQuestion: string | null,
+  lastAnswer: string | null,
+): Promise<OnboardingTurnResult> {
+  const res = await fetch(`${API_BASE}/api/onboarding/turn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      profile,
+      last_question: lastQuestion,
+      last_answer: lastAnswer,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+    throw new Error(err.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
 }
 
 // -------- Dashboard --------

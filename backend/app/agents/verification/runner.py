@@ -1,5 +1,8 @@
+import httpx
+
 from app.services.insee_sirene import fetch_sirene
 from app.services.inpi_rne import fetch_rne
+from app.services.recherche import fetch_company_by_siren
 from app.schemas.verification import Mismatch, VerificationResult
 
 
@@ -8,9 +11,21 @@ async def run_verification_agent(siret: str, company_name: str | None = None) ->
     siret_clean = siret.replace(" ", "")
     siren = siret_clean[:9]
 
-    # 1. Fetch both sources in parallel-ish (sequential is fine, APIs are fast)
-    sirene = await fetch_sirene(siret_clean)
-    rne = await fetch_rne(siren)
+    # Fetch company data once from recherche-entreprises API
+    try:
+        company_data = await fetch_company_by_siren(siren)
+        error_msg = None
+    except httpx.HTTPError as e:
+        company_data = None
+        error_msg = str(e)
+
+    # 1. Retrieve data using the single fetched payload
+    if error_msg:
+        sirene = {"found": False, "error": error_msg}
+        rne = {"found": False, "error": error_msg}
+    else:
+        sirene = await fetch_sirene(siret_clean, company_data=company_data)
+        rne = await fetch_rne(siren, company_data=company_data)
 
     # 2. If SIRENE not found → immediate not_verified
     if not sirene.get("found"):

@@ -1,3 +1,4 @@
+<<<<<<< HEAD:src/routes/auth.tsx
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 
@@ -278,3 +279,12 @@ function OAuthButton({ label }: { label: string }) {
     </button>
   );
 }
+=======
+import { createFileRoute, redirect } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/auth")({
+  beforeLoad: () => {
+    throw redirect({ to: "/" });
+  },
+});
+>>>>>>> 432de77 (fix(onboarding): resolve agent infinite loop and add human-in-the-loop validation):frontend/src/routes/auth.tsx

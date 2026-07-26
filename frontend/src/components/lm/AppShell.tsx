@@ -9,6 +9,17 @@ const nav = [
   { to: "/education", label: "Éducation" },
 ];
 
+export function LogoutBubble() {
+  return (
+    <Link
+      to="/"
+      className="px-4 py-1.5 rounded-full border border-border text-[13px] font-medium text-ink/70 hover:border-ink hover:text-ink transition-colors"
+    >
+      Déconnexion
+    </Link>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
@@ -37,12 +48,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               );
             })}
           </div>
-          <Link
-            to="/parametres"
-            className="px-4 py-1.5 bg-ink text-background rounded-full text-[13px] font-medium hover:bg-teal-dark transition-colors"
-          >
-            Alexandre M.
-          </Link>
+          <div className="flex items-center gap-3 shrink-0">
+            <LogoutBubble />
+            <Link
+              to="/parametres"
+              className="px-4 py-1.5 bg-ink text-background rounded-full text-[13px] font-medium hover:bg-teal-dark transition-colors"
+            >
+              Alexandre M.
+            </Link>
+          </div>
         </div>
       </nav>
       <main className="pt-24 pb-24 px-6 max-w-7xl mx-auto">{children}</main>

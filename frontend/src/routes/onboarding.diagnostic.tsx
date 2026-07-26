@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { LogoutBubble } from "@/components/lm/AppShell";
 import { Chatbot } from "@/components/lm/Chatbot";
 import { nextDiagnosticQuestion } from "@/lib/api-mock";
 
@@ -27,9 +28,12 @@ function DiagnosticPage() {
 
   return (
     <div className="min-h-screen px-6 py-16 max-w-4xl mx-auto">
-      <Link to="/" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink">
-        ← Retour
-      </Link>
+      <div className="flex items-center justify-between gap-4">
+        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink">
+          ← Retour
+        </Link>
+        <LogoutBubble />
+      </div>
 
       {!started ? (
         <section className="mt-16 max-w-2xl mx-auto text-center animate-slide-up">
