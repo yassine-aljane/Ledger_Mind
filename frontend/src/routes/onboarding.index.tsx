@@ -1,10 +1,6 @@
-<<<<<<< HEAD:src/routes/index.tsx
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-=======
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { LogoutBubble } from "@/components/lm/AppShell";
->>>>>>> 432de77 (fix(onboarding): resolve agent infinite loop and add human-in-the-loop validation):frontend/src/routes/onboarding.index.tsx
 
 export const Route = createFileRoute("/onboarding/")({
   head: () => ({
@@ -58,38 +54,44 @@ function Gate() {
             Commençons par <span className="italic font-normal">l'essentiel.</span>
           </h1>
           <p className="mt-8 text-lg text-ink/60 text-pretty max-w-lg mx-auto">
-            Pour bien vous accompagner, on a besoin de connaître votre situation. Avez-vous déjà un{" "}
-            <span className="font-semibold text-ink">numéro SIRET</span> ?
+            Avez-vous déjà un statut administratif ou un SIRET enregistré pour votre activité ?
           </p>
 
-          <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="mt-12 grid sm:grid-cols-2 gap-4">
             <Link
               to="/onboarding/verification"
-              className="px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
+              className="group p-8 bg-white border border-border rounded-2xl text-left hover:border-teal-dark hover:shadow-lg transition-all"
             >
-              Oui, j'ai mon SIRET
+              <div className="size-10 rounded-full bg-teal-dark/10 text-teal-dark font-mono text-sm font-semibold grid place-items-center group-hover:bg-teal-dark group-hover:text-background transition-colors">
+                A
+              </div>
+              <p className="mt-6 font-semibold text-lg">Oui, j'ai un SIRET</p>
+              <p className="mt-2 text-sm text-ink/60 leading-relaxed">
+                Vérification automatique auprès de l'INSEE et du RNE en 30 secondes.
+              </p>
+              <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-teal-dark">
+                Vérifier mon SIRET →
+              </span>
             </Link>
+
             <Link
               to="/onboarding/diagnostic"
-              className="px-10 py-5 bg-background border border-border rounded-xl font-semibold hover:border-ink transition-colors"
+              className="group p-8 bg-white border border-border rounded-2xl text-left hover:border-teal-dark hover:shadow-lg transition-all"
             >
-              Non, pas encore
+              <div className="size-10 rounded-full bg-amber-fiscal/20 text-amber-900 font-mono text-sm font-semibold grid place-items-center group-hover:bg-amber-fiscal group-hover:text-amber-950 transition-colors">
+                B
+              </div>
+              <p className="mt-6 font-semibold text-lg">Non / Je ne sais pas</p>
+              <p className="mt-2 text-sm text-ink/60 leading-relaxed">
+                Diagnostic guidé sans jargon pour faire le point sur votre situation.
+              </p>
+              <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-teal-dark">
+                Lancer le diagnostic →
+              </span>
             </Link>
           </div>
-
-          <p className="mt-16 text-xs text-ink/40 italic max-w-md mx-auto leading-relaxed">
-            Le SIRET est le numéro qui identifie officiellement votre activité auprès de
-            l'administration française. Vous l'avez si vous êtes déclaré en auto-entrepreneur,
-            micro-entreprise ou tout autre statut.
-          </p>
         </section>
       </main>
-
-      <footer className="px-6 py-8 max-w-7xl mx-auto w-full">
-        <p className="text-[11px] uppercase tracking-widest text-ink/40 font-mono">
-          © 2026 LedgerMind — l'assistant fiscal qui parle humain.
-        </p>
-      </footer>
     </div>
   );
 }

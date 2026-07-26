@@ -1,4 +1,3 @@
-<<<<<<< HEAD:src/routes/auth.tsx
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 
@@ -59,33 +58,19 @@ function AuthPage() {
           <span className="font-semibold tracking-tight uppercase text-sm">LedgerMind</span>
         </Link>
 
-        <div className="relative">
-          <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-teal-light/90 mb-6">
-            Étape 00 · Votre espace privé
+        <div className="relative my-12 max-w-md">
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-teal-light mb-4">
+            Espace membre
           </p>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tighter leading-[1.02] text-balance">
-            L'assistant fiscal <span className="italic font-normal text-teal-light">qui parle humain.</span>
-          </h1>
-          <p className="mt-6 text-base md:text-lg text-background/70 max-w-md text-pretty">
-            Chiffrez, comprenez et provisionnez vos impôts sans jargon. Créé pour les freelances,
-            créateurs et micro-entrepreneurs français.
+          <blockquote className="text-2xl md:text-3xl font-extrabold tracking-tight text-balance leading-snug">
+            « LedgerMind a transformé ma gestion d'auto-entrepreneur en{" "}
+            <span className="italic font-normal">un jeu d'enfant.</span> »
+          </blockquote>
+          <p className="mt-6 text-sm text-background/60 font-medium">
+            Clara V. — Créatrice de contenu & Designer
           </p>
-
-          <ul className="mt-10 space-y-3 text-sm text-background/80">
-            {[
-              "Diagnostic fiscal en 2 minutes",
-              "Reçu clair de vos provisions mensuelles",
-              "Simulateur temps réel BNC, BIC, micro",
-            ].map((item) => (
-              <li key={item} className="flex items-center gap-3">
-                <span className="size-1.5 rounded-full bg-teal-light" />
-                {item}
-              </li>
-            ))}
-          </ul>
         </div>
 
-        <div className="relative dotted-divider opacity-30" />
         <p className="relative text-[11px] uppercase tracking-widest text-background/40 font-mono">
           © 2026 LedgerMind
         </p>
@@ -110,22 +95,22 @@ function AuthPage() {
               </>
             ) : (
               <>
-                Créons votre <span className="italic font-normal">espace.</span>
+                Rejoignez <span className="italic font-normal">LedgerMind.</span>
               </>
             )}
           </h2>
-          <p className="mt-3 text-sm text-ink/60">
+          <p className="mt-3 text-ink/60 text-sm text-pretty">
             {isLogin
-              ? "Connectez-vous pour retrouver vos provisions et votre diagnostic."
-              : "30 secondes suffisent. Aucune carte bancaire demandée."}
+              ? "Saisissez vos identifiants pour accéder à votre espace."
+              : "Créez votre compte pour commencer à automatiser vos obligations."}
           </p>
 
-          {/* Segmented switch */}
-          <div className="mt-8 relative grid grid-cols-2 rounded-full border border-border bg-secondary/60 p-1 text-sm font-medium">
-            <span
-              aria-hidden
-              className="absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-ink transition-transform duration-300 ease-out"
-              style={{ transform: isLogin ? "translateX(4px)" : "translateX(calc(100% + 4px))" }}
+          {/* Mode switch */}
+          <div className="mt-8 relative grid grid-cols-2 p-1 bg-white border border-border rounded-full text-xs font-semibold">
+            <div
+              className={`absolute inset-y-1 w-[calc(50%-4px)] bg-ink rounded-full transition-transform duration-300 ease-out ${
+                isLogin ? "translate-x-1" : "translate-x-[calc(100%+4px)]"
+              }`}
             />
             <button
               type="button"
@@ -279,12 +264,3 @@ function OAuthButton({ label }: { label: string }) {
     </button>
   );
 }
-=======
-import { createFileRoute, redirect } from "@tanstack/react-router";
-
-export const Route = createFileRoute("/auth")({
-  beforeLoad: () => {
-    throw redirect({ to: "/" });
-  },
-});
->>>>>>> 432de77 (fix(onboarding): resolve agent infinite loop and add human-in-the-loop validation):frontend/src/routes/auth.tsx
