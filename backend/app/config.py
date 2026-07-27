@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     mistral_model: str = "mistral/mistral-large-latest"
 
     frontend_origin: str = "http://localhost:3000"
+    session_db_path: str = "sessions.db"
 
     class Config:
         env_file = ".env"

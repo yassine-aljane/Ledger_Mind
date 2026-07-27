@@ -12,7 +12,7 @@ import logging
 from openai import AsyncOpenAI
 
 from app.config import settings
-from app.schemas.onboarding import InfluencerProfile
+from app.schemas.orchestrator import UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -105,28 +105,34 @@ _client = AsyncOpenAI(
 )
 
 
-def next_missing_field(profile: InfluencerProfile) -> str | None:
+def next_missing_field(profile: UserProfile) -> str | None:
     for field in FIELD_PRIORITY:
         if getattr(profile, field) in (None, []):
             return field
     return None
 
 
-def completeness_ratio(profile: InfluencerProfile) -> float:
+def completeness_ratio(profile: UserProfile) -> float:
     filled = sum(1 for f in FIELD_PRIORITY if getattr(profile, f) not in (None, []))
     return filled / len(FIELD_PRIORITY)
 
 
 async def generate_question_for_field(
-    profile: InfluencerProfile, field: str
+    profile: UserProfile,
+    field: str,
+    verification_context: dict | None = None,
 ) -> tuple[str, list[str]]:
     fallback_q, fallback_qr = _FALLBACK_QUESTIONS.get(
         field, (f"Peux-tu me dire {_FIELD_DESCRIPTIONS.get(field, field)} ?", [])
     )
 
+    context_block = profile.model_dump_json()
+    if verification_context:
+        context_block += f"\n\nContexte registre (SIRENE/RNE) :\n{json.dumps(verification_context, ensure_ascii=False)}"
+
     prompt = _QUESTION_INSTRUCTION.format(
         field_description=_FIELD_DESCRIPTIONS.get(field, field),
-        current_profile=profile.model_dump_json(),
+        current_profile=context_block,
     )
 
     try:

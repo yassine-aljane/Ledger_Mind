@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
 import { Chatbot } from "@/components/lm/Chatbot";
-import { nextDiagnosticQuestion } from "@/lib/api-mock";
+import { startOrchestrator, type OrchestratorTurnResponse } from "@/lib/api-mock";
 
 export const Route = createFileRoute("/onboarding/diagnostic")({
   head: () => ({
@@ -23,8 +23,21 @@ export const Route = createFileRoute("/onboarding/diagnostic")({
 });
 
 function DiagnosticPage() {
-  const [started, setStarted] = useState(false);
+  const [startResponse, setStartResponse] = useState<OrchestratorTurnResponse | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleStart = async () => {
+    setLoading(true);
+    try {
+      const response = await startOrchestrator(undefined);
+      setStartResponse(response);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen px-6 py-16 max-w-4xl mx-auto">
@@ -35,7 +48,7 @@ function DiagnosticPage() {
         <LogoutBubble />
       </div>
 
-      {!started ? (
+      {!startResponse ? (
         <section className="mt-16 max-w-2xl mx-auto text-center animate-slide-up">
           <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-teal-dark mb-6">
             Étape 02 · Diagnostic
@@ -63,18 +76,21 @@ function DiagnosticPage() {
           </div>
 
           <button
-            onClick={() => setStarted(true)}
-            className="mt-12 px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
+            onClick={handleStart}
+            disabled={loading}
+            className="mt-12 px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
           >
-            Commencer le diagnostic
+            {loading ? "Démarrage…" : "Commencer le diagnostic"}
           </button>
         </section>
       ) : (
         <div className="mt-12">
           <Chatbot
             eyebrow="Diagnostic de régularisation"
-            fetchNext={nextDiagnosticQuestion}
-            onFinish={() => navigate({ to: "/onboarding/diagnostic/resultat" })}
+            orchestratorSessionId={startResponse.session_id}
+            initialQuestion={startResponse.message ?? undefined}
+            initialQuickReplies={startResponse.quick_replies}
+            onOrchestratorFinish={() => navigate({ to: "/onboarding/diagnostic/resultat" })}
           />
         </div>
       )}

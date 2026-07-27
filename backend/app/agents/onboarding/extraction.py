@@ -1,5 +1,5 @@
 """
-LLM-based extraction: given the current InfluencerProfile, the last question
+LLM-based extraction: given the current UserProfile, the last question
 asked, and the user's free-text answer, extract only the fields we can
 confidently fill in.
 
@@ -14,9 +14,22 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from app.config import settings
-from app.schemas.onboarding import InfluencerProfile
+from app.schemas.orchestrator import UserProfile
 
 logger = logging.getLogger(__name__)
+
+_PROFILE_QUESTION_FIELDS = {
+    "activity_types",
+    "revenue_sources",
+    "currencies",
+    "estimated_monthly_revenue",
+    "revenue_variability",
+    "invoices_already_issued",
+    "first_income_date",
+    "has_recurring_contracts",
+    "in_kind_gifts",
+    "international_clients",
+}
 
 _EXTRACTION_INSTRUCTION = """Tu extrais des informations structurées à partir de la réponse
 d'un utilisateur, pour compléter son profil fiscal de créateur de contenu.
@@ -58,11 +71,11 @@ LIST_FIELDS = {"activity_types", "revenue_sources", "currencies"}
 BOOL_FIELDS = {"invoices_already_issued", "has_recurring_contracts", "in_kind_gifts", "international_clients"}
 
 
-def _normalize_extracted_dict(updates: dict[str, Any], current_profile: InfluencerProfile) -> dict[str, Any]:
+def _normalize_extracted_dict(updates: dict[str, Any], current_profile: UserProfile) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
 
     for field, value in updates.items():
-        if field not in InfluencerProfile.model_fields or value is None:
+        if field not in _PROFILE_QUESTION_FIELDS or value is None:
             continue
 
         if field in LIST_FIELDS:
@@ -73,8 +86,7 @@ def _normalize_extracted_dict(updates: dict[str, Any], current_profile: Influenc
                 new_items = [str(v).strip() for v in value if str(v).strip()]
             else:
                 new_items = []
-            
-            # Combine existing and new unique items
+
             combined = existing + [item for item in new_items if item not in existing]
             if combined:
                 normalized[field] = combined
@@ -101,18 +113,17 @@ def _normalize_extracted_dict(updates: dict[str, Any], current_profile: Influenc
                 normalized[field] = "unknown"
 
         else:
-            # String fields: estimated_monthly_revenue, first_income_date
             normalized[field] = str(value).strip()
 
     return normalized
 
 
 async def extract_fields_from_answer(
-    profile: InfluencerProfile,
+    profile: UserProfile,
     last_question: str,
     last_answer: str,
     target_field: str | None = None,
-) -> InfluencerProfile:
+) -> UserProfile:
     prompt = _EXTRACTION_INSTRUCTION.format(
         current_profile=profile.model_dump_json(),
         last_question=last_question,
@@ -138,21 +149,20 @@ async def extract_fields_from_answer(
         raw_dict = {}
 
     normalized = _normalize_extracted_dict(raw_dict, profile)
-    
-    # Merge sanitized updates into current profile
+
     profile_dict = profile.model_dump()
     profile_dict.update(normalized)
 
-    # Deterministic fallback: if target_field was missing and LLM failed to extract it,
-    # populate target_field with the user's answer to avoid infinite question loops.
-    if target_field and target_field in InfluencerProfile.model_fields:
+    if target_field and target_field in _PROFILE_QUESTION_FIELDS:
         curr_val = profile_dict.get(target_field)
         if curr_val in (None, [], ""):
             if target_field in LIST_FIELDS:
                 profile_dict[target_field] = [last_answer.strip()]
             elif target_field in BOOL_FIELDS:
                 ans_lower = last_answer.strip().lower()
-                profile_dict[target_field] = any(k in ans_lower for k in ("oui", "yes", "vrai", "régulièrement", "parfois", "chaque"))
+                profile_dict[target_field] = any(
+                    k in ans_lower for k in ("oui", "yes", "vrai", "régulièrement", "parfois", "chaque")
+                )
             elif target_field == "revenue_variability":
                 ans_lower = last_answer.strip().lower()
                 profile_dict[target_field] = "stable" if "stable" in ans_lower else "spiky"
@@ -160,7 +170,7 @@ async def extract_fields_from_answer(
                 profile_dict[target_field] = last_answer.strip()
 
     try:
-        return InfluencerProfile.model_validate(profile_dict)
+        return UserProfile.model_validate(profile_dict)
     except Exception as e:
         logger.error("Validation error when constructing profile: %s. Dict was: %r", e, profile_dict)
         return profile

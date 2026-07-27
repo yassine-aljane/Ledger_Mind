@@ -7,7 +7,7 @@ from app.schemas.verification import Mismatch, VerificationResult
 
 
 async def run_verification_agent(siret: str, company_name: str | None = None) -> VerificationResult:
-    """Vérifie un SIRET en croisant SIRENE et RNE sans passer par le LLM."""
+    """Verification Service — vérifie un SIRET en croisant SIRENE et RNE sans passer par le LLM."""
     siret_clean = siret.replace(" ", "")
     siren = siret_clean[:9]
 

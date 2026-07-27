@@ -1,7 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
-import { ocrExtractSiret, verifySiret, type SiretVerification } from "@/lib/api-mock";
+import {
+  ocrExtractSiret,
+  startOrchestrator,
+  orchestratorTurn,
+  getStoredSessionId,
+  type OrchestratorTurnResponse,
+  type UserProfile,
+} from "@/lib/api-mock";
 
 export const Route = createFileRoute("/onboarding/verification")({
   head: () => ({
@@ -23,7 +30,7 @@ function VerificationPage() {
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
-  const [result, setResult] = useState<SiretVerification | null>(null);
+  const [orchestratorResult, setOrchestratorResult] = useState<OrchestratorTurnResponse | null>(null);
   const navigate = useNavigate();
 
   const digits = siret.replace(/\D/g, "");
@@ -31,14 +38,36 @@ function VerificationPage() {
   const isValid = digitCount === 14;
   const showError = touched && !isValid;
 
+  const profile: UserProfile | null = orchestratorResult?.profile ?? null;
+
   const runVerify = async (value: string) => {
     setLoading(true);
     try {
-      const r = await verifySiret(value);
-      setResult(r);
+      const r = await startOrchestrator(value);
+      setOrchestratorResult(r);
     } catch (error) {
       console.error(error);
-      setResult(null);
+      setOrchestratorResult(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    const sessionId = getStoredSessionId() ?? orchestratorResult?.session_id;
+    if (!sessionId) return;
+    setLoading(true);
+    try {
+      const turn = await orchestratorTurn(sessionId, undefined);
+      navigate({
+        to: "/onboarding/profil",
+        state: {
+          initialQuestion: turn.message ?? undefined,
+          initialQuickReplies: turn.quick_replies,
+        } as Record<string, unknown>,
+      });
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -49,7 +78,6 @@ function VerificationPage() {
     setOcrError(null);
     try {
       const extracted = await ocrExtractSiret(file);
-      // Pre-fill the manual input with the extracted SIRET and switch tabs
       setSiret(extracted);
       setTouched(true);
       setTab("manual");
@@ -83,7 +111,7 @@ function VerificationPage() {
         </p>
       </div>
 
-      {!result && (
+      {!orchestratorResult && (
         <>
           <div className="flex gap-1 p-1 bg-white border border-border rounded-full w-fit mb-8">
             <button
@@ -195,7 +223,6 @@ function VerificationPage() {
                     ? "border-coral/50 hover:border-coral"
                     : "border-border hover:border-teal-dark"
                 }`}
-                style={ocrError ? { "--tw-border-opacity": "1" } as React.CSSProperties : {}}
               >
                 <input
                   type="file"
@@ -213,19 +240,11 @@ function VerificationPage() {
                       <span className="text-2xl text-teal-dark">⟳</span>
                     </div>
                     <p className="font-semibold text-ink">Extraction en cours…</p>
-                    <p className="text-sm text-ink/40 mt-2">Lecture du document, recherche du SIRET…</p>
                   </>
                 ) : ocrError ? (
                   <>
-                    <div
-                      className="mx-auto size-14 rounded-full grid place-items-center mb-6"
-                      style={{ background: "color-mix(in oklab, var(--coral) 12%, transparent)" }}
-                    >
-                      <span className="text-2xl" style={{ color: "var(--coral)" }}>✕</span>
-                    </div>
                     <p className="font-semibold" style={{ color: "var(--coral)" }}>Extraction échouée</p>
                     <p className="text-sm mt-2" style={{ color: "var(--coral)", opacity: 0.8 }}>{ocrError}</p>
-                    <p className="text-xs text-ink/40 mt-4">Cliquez pour réessayer avec un autre fichier.</p>
                   </>
                 ) : (
                   <>
@@ -233,10 +252,7 @@ function VerificationPage() {
                       <span className="text-2xl text-teal-dark">↑</span>
                     </div>
                     <p className="font-semibold text-ink">Déposez votre justificatif</p>
-                    <p className="text-sm text-ink/50 mt-2">
-                      Avis SIRENE, extrait Kbis, justificatif auto-entrepreneur…
-                    </p>
-                    <p className="text-xs text-ink/30 mt-3">PDF ou image · Max 20 Mo</p>
+                    <p className="text-sm text-ink/50 mt-2">PDF ou image · Max 20 Mo</p>
                   </>
                 )}
               </label>
@@ -245,62 +261,65 @@ function VerificationPage() {
         </>
       )}
 
-      {result && (
+      {orchestratorResult && profile && (
         <div className="bg-white border border-border rounded-2xl p-8 animate-slide-up">
           <div className="flex items-center gap-3 mb-6">
             <div className="size-8 rounded-full bg-teal-light grid place-items-center text-background text-sm">
-              {result.status === "verified" ? "✓" : "!"}
+              {profile.verification_status === "verified" ? "✓" : "!"}
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-teal-dark font-semibold">
-                {result.status === "verified" ? "SIRET vérifié" : "SIRET non vérifié"}
+                {profile.verification_status === "verified" ? "SIRET vérifié" : "SIRET non vérifié"}
               </p>
-              <p className="font-mono text-sm text-ink/60">{result.siret}</p>
+              <p className="font-mono text-sm text-ink/60">{profile.siret}</p>
             </div>
           </div>
 
           <dl className="grid grid-cols-2 gap-6 mb-8">
             <div>
               <dt className="text-xs uppercase tracking-widest text-ink/40">Dénomination</dt>
-              <dd className="mt-1 font-semibold">{result.denomination ?? "—"}</dd>
+              <dd className="mt-1 font-semibold">{profile.denomination ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-widest text-ink/40">Forme juridique</dt>
-              <dd className="mt-1 font-semibold">{result.legal_form ?? "—"}</dd>
+              <dd className="mt-1 font-semibold">{profile.legal_form ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-widest text-ink/40">Code APE</dt>
-              <dd className="mt-1 font-semibold">{result.ape_code ?? "—"}</dd>
+              <dd className="mt-1 font-semibold">{profile.ape_code ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-widest text-ink/40">Statut administratif</dt>
-              <dd className="mt-1 font-semibold">{result.administrative_status ?? "—"}</dd>
+              <dd className="mt-1 font-semibold">{profile.administrative_status ?? "—"}</dd>
             </div>
             <div className="col-span-2">
               <dt className="text-xs uppercase tracking-widest text-ink/40">Activité déclarée</dt>
-              <dd className="mt-1 font-semibold">{result.activity_declared ?? "—"}</dd>
+              <dd className="mt-1 font-semibold">{profile.activity_declared ?? "—"}</dd>
             </div>
             <div className="col-span-2">
               <dt className="text-xs uppercase tracking-widest text-ink/40">Explication</dt>
-              <dd className="mt-1 text-sm text-ink/70">{result.explanation}</dd>
+              <dd className="mt-1 text-sm text-ink/70">{orchestratorResult.message}</dd>
             </div>
           </dl>
 
-          {result.status === "verified" ? (
+          {profile.verification_status === "verified" ? (
             <button
-              onClick={() => navigate({ to: "/onboarding/profil" })}
-              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
+              onClick={handleContinue}
+              disabled={loading}
+              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
             >
-              Continuer vers mon profil
+              {loading ? "Chargement…" : "Continuer vers mon profil"}
             </button>
           ) : (
             <div className="space-y-4">
               <div className="rounded-2xl bg-amber-50 border border-amber-200 p-6 text-ink">
                 <p className="font-semibold">Ce SIRET n'a pas été vérifié.</p>
-                <p className="mt-2 text-sm text-ink/70">{result.next_action ?? "Veuillez vérifier votre numéro ou contacter l'administration."}</p>
+                <p className="mt-2 text-sm text-ink/70">
+                  Vérifiez votre numéro ou contactez l'administration.
+                </p>
               </div>
               <button
-                onClick={() => setResult(null)}
+                onClick={() => setOrchestratorResult(null)}
                 className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
               >
                 Réessayer

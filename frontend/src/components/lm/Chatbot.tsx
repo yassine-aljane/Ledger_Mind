@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
   nextOnboardingTurn,
+  orchestratorTurn,
   emptyInfluencerProfile,
   type InfluencerProfile,
   type OnboardingTurnResult,
+  type UserProfile,
 } from "@/lib/api-mock";
 
 export type ChatTurn = {
@@ -29,15 +31,26 @@ export function Chatbot({
   fetchNext,
   eyebrow = "Diagnostic",
   intro,
+  orchestratorSessionId,
+  onOrchestratorFinish,
+  initialQuestion,
+  initialQuickReplies,
 }: {
-  onFinish: (profile: InfluencerProfile, transcript: ChatTurn[]) => void;
+  onFinish?: (profile: InfluencerProfile | UserProfile, transcript: ChatTurn[]) => void;
   fetchNext?: (step: number) => Promise<ChatQuestion | null>;
   eyebrow?: string;
   intro?: string;
+  orchestratorSessionId?: string;
+  onOrchestratorFinish?: (profile: UserProfile, transcript: ChatTurn[]) => void;
+  initialQuestion?: string;
+  initialQuickReplies?: string[];
 }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const profileRef = useRef<InfluencerProfile>(emptyInfluencerProfile);
   const [currentTurn, setCurrentTurn] = useState<OnboardingTurnResult | null>(null);
+  const [orchestratorMessage, setOrchestratorMessage] = useState<string | null>(null);
+  const [orchestratorQuickReplies, setOrchestratorQuickReplies] = useState<string[]>([]);
+  const [orchestratorCompleteness, setOrchestratorCompleteness] = useState(0);
   const [currentScriptQuestion, setCurrentScriptQuestion] = useState<ChatQuestion | null>(null);
   const [step, setStep] = useState(0);
   const [thinking, setThinking] = useState(true);
@@ -50,6 +63,8 @@ export function Chatbot({
     answer: null,
   });
 
+  const isOrchestrator = Boolean(orchestratorSessionId);
+
   useEffect(() => {
     if (fetchNext) {
       let cancelled = false;
@@ -58,7 +73,7 @@ export function Chatbot({
         if (cancelled) return;
         if (!q) {
           setThinking(false);
-          onFinish(profileRef.current, turns);
+          onFinish?.(profileRef.current, turns);
           return;
         }
         setCurrentScriptQuestion(q);
@@ -71,17 +86,102 @@ export function Chatbot({
       return () => {
         cancelled = true;
       };
-    } else {
+    }
+
+    if (isOrchestrator) {
       if (startedRef.current) return;
       startedRef.current = true;
-      runAgentTurn(null, null);
+      if (initialQuestion) {
+        setOrchestratorMessage(initialQuestion);
+        setOrchestratorQuickReplies(initialQuickReplies ?? []);
+        setTurns([{ id: "a-0", role: "assistant", text: initialQuestion, time: nowTime() }]);
+        setThinking(false);
+      } else {
+        runOrchestratorTurn(null, null);
+      }
+      return;
     }
+
+    if (startedRef.current) return;
+    startedRef.current = true;
+    runAgentTurn(null, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns, thinking, error]);
+
+  async function runOrchestratorTurn(lastQuestion: string | null, lastAnswer: string | null) {
+    if (!orchestratorSessionId) return;
+    setError(null);
+    setThinking(true);
+    lastCallRef.current = { question: lastQuestion, answer: lastAnswer };
+
+    try {
+      const result = await orchestratorTurn(
+        orchestratorSessionId,
+        lastAnswer ?? undefined,
+      );
+      setThinking(false);
+
+      if (result.ui_action === "done" || result.ui_action === "show_compliance" || result.ui_action === "show_tax_result") {
+        setOrchestratorMessage(null);
+        setOrchestratorQuickReplies([]);
+        onOrchestratorFinish?.(result.profile, turns);
+        return;
+      }
+
+      if (result.ui_action === "ask_question" && result.message) {
+        setOrchestratorMessage(result.message);
+        setOrchestratorQuickReplies(result.quick_replies);
+        const filled = [
+          result.profile.activity_types.length > 0,
+          result.profile.revenue_sources.length > 0,
+          result.profile.international_clients !== null,
+          result.profile.currencies.length > 0,
+          result.profile.estimated_monthly_revenue !== null,
+          result.profile.revenue_variability !== null,
+          result.profile.invoices_already_issued !== null,
+          result.profile.has_recurring_contracts !== null,
+          result.profile.in_kind_gifts !== null,
+          result.profile.first_income_date !== null,
+        ].filter(Boolean).length;
+        setOrchestratorCompleteness(filled / 10);
+
+        if (!lastAnswer) {
+          setTurns((prev) => {
+            const alreadyShown = prev.some((t) => t.text === result.message);
+            if (alreadyShown) return prev;
+            return [
+              ...prev,
+              {
+                id: `a-${prev.length}`,
+                role: "assistant",
+                text: result.message!,
+                time: nowTime(),
+              },
+            ];
+          });
+        } else {
+          setTurns((prev) => [
+            ...prev,
+            {
+              id: `a-${prev.length}`,
+              role: "assistant",
+              text: result.message!,
+              time: nowTime(),
+            },
+          ]);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur réseau — veuillez réessayer.";
+      console.error("Orchestrator turn failed:", err);
+      setThinking(false);
+      setError(msg);
+    }
+  }
 
   async function runAgentTurn(lastQuestion: string | null, lastAnswer: string | null) {
     setError(null);
@@ -95,7 +195,7 @@ export function Chatbot({
 
       if (result.is_done) {
         setCurrentTurn(null);
-        onFinish(result.profile, turns);
+        onFinish?.(result.profile, turns);
         return;
       }
 
@@ -110,8 +210,7 @@ export function Chatbot({
         },
       ]);
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Erreur réseau — veuillez réessayer.";
+      const msg = err instanceof Error ? err.message : "Erreur réseau — veuillez réessayer.";
       console.error("Onboarding turn failed:", err);
       setThinking(false);
       setError(msg);
@@ -130,6 +229,16 @@ export function Chatbot({
       setInput("");
       setCurrentScriptQuestion(null);
       setStep((s) => s + 1);
+    } else if (isOrchestrator) {
+      const question = orchestratorMessage;
+      if (!question) return;
+      setTurns((prev) => [
+        ...prev,
+        { id: `u-${prev.length}`, role: "user", text: answer, time: nowTime() },
+      ]);
+      setInput("");
+      setOrchestratorMessage(null);
+      runOrchestratorTurn(question, answer);
     } else {
       if (!currentTurn?.next_question) return;
       const question = currentTurn.next_question;
@@ -144,17 +253,34 @@ export function Chatbot({
   };
 
   const handleRetry = () => {
-    if (!fetchNext) {
+    if (isOrchestrator) {
+      const { question, answer } = lastCallRef.current;
+      runOrchestratorTurn(question, answer);
+    } else if (!fetchNext) {
       const { question, answer } = lastCallRef.current;
       runAgentTurn(question, answer);
     }
   };
 
-  const activeQuestionText = fetchNext ? currentScriptQuestion?.question : currentTurn?.next_question;
-  const quickReplies = fetchNext ? (currentScriptQuestion?.quickReplies ?? []) : (currentTurn?.quick_replies ?? []);
+  const activeQuestionText = fetchNext
+    ? currentScriptQuestion?.question
+    : isOrchestrator
+    ? orchestratorMessage
+    : currentTurn?.next_question;
+  const quickReplies = fetchNext
+    ? (currentScriptQuestion?.quickReplies ?? [])
+    : isOrchestrator
+    ? orchestratorQuickReplies
+    : (currentTurn?.quick_replies ?? []);
   const progress = fetchNext
     ? (currentScriptQuestion ? currentScriptQuestion.step / currentScriptQuestion.total : 1)
-    : (currentTurn ? currentTurn.completeness : thinking ? 0 : 1);
+    : isOrchestrator
+    ? orchestratorCompleteness
+    : currentTurn
+    ? currentTurn.completeness
+    : thinking
+    ? 0
+    : 1;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-fade-in">
