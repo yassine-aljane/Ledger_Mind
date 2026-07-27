@@ -1,17 +1,14 @@
 """
-Deterministic question ordering + LLM-generated phrasing.
+Deterministic question ordering + LLM-generated phrasing (Gemini).
 
-The ORDER in which fields are asked is fixed and rule-based (tax-relevant
-priority), so behavior is consistent and testable. The LLM is only used to
-phrase the question naturally and propose quick-reply options — never to
-decide what to ask or in what order.
+The ORDER in which fields are asked is fixed and rule-based.
+The LLM only phrases the question and quick replies.
 """
 
 import json
 import logging
-from openai import AsyncOpenAI
 
-from app.config import settings
+from app.agents.intake.llm import chat_json
 from app.schemas.orchestrator import UserProfile
 
 logger = logging.getLogger(__name__)
@@ -45,43 +42,43 @@ _FIELD_DESCRIPTIONS = {
 _FALLBACK_QUESTIONS = {
     "activity_types": (
         "Quel est votre type d'activité principale (sponsoring, affiliation, vente de produits/UGC...) ?",
-        ["Sponsoring / Partenariats", "Affiliation", "Vente de produits/services", "Prestations UGC"]
+        ["Sponsoring / Partenariats", "Affiliation", "Vente de produits/services", "Prestations UGC"],
     ),
     "revenue_sources": (
         "Quelles sont vos principales sources de revenus ou plateformes ?",
-        ["YouTube", "Instagram / TikTok", "Boutique / Site web", "Facturation directe"]
+        ["YouTube", "Instagram / TikTok", "Boutique / Site web", "Facturation directe"],
     ),
     "international_clients": (
         "Facturez-vous des clients ou plateformes basés à l'étranger ?",
-        ["Oui (hors France)", "Non (France uniquement)"]
+        ["Oui (hors France)", "Non (France uniquement)"],
     ),
     "currencies": (
         "Dans quelles devises recevez-vous vos paiements ?",
-        ["EUR uniquement", "EUR + USD", "Plusieurs devises"]
+        ["EUR uniquement", "EUR + USD", "Plusieurs devises"],
     ),
     "estimated_monthly_revenue": (
         "Quelle est votre estimation de revenus mensuels moyens ?",
-        ["Moins de 1 000 €", "1 000 € – 3 000 €", "3 000 € – 7 000 €", "Plus de 7 000 €"]
+        ["Moins de 1 000 €", "1 000 € – 3 000 €", "3 000 € – 7 000 €", "Plus de 7 000 €"],
     ),
     "revenue_variability": (
         "Vos revenus sont-ils plutôt stables ou irréguliers (pics de saisonnalité) ?",
-        ["Stables chaque mois", "Irréguliers (pics ponctuels)"]
+        ["Stables chaque mois", "Irréguliers (pics ponctuels)"],
     ),
     "invoices_already_issued": (
         "Émettez-vous déjà des factures pour votre activité ?",
-        ["Oui, régulièrement", "Parfois", "Non, jamais"]
+        ["Oui, régulièrement", "Parfois", "Non, jamais"],
     ),
     "has_recurring_contracts": (
         "Avez-vous des contrats récurrents (ex: abonnements/retainers avec des marques) ?",
-        ["Oui, des contrats récurrents", "Non, prestations ponctuelles"]
+        ["Oui, des contrats récurrents", "Non, prestations ponctuelles"],
     ),
     "in_kind_gifts": (
         "Recevez-vous des cadeaux ou dotations en nature de la part des marques ?",
-        ["Oui, régulièrement", "Rarement", "Non"]
+        ["Oui, régulièrement", "Rarement", "Non"],
     ),
     "first_income_date": (
         "Depuis quand percevez-vous des revenus de cette activité ?",
-        ["Moins de 6 mois", "6 à 12 mois", "Plus de 2 ans"]
+        ["Moins de 6 mois", "6 à 12 mois", "Plus de 2 ans"],
     ),
 }
 
@@ -92,17 +89,12 @@ pour connaître : {field_description}.
 Profil actuel de l'utilisateur (déjà connu, ne redemande pas ça) :
 {current_profile}
 
-Réponds UNIQUEMENT avec un JSON de cette forme, sans texte autour :
+Réponds UNIQUEMENT avec un objet JSON brut (commence par {{, pas de markdown) :
 {{"question": "...", "quick_replies": ["...", "...", "..."]}}
 
 Les quick_replies doivent être 3 à 5 réponses courtes et plausibles, adaptées
-au profil déjà connu (par exemple, si l'utilisateur a déjà dit qu'il fait du
-sponsoring Instagram, adapte les options en conséquence)."""
-
-_client = AsyncOpenAI(
-    api_key=settings.mistral_api_key,
-    base_url="https://api.mistral.ai/v1",
-)
+au profil déjà connu.
+"""
 
 
 def next_missing_field(profile: UserProfile) -> str | None:
@@ -121,14 +113,25 @@ async def generate_question_for_field(
     profile: UserProfile,
     field: str,
     verification_context: dict | None = None,
+    *,
+    preface: str | None = None,
 ) -> tuple[str, list[str]]:
+    """LLM phrases the question dynamically; falls back on error."""
     fallback_q, fallback_qr = _FALLBACK_QUESTIONS.get(
         field, (f"Peux-tu me dire {_FIELD_DESCRIPTIONS.get(field, field)} ?", [])
     )
 
-    context_block = profile.model_dump_json()
+    known = {
+        k: getattr(profile, k)
+        for k in FIELD_PRIORITY
+        if getattr(profile, k) not in (None, [])
+    }
+    context_block = json.dumps(known, ensure_ascii=False)
     if verification_context:
-        context_block += f"\n\nContexte registre (SIRENE/RNE) :\n{json.dumps(verification_context, ensure_ascii=False)}"
+        context_block += (
+            f"\n\nContexte registre (SIRENE/RNE) :\n"
+            f"{json.dumps(verification_context, ensure_ascii=False)}"
+        )
 
     prompt = _QUESTION_INSTRUCTION.format(
         field_description=_FIELD_DESCRIPTIONS.get(field, field),
@@ -136,21 +139,28 @@ async def generate_question_for_field(
     )
 
     try:
-        response = await _client.chat.completions.create(
-            model=settings.mistral_model.removeprefix("mistral/"),
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            response_format={"type": "json_object"},
-        )
-        raw = response.choices[0].message.content or ""
-        data = json.loads(_strip_json_fences(raw))
-        question = data.get("question") or fallback_q
-        quick_replies = data.get("quick_replies") or fallback_qr
-        return question, quick_replies
+        data = await chat_json(prompt, temperature=0.4, max_tokens=1024)
+        question = data.get("question")
+        quick_replies = data.get("quick_replies")
+
+        if not question or not quick_replies:
+            logger.warning(
+                "FALLBACK_QUESTION field=%s reason=empty_llm_payload data=%r",
+                field,
+                data,
+            )
+
+        question = question or fallback_q
+        quick_replies = quick_replies or fallback_qr
     except Exception as e:
-        logger.warning("LLM call for question generation failed (%s). Using fallback for field '%s'.", e, field)
-        return fallback_q, fallback_qr
+        logger.warning(
+            "FALLBACK_QUESTION field=%s reason=llm_error error=%s: %s",
+            field,
+            type(e).__name__,
+            e,
+        )
+        question, quick_replies = fallback_q, fallback_qr
 
-
-def _strip_json_fences(text: str) -> str:
-    return text.replace("```json", "").replace("```", "").strip()
+    if preface:
+        question = f"{preface.strip()}\n\n{question}"
+    return question, quick_replies

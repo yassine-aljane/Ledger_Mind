@@ -1,7 +1,7 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.schemas.verification import OcrResult, VerificationRequest, VerificationResult
-from app.agents.verification.runner import run_verification_agent
+from app.agents.intake.tools.verification import run_verification_agent
 from app.services.ocr_siret import SiretNotFoundError, extract_siret_from_bytes
 
 router = APIRouter(prefix="/api/verification", tags=["verification"])
@@ -34,4 +34,4 @@ async def ocr_extract_siret(file: UploadFile = File(...)):
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de l'extraction : {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'extraction : {e}")

@@ -31,6 +31,7 @@ function VerificationPage() {
   const [loading, setLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [orchestratorResult, setOrchestratorResult] = useState<OrchestratorTurnResponse | null>(null);
+  const [prefetchedTurn, setPrefetchedTurn] = useState<OrchestratorTurnResponse | null>(null);
   const navigate = useNavigate();
 
   const digits = siret.replace(/\D/g, "");
@@ -42,9 +43,16 @@ function VerificationPage() {
 
   const runVerify = async (value: string) => {
     setLoading(true);
+    setPrefetchedTurn(null);
     try {
       const r = await startOrchestrator(value);
       setOrchestratorResult(r);
+      // Prefetch first profile question while the user reads the verification card
+      if (r.profile.verification_status === "verified") {
+        orchestratorTurn(r.session_id, undefined)
+          .then(setPrefetchedTurn)
+          .catch((err) => console.error("Prefetch first question failed:", err));
+      }
     } catch (error) {
       console.error(error);
       setOrchestratorResult(null);
@@ -56,6 +64,18 @@ function VerificationPage() {
   const handleContinue = async () => {
     const sessionId = getStoredSessionId() ?? orchestratorResult?.session_id;
     if (!sessionId) return;
+
+    if (prefetchedTurn?.ui_action === "ask_question") {
+      navigate({
+        to: "/onboarding/profil",
+        state: {
+          initialQuestion: prefetchedTurn.message ?? undefined,
+          initialQuickReplies: prefetchedTurn.quick_replies,
+        } as Record<string, unknown>,
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const turn = await orchestratorTurn(sessionId, undefined);

@@ -24,8 +24,19 @@ export const Route = createFileRoute("/onboarding/profil")({
   component: ProfilPage,
 });
 
-function isProfileComplete(profile: UserProfile): boolean {
-  return profile.tax_category !== null;
+function isIntakeComplete(profile: UserProfile): boolean {
+  const questionsDone =
+    profile.activity_types.length > 0 &&
+    profile.revenue_sources.length > 0 &&
+    profile.international_clients !== null &&
+    profile.currencies.length > 0 &&
+    profile.estimated_monthly_revenue !== null &&
+    profile.revenue_variability !== null &&
+    profile.invoices_already_issued !== null &&
+    profile.has_recurring_contracts !== null &&
+    profile.in_kind_gifts !== null &&
+    profile.first_income_date !== null;
+  return questionsDone || profile.tax_category !== null;
 }
 
 function ProfilPage() {
@@ -61,14 +72,14 @@ function ProfilPage() {
     (async () => {
       try {
         const p = await fetchUserProfile(id);
-        if (isProfileComplete(p)) {
+        if (isIntakeComplete(p)) {
           setProfile(p);
         } else {
           const turn = await orchestratorTurn(id, undefined);
           if (turn.ui_action === "ask_question" && turn.message) {
             setInitialQuestion(turn.message);
             setInitialQuickReplies(turn.quick_replies);
-          } else if (turn.ui_action === "show_compliance" || turn.ui_action === "done") {
+          } else if (turn.ui_action === "done") {
             setProfile(turn.profile);
           }
         }

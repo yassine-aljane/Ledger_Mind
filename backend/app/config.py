@@ -3,7 +3,12 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    mistral_api_key: str
+    # Intake agent LLM (Google AI Studio / Gemini)
+    gemini_api_key: str
+    gemini_model: str = "gemini-2.5-flash"
+
+    # Legacy — ignored by intake; kept so old .env files still load
+    mistral_api_key: str | None = None
     mistral_model: str = "mistral/mistral-large-latest"
 
     frontend_origin: str = "http://localhost:3000"
@@ -11,9 +16,11 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
-        extra = "ignore"  # ignore unused env vars (INSEE, INPI keys)
+        extra = "ignore"
 
 
 settings = Settings()
 
-os.environ.setdefault("MISTRAL_API_KEY", settings.mistral_api_key)
+os.environ.setdefault("GEMINI_API_KEY", settings.gemini_api_key)
+if settings.mistral_api_key:
+    os.environ.setdefault("MISTRAL_API_KEY", settings.mistral_api_key)

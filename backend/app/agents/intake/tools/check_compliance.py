@@ -1,6 +1,6 @@
-"""Deterministic compliance comparison — no LLM, no network."""
+"""Tool: compliance comparison. No LLM, no network."""
 
-from app.agents.tax_classifier import ape_prefix_category, classify_activity_types
+from app.agents.intake.tools.classify_tax import ape_prefix_category, classify_activity_types
 from app.schemas.orchestrator import (
     ComplianceAlert,
     Mismatch,
@@ -23,12 +23,6 @@ def _activity_types_implied_category(activity_types: list[str]) -> str | None:
 def check_compliance(
     profile: UserProfile,
 ) -> tuple[bool, list[Mismatch], list[ComplianceAlert], list[RecommendedAction]]:
-    """
-    Three-way comparison, deterministic only:
-      1. profile.activity_types (what the user says they do)
-      2. profile.ape_code / activity_declared (registry)
-      3. Required obligations derived from profile.tax_category + profile.legal_form
-    """
     mismatches: list[Mismatch] = []
     alerts: list[ComplianceAlert] = []
     actions: list[RecommendedAction] = []
@@ -38,20 +32,19 @@ def check_compliance(
     registry_cat = ape_prefix_category(profile.ape_code)
 
     activity_mismatch = False
-    if declared_cat and registry_cat and declared_cat != registry_cat:
-        if not (declared_cat == "mixed"):
-            activity_mismatch = True
-            mismatches.append(
-                Mismatch(
-                    field="activite_principale",
-                    declared_value=declared_cat,
-                    actual_value=registry_cat,
-                    note=(
-                        f"Votre activité déclarée ({declared_cat}) ne correspond pas "
-                        f"au code APE {profile.ape_code} ({registry_cat})."
-                    ),
-                )
+    if declared_cat and registry_cat and declared_cat != registry_cat and declared_cat != "mixed":
+        activity_mismatch = True
+        mismatches.append(
+            Mismatch(
+                field="activite_principale",
+                declared_value=declared_cat,
+                actual_value=registry_cat,
+                note=(
+                    f"Votre activité déclarée ({declared_cat}) ne correspond pas "
+                    f"au code APE {profile.ape_code} ({registry_cat})."
+                ),
             )
+        )
 
     if profile.international_clients and not profile.currencies:
         alerts.append(
