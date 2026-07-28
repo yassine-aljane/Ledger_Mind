@@ -1,8 +1,9 @@
 """
-Orchestrator — thin deterministic step runner.
+Orchestrator — deterministic step runner.
 
-Owns session persistence and pipeline order. Delegates to the Intake agent
-(verification → profile Q&A → tax classify → compliance — all inside intake).
+Verification: identity (step 1) → registry doc OCR for EI (step 2) → SIRENE avis (step 3)
+Profiling: activity + mixed activity + revenue (steps 4–5)
+Finalize: classification + inconsistency (step 6)
 """
 
 from __future__ import annotations
@@ -18,9 +19,7 @@ from app.schemas.orchestrator import (
 
 logger = logging.getLogger(__name__)
 
-PIPELINE: list[str] = [
-    "intake",  # agents.intake (verify + questions + tax + compliance tools)
-]
+PIPELINE: list[str] = ["intake"]
 
 
 def _response(
@@ -39,12 +38,20 @@ def _response(
 
 
 async def _finish_intake(state: OrchestratorState) -> OrchestratorTurnResponse:
-    """Persist completed intake profile (tax + compliance already applied by agent)."""
     state.phase = "done"
     state.last_question = None
     state.quick_replies = []
     state.profile_completeness = 1.0
     await async_save_session(state.session_id, state)
+
+    if state.profile.fiscal_classification_status == "requires_expert":
+        return _response(
+            state,
+            "requires_expert",
+            state.profile.fiscal_inconsistency_reason
+            or "Incohérence détectée — contactez le SIE ou demandez un rescrit fiscal.",
+        )
+
     return _response(
         state,
         "done",
@@ -67,6 +74,24 @@ async def _intake_ask(state: OrchestratorState) -> OrchestratorTurnResponse:
     return _response(state, "ask_question", result.question)
 
 
+async def _advance_verification(state: OrchestratorState) -> OrchestratorTurnResponse:
+    profile = state.profile
+
+    if profile.registry_document_required and not profile.registry_document_uploaded:
+        state.phase = "verification_registry_document"
+        state.quick_replies = []
+        await async_save_session(state.session_id, state)
+        return _response(state, "upload_registry_document", intake.REGISTRY_DOC_MESSAGE)
+
+    if not profile.sirene_document_uploaded:
+        state.phase = "verification_document"
+        state.quick_replies = []
+        await async_save_session(state.session_id, state)
+        return _response(state, "upload_sirene_document", intake.SIRENE_UPLOAD_MESSAGE)
+
+    return await _intake_ask(state)
+
+
 async def start_orchestrator(
     siret: str | None,
     company_name: str | None = None,
@@ -76,10 +101,11 @@ async def start_orchestrator(
     if state is None:
         raise RuntimeError("Failed to create session")
 
-    if siret is None:
-        state.skip_verification = True
-        state.profile = intake.skip_verification(state.profile)
-        return await _intake_ask(state)
+    if not siret or not siret.strip():
+        raise ValueError(
+            "Un numéro SIRET ou SIREN est requis pour créer un profil. "
+            "Utilisez l'agent de régularisation si vous n'êtes pas encore immatriculé."
+        )
 
     result = await intake.run_verification(siret, company_name)
     state.profile = intake.apply_verification_to_profile(state.profile, result)
@@ -99,7 +125,17 @@ async def orchestrator_turn(
         raise ValueError(f"Session not found: {session_id}")
 
     if state.phase == "verification":
-        return await _intake_ask(state)
+        return await _advance_verification(state)
+
+    if state.phase == "verification_registry_document":
+        if state.profile.registry_document_uploaded:
+            return await _advance_verification(state)
+        return _response(state, "upload_registry_document", intake.REGISTRY_DOC_MESSAGE)
+
+    if state.phase == "verification_document":
+        if state.profile.sirene_document_uploaded:
+            return await _intake_ask(state)
+        return _response(state, "upload_sirene_document", intake.SIRENE_UPLOAD_MESSAGE)
 
     if state.phase == "profile_questions":
         result = await intake.handle_profile_answer(

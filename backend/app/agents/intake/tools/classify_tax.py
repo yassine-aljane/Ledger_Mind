@@ -1,105 +1,119 @@
 """
-Tool: classify tax category from profile fields. No LLM, no network.
+Tool: classify tax category — Kbis/RCS test (step 2) + mixed activity (step 4).
 
-APE prefix mapping follows INSEE NAF Rev. 2. Maintenance:
-https://www.insee.fr/fr/information/2406147
+NAF/APE is NOT used. Never auto-classify when fiscal_classification_status = requires_expert.
 """
+
+from __future__ import annotations
 
 from app.schemas.orchestrator import UserProfile
 
-_SERVICE_KEYWORDS: dict[str, list[str]] = {
-    "sponsoring": ["sponsor", "partenariat", "partnership"],
-    "affiliation": ["affiliation", "affiliate"],
-    "prestations": ["prestation", "service", "consulting", "conseil"],
-    "ugc": ["ugc", "contenu", "content creation", "création de contenu"],
-    "consulting": ["consulting", "conseil", "coaching"],
-    "ads": ["pub", "ads", "publicité", "advertising"],
-    "courses": ["formation", "course", "cours", "e-learning"],
-}
+_COMMERCE_KEYWORDS = (
+    "vente", "produit", "boutique", "e-commerce", "ecommerce", "dropship",
+    "preset", "préréglage", "physique", "marchandise", "shop",
+)
+_SERVICE_KEYWORDS = (
+    "sponsor", "partenariat", "affiliation", "ugc", "contenu", "prestation",
+    "conseil", "formation", "consulting", "coaching", "service",
+)
 
-_COMMERCE_KEYWORDS: dict[str, list[str]] = {
-    "product sales": ["vente", "product", "produit", "e-commerce", "ecommerce", "boutique"],
-    "dropshipping": ["dropship"],
-    "physical goods": ["physique", "marchandise", "goods", "stock"],
-}
-
-_APE_PREFIX_CATEGORY: dict[str, str] = {
-    "01": "BIC", "02": "BIC", "03": "BIC",
-    "45": "BIC", "46": "BIC", "47": "BIC",
-    "56": "BIC",
-    "62": "BNC", "63": "BNC", "69": "BNC", "70": "BNC", "71": "BNC",
-    "72": "BNC", "73": "BNC", "74": "BNC", "77": "BNC", "78": "BNC",
-    "82": "BNC", "85": "BNC", "86": "BNC", "90": "BNC", "91": "BNC",
-    "92": "BNC", "93": "BNC", "95": "BNC", "96": "BNC",
-}
+_MICRO_BNC_PLAFOND = "77 700 €/an"
+_MICRO_BIC_VENTE_PLAFOND = "188 700 €/an"
+_MICRO_BIC_SERVICE_PLAFOND = "77 700 €/an (services) + 188 700 €/an (vente)"
+_MIXED_GLOBAL_PLAFOND = "203 100 €/an (dont services ≤ 83 600 €)"
 
 
-def ape_prefix_category(ape_code: str | None) -> str | None:
-    if not ape_code:
-        return None
-    normalized = ape_code.strip().upper().replace(".", "").replace(" ", "")
-    if len(normalized) < 2:
-        return None
-    return _APE_PREFIX_CATEGORY.get(normalized[:2])
-
-
-def classify_activity_types(activity_types: list[str]) -> set[str]:
+def _activity_kinds(types: list[str]) -> set[str]:
+    combined = " ".join(t.strip().lower() for t in types)
     kinds: set[str] = set()
-    combined = " ".join(a.strip().lower() for a in activity_types)
-
-    for keywords in _SERVICE_KEYWORDS.values():
-        if any(kw in combined for kw in keywords):
-            kinds.add("service")
-
-    for keywords in _COMMERCE_KEYWORDS.values():
-        if any(kw in combined for kw in keywords):
-            kinds.add("commerce")
-
+    if any(kw in combined for kw in _COMMERCE_KEYWORDS):
+        kinds.add("commerce")
+    if any(kw in combined for kw in _SERVICE_KEYWORDS):
+        kinds.add("service")
     return kinds
 
 
-def classify_tax_category(profile: UserProfile) -> tuple[str, str, str, str]:
-    """Returns (category, reason, recommended_regime, plafond)."""
-    activity_kinds = classify_activity_types(profile.activity_types)
-    ape_cat = ape_prefix_category(profile.ape_code)
+def detect_fiscal_inconsistency(profile: UserProfile) -> str | None:
+    """Step 6 — contradiction between Kbis test and user declarations."""
+    if profile.registry_tax_base is None:
+        return None
 
-    if "service" in activity_kinds and "commerce" in activity_kinds:
-        category = "mixed"
-    elif "commerce" in activity_kinds:
-        category = "BIC"
-    elif "service" in activity_kinds:
-        category = "BNC"
-    elif ape_cat == "BIC":
-        category = "BIC"
-    elif ape_cat == "BNC":
-        category = "BNC"
-    else:
-        category = "BNC"
-
-    activities_label = (
-        ", ".join(profile.activity_types) if profile.activity_types else "activité non précisée"
-    )
-
-    if category == "mixed":
-        reason = (
-            f"Vos activités ({activities_label}) combinent prestations de services et ventes "
-            f"de produits, imposées en régime mixte (BNC + BIC)."
+    if profile.rcs_registered is True and profile.main_activity_commercial is False:
+        return (
+            "Inscription RCS confirmée (Kbis) mais activité déclarée non commerciale. "
+            "Contactez votre SIE ou demandez un rescrit fiscal via impots.gouv.fr."
         )
-        recommended_regime = "Micro-BNC + Micro-BIC"
-        plafond = "77 700 €/an (BNC) + 188 700 €/an (BIC vente)"
-    elif category == "BNC":
+
+    if profile.rcs_registered is False and profile.main_activity_commercial is True:
+        return (
+            "Extrait RNE seul (BNC attendu) mais activité déclarée commerciale. "
+            "Contactez votre SIE ou demandez un rescrit fiscal via impots.gouv.fr."
+        )
+
+    return None
+
+
+def _is_mixed_bic(profile: UserProfile) -> bool:
+    if not profile.has_secondary_activity:
+        return False
+    primary_kinds = _activity_kinds(profile.activity_types)
+    secondary_kinds = _activity_kinds(profile.secondary_activity_types)
+    all_kinds = primary_kinds | secondary_kinds
+    return "commerce" in all_kinds and "service" in all_kinds
+
+
+def classify_tax_category(
+    profile: UserProfile,
+) -> tuple[str | None, str, str | None, str | None, str | None]:
+    """Returns (category, reason, regime, plafond, fiscal_status)."""
+    inconsistency = detect_fiscal_inconsistency(profile)
+    if inconsistency:
+        return None, inconsistency, None, None, "requires_expert"
+
+    base = profile.registry_tax_base
+    if base is None:
+        return (
+            None,
+            "Classification en attente — complétez la vérification RCS/RNE (étape 2).",
+            None,
+            None,
+            None,
+        )
+
+    if base == "BNC":
+        category = "BNC"
         reason = (
-            f"Vos activités ({activities_label}) relèvent des prestations de services, "
-            f"imposées en BNC."
+            "Extrait RNE seul détecté — inscription RNE uniquement. Activité non commerciale, "
+            "imposée en BNC (régime des bénéfices non commerciaux)."
         )
         recommended_regime = "Micro-BNC"
-        plafond = "77 700 €/an"
-    else:
+        plafond = _MICRO_BNC_PLAFOND
+    elif _is_mixed_bic(profile):
+        category = "mixed"
         reason = (
-            f"Vos activités ({activities_label}) relèvent de la vente de biens ou du commerce, "
-            f"imposées en BIC."
+            "Activité mixte détectée : vos activités principales et secondaires combinent "
+            "prestations de services (BIC services, 50 % abattement) et ventes de produits "
+            "(BIC vente, 71 % abattement). Vérifiez sur formalites.entreprises.gouv.fr "
+            "que les deux activités sont déclarées séparément."
         )
-        recommended_regime = "Micro-BIC"
-        plafond = "188 700 €/an"
+        recommended_regime = "Micro-BIC (services + vente)"
+        plafond = _MIXED_GLOBAL_PLAFOND
+    else:
+        category = "BIC"
+        kinds = _activity_kinds(profile.activity_types + profile.secondary_activity_types)
+        if "commerce" in kinds and "service" not in kinds:
+            reason = (
+                "Kbis confirmé — activité commerciale inscrite au RCS. "
+                "Ventes de biens / produits, imposées en BIC vente."
+            )
+            recommended_regime = "Micro-BIC (vente)"
+            plafond = _MICRO_BIC_VENTE_PLAFOND
+        else:
+            reason = (
+                "Kbis confirmé — activité commerciale inscrite au RCS. "
+                "Prestations de services (partenariats, influence), imposées en BIC services."
+            )
+            recommended_regime = "Micro-BIC (services)"
+            plafond = _MICRO_BIC_SERVICE_PLAFOND
 
-    return category, reason, recommended_regime, plafond
+    return category, reason, recommended_regime, plafond, "confirmed"

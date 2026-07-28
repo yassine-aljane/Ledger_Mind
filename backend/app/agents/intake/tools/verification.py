@@ -1,18 +1,28 @@
-"""Tool: verify a SIRET against SIRENE + RNE. No LLM."""
+"""Tool: verify SIREN/SIRET — step 1 (identity) + auto RCS for commercial companies."""
 
 import httpx
 
-from app.services.insee_sirene import fetch_sirene
+from app.agents.intake.tools.registry_analysis import analyze_registry
 from app.services.inpi_rne import fetch_rne
 from app.services.recherche import fetch_company_by_siren
 from app.schemas.verification import Mismatch, VerificationResult
 
 
 async def run_verification_service(siret: str, company_name: str | None = None) -> VerificationResult:
-    """Vérifie un SIRET en croisant SIRENE et RNE — deterministic registry lookup."""
-    del company_name  # reserved for future name cross-check
-    siret_clean = siret.replace(" ", "")
-    siren = siret_clean[:9]
+    del company_name
+    identifier = siret.replace(" ", "")
+    if len(identifier) not in (9, 14) or not identifier.isdigit():
+        return VerificationResult(
+            status="not_verified",
+            siret=identifier,
+            explanation=(
+                "Le numéro saisi est invalide. Indiquez un SIREN (9 chiffres) "
+                "ou un SIRET complet (14 chiffres)."
+            ),
+            next_action="Vérifiez votre numéro sur annuaire-entreprises.data.gouv.fr.",
+        )
+
+    siren = identifier[:9]
 
     try:
         company_data = await fetch_company_by_siren(siren)
@@ -21,83 +31,100 @@ async def run_verification_service(siret: str, company_name: str | None = None) 
         company_data = None
         error_msg = str(e)
 
-    if error_msg:
-        sirene = {"found": False, "error": error_msg}
-        rne = {"found": False, "error": error_msg}
-    else:
-        sirene = await fetch_sirene(siret_clean, company_data=company_data)
-        rne = await fetch_rne(siren, company_data=company_data)
-
-    if not sirene.get("found"):
+    if error_msg or not company_data:
         return VerificationResult(
             status="not_verified",
-            siret=siret_clean,
-            explanation="Le SIRET est introuvable dans la base SIRENE (INSEE). "
-                        "Vérifiez que le numéro est correct et complet (14 chiffres).",
-            next_action="Vérifiez le SIRET auprès du greffe ou sur societe.com.",
+            siret=identifier,
+            explanation="Le numéro est introuvable dans la base SIRENE (INSEE).",
+            next_action="Vérifiez le numéro sur annuaire-entreprises.data.gouv.fr.",
         )
 
-    etat = sirene.get("etat_administratif", "")
-    is_active = etat == "A"
+    identity = analyze_registry(company_data)
+    rne = await fetch_rne(siren, company_data=company_data)
+
+    resolved_siret = identifier
+    if len(identifier) == 9:
+        siege_siret = ((company_data.get("siege") or {}).get("siret") or "").replace(" ", "")
+        if len(siege_siret) == 14:
+            resolved_siret = siege_siret
 
     mismatches: list[Mismatch] = []
-
-    if rne.get("found"):
-        sirene_ape = (sirene.get("activite_principale") or "").strip().upper()
-        rne_act = (rne.get("activite_declaree") or "").strip().upper()
-        if sirene_ape and rne_act and sirene_ape != rne_act:
-            mismatches.append(Mismatch(
-                field="activite_principale",
-                sirene_value=sirene_ape,
-                rne_value=rne_act,
-                note="Les codes d'activité diffèrent entre SIRENE et RNE.",
-            ))
-
-        if rne.get("radiee"):
-            is_active = False
-            mismatches.append(Mismatch(
+    if rne.get("found") and rne.get("radiee"):
+        mismatches.append(
+            Mismatch(
                 field="etat_administratif",
-                sirene_value="actif" if etat == "A" else "inactif",
+                sirene_value="actif" if identity.is_active else "inactif",
                 rne_value="radiée",
-                note="L'entité est radiée au RNE (INPI) alors que SIRENE l'indique autrement.",
-            ))
-
-    if not is_active:
-        status = "not_verified"
-        expl_parts = ["L'entité est inactive ou radiée."]
-        if etat == "F":
-            expl_parts.append("SIRENE indique que l'établissement est fermé (état F).")
-        if rne.get("found") and rne.get("radiee"):
-            expl_parts.append("Le RNE confirme que la société est radiée.")
-        explanation = " ".join(expl_parts)
-        next_action = (
-            "Contactez le greffe du tribunal de commerce pour plus d'informations "
-            "sur l'état de cette entreprise."
+                note="L'entité est radiée au RNE (INPI).",
+            )
         )
-    else:
-        status = "verified"
-        name = sirene.get("denomination") or ""
-        explanation = f"L'entité « {name} » est active et validée par SIRENE."
-        if rne.get("found") and not mismatches:
-            explanation += " Les données RNE (INPI) sont cohérentes."
-        elif mismatches:
-            explanation += f" Attention : {len(mismatches)} écart(s) détecté(s) entre SIRENE et RNE."
-        next_action = None
+
+    if not identity.is_active:
+        return VerificationResult(
+            status="not_verified",
+            siret=identifier,
+            denomination=identity.denomination,
+            legal_form=identity.legal_form,
+            nature_juridique_code=identity.nature_juridique_code,
+            is_entrepreneur_individuel=identity.is_entrepreneur_individuel,
+            micro_eligible=identity.micro_eligible,
+            registry_address=identity.registry_address,
+            ape_code=identity.ape_code,
+            activity_declared=identity.activity_declared,
+            creation_date=identity.creation_date,
+            administrative_status="inactif",
+            registry_document_required=False,
+            rcs_registered=identity.rcs_registered,
+            registry_tax_base=identity.registry_tax_base,
+            registry_tax_reason=identity.registry_tax_reason,
+            mismatches=mismatches,
+            explanation="L'entité est inactive ou radiée.",
+            next_action="Contactez le greffe ou régularisez votre situation.",
+        )
+
+    name = identity.denomination or ""
+    explanation_parts = [f"L'entité « {name} » est active et confirmée au registre."]
+
+    if identity.micro_eligible:
+        explanation_parts.append(
+            "Entrepreneur individuel (personne physique) — éligible au régime micro."
+        )
+    elif identity.legal_form:
+        explanation_parts.append(f"Forme juridique : {identity.legal_form}.")
+
+    if identity.ape_code:
+        explanation_parts.append(
+            f"Code NAF {identity.ape_code} (usage statistique uniquement)."
+        )
+
+    if identity.registry_tax_base:
+        explanation_parts.append(identity.registry_tax_reason)
+    elif identity.registry_document_required:
+        explanation_parts.append(
+            "Prochaine étape : déposez votre Kbis ou extrait RNE pour vérification automatique BIC/BNC."
+        )
 
     return VerificationResult(
-        status=status,
-        siret=siret_clean,
-        denomination=sirene.get("denomination"),
-        legal_form=rne.get("forme_juridique") if rne.get("found") else None,
-        ape_code=sirene.get("activite_principale"),
-        activity_declared=rne.get("activite_declaree") if rne.get("found") else None,
-        creation_date=sirene.get("date_creation"),
-        administrative_status="actif" if etat == "A" else "inactif",
+        status="verified",
+        siret=resolved_siret,
+        denomination=identity.denomination,
+        legal_form=identity.legal_form,
+        nature_juridique_code=identity.nature_juridique_code,
+        is_entrepreneur_individuel=identity.is_entrepreneur_individuel,
+        micro_eligible=identity.micro_eligible,
+        registry_address=identity.registry_address,
+        ape_code=identity.ape_code,
+        activity_declared=identity.activity_declared,
+        creation_date=identity.creation_date,
+        administrative_status="actif",
+        registry_document_required=identity.registry_document_required,
+        rcs_registered=identity.rcs_registered,
+        registry_tax_base=identity.registry_tax_base,
+        registry_tax_reason=identity.registry_tax_reason,
         mismatches=mismatches,
-        explanation=explanation,
-        next_action=next_action,
+        explanation=" ".join(explanation_parts),
+        next_action=None,
     )
 
 
-# Backward-compat alias for deprecated /api/verification router
 run_verification_agent = run_verification_service

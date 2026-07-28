@@ -1,6 +1,8 @@
-"""Tool: compliance comparison. No LLM, no network."""
+"""Tool: compliance checks for onboarding/verification scope only. No LLM."""
 
-from app.agents.intake.tools.classify_tax import ape_prefix_category, classify_activity_types
+from __future__ import annotations
+
+from app.agents.intake.tools.classify_tax import detect_fiscal_inconsistency
 from app.schemas.orchestrator import (
     ComplianceAlert,
     Mismatch,
@@ -8,15 +10,30 @@ from app.schemas.orchestrator import (
     UserProfile,
 )
 
+# TVA franchise thresholds (services) — step 5, tracked by app from declared CA
+_VAT_SERVICES_THRESHOLD = 37_500
+_VAT_GOODS_THRESHOLD = 85_000
 
-def _activity_types_implied_category(activity_types: list[str]) -> str | None:
-    kinds = classify_activity_types(activity_types)
-    if "service" in kinds and "commerce" in kinds:
-        return "mixed"
-    if "commerce" in kinds:
-        return "BIC"
-    if "service" in kinds:
-        return "BNC"
+
+def _parse_revenue_eur(value: str | None) -> float | None:
+    if not value:
+        return None
+    digits = "".join(c if c.isdigit() or c == "." else " " for c in value)
+    parts = [p for p in digits.split() if p]
+    if not parts:
+        return None
+    try:
+        return float(parts[0])
+    except ValueError:
+        return None
+
+
+def _annual_revenue_estimate(profile: UserProfile) -> float | None:
+    if profile.estimated_annual_revenue:
+        return _parse_revenue_eur(profile.estimated_annual_revenue)
+    monthly = _parse_revenue_eur(profile.estimated_monthly_revenue)
+    if monthly is not None:
+        return monthly * 12
     return None
 
 
@@ -27,70 +44,88 @@ def check_compliance(
     alerts: list[ComplianceAlert] = []
     actions: list[RecommendedAction] = []
     step = 1
-
-    declared_cat = _activity_types_implied_category(profile.activity_types)
-    registry_cat = ape_prefix_category(profile.ape_code)
-
     activity_mismatch = False
-    if declared_cat and registry_cat and declared_cat != registry_cat and declared_cat != "mixed":
+
+    inconsistency = detect_fiscal_inconsistency(profile)
+    if inconsistency:
         activity_mismatch = True
         mismatches.append(
             Mismatch(
-                field="activite_principale",
-                declared_value=declared_cat,
-                actual_value=registry_cat,
-                note=(
-                    f"Votre activité déclarée ({declared_cat}) ne correspond pas "
-                    f"au code APE {profile.ape_code} ({registry_cat})."
-                ),
+                field="fiscal_classification",
+                declared_value="déclaration utilisateur",
+                actual_value=f"registre ({profile.registry_tax_base})",
+                note=inconsistency,
             )
         )
-
-    if profile.international_clients and not profile.currencies:
         alerts.append(
             ComplianceAlert(
-                severity="warning",
-                message=(
-                    "Vous facturez des clients internationaux mais aucune devise de paiement "
-                    "n'est renseignée — vérifiez vos obligations de TVA intracommunautaire."
-                ),
+                severity="critical",
+                message=inconsistency,
             )
         )
-
-    if profile.has_recurring_contracts and profile.invoices_already_issued is False:
-        alerts.append(
-            ComplianceAlert(
-                severity="warning",
-                message=(
-                    "Vous avez des contrats récurrents mais n'émettez pas encore de factures — "
-                    "risque de non-conformité comptable."
-                ),
-            )
-        )
-
-    if profile.in_kind_gifts and profile.tax_category == "BNC":
-        alerts.append(
-            ComplianceAlert(
-                severity="info",
-                message=(
-                    "Les cadeaux en nature reçus de marques doivent être valorisés et déclarés "
-                    "en BNC (avantage en nature)."
-                ),
-            )
-        )
-
-    if activity_mismatch:
         actions.append(
             RecommendedAction(
                 step=step,
-                title="Mettre à jour votre code APE",
+                title="Contacter le SIE ou demander un rescrit fiscal",
                 description=(
-                    "Contactez le greffe ou modifiez votre activité sur le guichet unique "
-                    "pour aligner votre code APE avec votre activité réelle."
+                    "Utilisez la messagerie sécurisée sur impots.gouv.fr pour obtenir "
+                    "une réponse officielle avant de déclarer votre régime."
+                ),
+            )
+        )
+        return activity_mismatch, mismatches, alerts, actions
+
+    if profile.has_secondary_activity and profile.tax_category == "mixed":
+        alerts.append(
+            ComplianceAlert(
+                severity="warning",
+                message=(
+                    "Activité mixte : vérifiez sur formalites.entreprises.gouv.fr (Guichet Unique) "
+                    "que vos activités principale et secondaire sont déclarées séparément."
+                ),
+            )
+        )
+        actions.append(
+            RecommendedAction(
+                step=step,
+                title="Vérifier les déclarations au Guichet Unique",
+                description=(
+                    "Assurez-vous que chaque activité (services et vente) figure bien "
+                    "dans votre dossier d'immatriculation."
                 ),
             )
         )
         step += 1
+
+    annual = _annual_revenue_estimate(profile)
+    if annual is not None and profile.tax_category in ("BIC", "mixed"):
+        threshold = _VAT_SERVICES_THRESHOLD
+        if annual >= threshold * 0.8:
+            alerts.append(
+                ComplianceAlert(
+                    severity="info" if annual < threshold else "warning",
+                    message=(
+                        f"CA annuel estimé ≈ {annual:,.0f} € — seuil franchise TVA services "
+                        f"{threshold:,} €/an. "
+                        + (
+                            "Vous êtes encore sous la franchise."
+                            if annual < threshold
+                            else "Vous approchez ou dépassez le seuil — vérifiez vos obligations TVA."
+                        )
+                    ).replace(",", " "),
+                )
+            )
+
+    if not profile.sirene_document_uploaded and profile.verification_status == "verified":
+        alerts.append(
+            ComplianceAlert(
+                severity="warning",
+                message=(
+                    "Avis de situation SIRENE non archivé — téléchargez-le sur "
+                    "avis-situation-sirene.insee.fr pour constituer votre dossier de preuve."
+                ),
+            )
+        )
 
     if profile.invoices_already_issued is False:
         actions.append(
@@ -105,27 +140,14 @@ def check_compliance(
         )
         step += 1
 
-    if profile.international_clients and profile.tax_category:
-        actions.append(
-            RecommendedAction(
-                step=step,
-                title="Vérifier vos obligations de TVA",
-                description=(
-                    "Clients internationaux détectés : vérifiez si vous devez vous immatriculer "
-                    "à la TVA ou appliquer le mécanisme d'autoliquidation."
-                ),
-            )
-        )
-        step += 1
-
     if profile.verification_status == "not_verified":
         actions.append(
             RecommendedAction(
                 step=step,
                 title="Régulariser votre immatriculation",
                 description=(
-                    "Votre SIRET n'a pas pu être vérifié — confirmez votre statut "
-                    "auprès de l'INSEE ou créez une nouvelle immatriculation."
+                    "Votre SIREN/SIRET n'a pas pu être vérifié — confirmez votre statut "
+                    "auprès de l'INSEE."
                 ),
             )
         )

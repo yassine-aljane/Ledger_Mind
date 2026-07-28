@@ -2,7 +2,6 @@
 
 from app.agents.intake.tools.extract_answer import (
     apply_updates,
-    extract_fields_from_answer,
     is_confused_answer,
 )
 from app.agents.intake.tools.verification import (
@@ -12,7 +11,6 @@ from app.agents.intake.tools.verification import (
 
 __all__ = [
     "apply_updates",
-    "extract_fields_from_answer",
     "is_confused_answer",
     "run_verification_agent",
     "run_verification_service",

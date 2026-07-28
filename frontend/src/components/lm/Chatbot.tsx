@@ -1,12 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  nextOnboardingTurn,
-  orchestratorTurn,
-  emptyInfluencerProfile,
-  type InfluencerProfile,
-  type OnboardingTurnResult,
-  type UserProfile,
-} from "@/lib/api-mock";
+import { orchestratorTurn, type UserProfile } from "@/lib/api";
 
 export type ChatTurn = {
   id: string;
@@ -36,7 +29,7 @@ export function Chatbot({
   initialQuestion,
   initialQuickReplies,
 }: {
-  onFinish?: (profile: InfluencerProfile | UserProfile, transcript: ChatTurn[]) => void;
+  onFinish?: (transcript: ChatTurn[]) => void;
   fetchNext?: (step: number) => Promise<ChatQuestion | null>;
   eyebrow?: string;
   intro?: string;
@@ -46,8 +39,6 @@ export function Chatbot({
   initialQuickReplies?: string[];
 }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
-  const profileRef = useRef<InfluencerProfile>(emptyInfluencerProfile);
-  const [currentTurn, setCurrentTurn] = useState<OnboardingTurnResult | null>(null);
   const [orchestratorMessage, setOrchestratorMessage] = useState<string | null>(null);
   const [orchestratorQuickReplies, setOrchestratorQuickReplies] = useState<string[]>([]);
   const [orchestratorCompleteness, setOrchestratorCompleteness] = useState(0);
@@ -73,7 +64,7 @@ export function Chatbot({
         if (cancelled) return;
         if (!q) {
           setThinking(false);
-          onFinish?.(profileRef.current, turns);
+          onFinish?.(turns);
           return;
         }
         setCurrentScriptQuestion(q);
@@ -97,14 +88,10 @@ export function Chatbot({
         setTurns([{ id: "a-0", role: "assistant", text: initialQuestion, time: nowTime() }]);
         setThinking(false);
       } else {
-        runOrchestratorTurn(null, null);
+        void runOrchestratorTurn(null, null);
       }
       return;
     }
-
-    if (startedRef.current) return;
-    startedRef.current = true;
-    runAgentTurn(null, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
@@ -125,7 +112,12 @@ export function Chatbot({
       );
       setThinking(false);
 
-      if (result.ui_action === "done" || result.ui_action === "show_compliance" || result.ui_action === "show_tax_result") {
+      if (
+        result.ui_action === "done" ||
+        result.ui_action === "show_compliance" ||
+        result.ui_action === "show_tax_result" ||
+        result.ui_action === "requires_expert"
+      ) {
         setOrchestratorMessage(null);
         setOrchestratorQuickReplies([]);
         onOrchestratorFinish?.(result.profile, turns);
@@ -149,22 +141,12 @@ export function Chatbot({
         ].filter(Boolean).length;
         setOrchestratorCompleteness(filled / 10);
 
-        if (!lastAnswer) {
-          setTurns((prev) => {
+        setTurns((prev) => {
+          if (!lastAnswer) {
             const alreadyShown = prev.some((t) => t.text === result.message);
             if (alreadyShown) return prev;
-            return [
-              ...prev,
-              {
-                id: `a-${prev.length}`,
-                role: "assistant",
-                text: result.message!,
-                time: nowTime(),
-              },
-            ];
-          });
-        } else {
-          setTurns((prev) => [
+          }
+          return [
             ...prev,
             {
               id: `a-${prev.length}`,
@@ -172,46 +154,12 @@ export function Chatbot({
               text: result.message!,
               time: nowTime(),
             },
-          ]);
-        }
+          ];
+        });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur réseau — veuillez réessayer.";
       console.error("Orchestrator turn failed:", err);
-      setThinking(false);
-      setError(msg);
-    }
-  }
-
-  async function runAgentTurn(lastQuestion: string | null, lastAnswer: string | null) {
-    setError(null);
-    setThinking(true);
-    lastCallRef.current = { question: lastQuestion, answer: lastAnswer };
-
-    try {
-      const result = await nextOnboardingTurn(profileRef.current, lastQuestion, lastAnswer);
-      profileRef.current = result.profile;
-      setThinking(false);
-
-      if (result.is_done) {
-        setCurrentTurn(null);
-        onFinish?.(result.profile, turns);
-        return;
-      }
-
-      setCurrentTurn(result);
-      setTurns((prev) => [
-        ...prev,
-        {
-          id: `a-${prev.length}`,
-          role: "assistant",
-          text: result.next_question!,
-          time: nowTime(),
-        },
-      ]);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erreur réseau — veuillez réessayer.";
-      console.error("Onboarding turn failed:", err);
       setThinking(false);
       setError(msg);
     }
@@ -238,49 +186,36 @@ export function Chatbot({
       ]);
       setInput("");
       setOrchestratorMessage(null);
-      runOrchestratorTurn(question, answer);
-    } else {
-      if (!currentTurn?.next_question) return;
-      const question = currentTurn.next_question;
-      setTurns((prev) => [
-        ...prev,
-        { id: `u-${prev.length}`, role: "user", text: answer, time: nowTime() },
-      ]);
-      setInput("");
-      setCurrentTurn(null);
-      runAgentTurn(question, answer);
+      void runOrchestratorTurn(question, answer);
     }
   };
 
   const handleRetry = () => {
     if (isOrchestrator) {
       const { question, answer } = lastCallRef.current;
-      runOrchestratorTurn(question, answer);
-    } else if (!fetchNext) {
-      const { question, answer } = lastCallRef.current;
-      runAgentTurn(question, answer);
+      void runOrchestratorTurn(question, answer);
     }
   };
 
   const activeQuestionText = fetchNext
     ? currentScriptQuestion?.question
     : isOrchestrator
-    ? orchestratorMessage
-    : currentTurn?.next_question;
+      ? orchestratorMessage
+      : null;
   const quickReplies = fetchNext
     ? (currentScriptQuestion?.quickReplies ?? [])
     : isOrchestrator
-    ? orchestratorQuickReplies
-    : (currentTurn?.quick_replies ?? []);
+      ? orchestratorQuickReplies
+      : [];
   const progress = fetchNext
-    ? (currentScriptQuestion ? currentScriptQuestion.step / currentScriptQuestion.total : 1)
+    ? currentScriptQuestion
+      ? currentScriptQuestion.step / currentScriptQuestion.total
+      : 1
     : isOrchestrator
-    ? orchestratorCompleteness
-    : currentTurn
-    ? currentTurn.completeness
-    : thinking
-    ? 0
-    : 1;
+      ? orchestratorCompleteness
+      : thinking
+        ? 0
+        : 1;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-fade-in">
@@ -335,7 +270,8 @@ export function Chatbot({
         {error && !thinking && (
           <div className="flex flex-col gap-3 animate-fade-in">
             <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-sm text-red-700">
-              <span className="font-semibold">Erreur : </span>{error}
+              <span className="font-semibold">Erreur : </span>
+              {error}
             </div>
             <button
               onClick={handleRetry}

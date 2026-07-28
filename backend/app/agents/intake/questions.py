@@ -1,8 +1,7 @@
 """
 Deterministic question ordering + LLM-generated phrasing (Gemini).
 
-The ORDER in which fields are asked is fixed and rule-based.
-The LLM only phrases the question and quick replies.
+Steps 4–5: activity, mixed activity, revenue data for VAT tracking.
 """
 
 import json
@@ -15,10 +14,14 @@ logger = logging.getLogger(__name__)
 
 FIELD_PRIORITY = [
     "activity_types",
+    "main_activity_commercial",
+    "has_secondary_activity",
+    "secondary_activity_types",
     "revenue_sources",
+    "estimated_monthly_revenue",
+    "estimated_annual_revenue",
     "international_clients",
     "currencies",
-    "estimated_monthly_revenue",
     "revenue_variability",
     "invoices_already_issued",
     "has_recurring_contracts",
@@ -27,11 +30,15 @@ FIELD_PRIORITY = [
 ]
 
 _FIELD_DESCRIPTIONS = {
-    "activity_types": "le type d'activité principale (sponsoring, affiliation, UGC, apparitions...)",
+    "activity_types": "le type d'activité principale (sponsoring, affiliation, UGC, vente de produits…)",
+    "main_activity_commercial": "si son activité principale est de nature commerciale (vente, partenariats rémunérés) ou non",
+    "has_secondary_activity": "s'il/elle a une autre activité déclarée en parallèle (conseil, formation, vente de produits distincts)",
+    "secondary_activity_types": "le type d'activité secondaire (vente de produits, conseil, formation…)",
     "revenue_sources": "les plateformes ou sources d'où viennent ses revenus",
+    "estimated_monthly_revenue": "une estimation de ses revenus mensuels",
+    "estimated_annual_revenue": "une estimation de son chiffre d'affaires annuel (pour le suivi des seuils TVA)",
     "international_clients": "s'il/elle facture des clients ou plateformes étrangères",
     "currencies": "les devises dans lesquelles il/elle est payé(e)",
-    "estimated_monthly_revenue": "une estimation de ses revenus mensuels",
     "revenue_variability": "si ses revenus sont stables ou irréguliers (pics ponctuels)",
     "invoices_already_issued": "s'il/elle émet déjà des factures",
     "has_recurring_contracts": "s'il/elle a des contrats récurrents avec des marques",
@@ -41,12 +48,39 @@ _FIELD_DESCRIPTIONS = {
 
 _FALLBACK_QUESTIONS = {
     "activity_types": (
-        "Quel est votre type d'activité principale (sponsoring, affiliation, vente de produits/UGC...) ?",
+        "Quel est votre type d'activité principale (sponsoring, affiliation, vente de produits/UGC…) ?",
         ["Sponsoring / Partenariats", "Affiliation", "Vente de produits/services", "Prestations UGC"],
+    ),
+    "main_activity_commercial": (
+        "Votre activité principale est-elle de nature commerciale "
+        "(partenariats rémunérés, vente, monétisation directe) ?",
+        ["Oui, activité commerciale", "Non, activité non commerciale (artistique/libérale)"],
+    ),
+    "has_secondary_activity": (
+        "Avez-vous une autre activité déclarée en parallèle "
+        "(conseil, formation, vente de produits distincts comme des presets, merch…) ?",
+        ["Oui, une activité secondaire", "Non, une seule activité"],
+    ),
+    "secondary_activity_types": (
+        "Quelle est votre activité secondaire ?",
+        [
+            "Vente de produits / presets / merch",
+            "Conseil / coaching",
+            "Formation / cours",
+            "Autre prestation de services",
+        ],
     ),
     "revenue_sources": (
         "Quelles sont vos principales sources de revenus ou plateformes ?",
         ["YouTube", "Instagram / TikTok", "Boutique / Site web", "Facturation directe"],
+    ),
+    "estimated_monthly_revenue": (
+        "Quelle est votre estimation de revenus mensuels moyens ?",
+        ["Moins de 1 000 €", "1 000 € – 3 000 €", "3 000 € – 7 000 €", "Plus de 7 000 €"],
+    ),
+    "estimated_annual_revenue": (
+        "Quel est votre chiffre d'affaires annuel estimé (pour le suivi des seuils TVA) ?",
+        ["Moins de 10 000 €", "10 000 € – 37 500 €", "37 500 € – 77 700 €", "Plus de 77 700 €"],
     ),
     "international_clients": (
         "Facturez-vous des clients ou plateformes basés à l'étranger ?",
@@ -55,10 +89,6 @@ _FALLBACK_QUESTIONS = {
     "currencies": (
         "Dans quelles devises recevez-vous vos paiements ?",
         ["EUR uniquement", "EUR + USD", "Plusieurs devises"],
-    ),
-    "estimated_monthly_revenue": (
-        "Quelle est votre estimation de revenus mensuels moyens ?",
-        ["Moins de 1 000 €", "1 000 € – 3 000 €", "3 000 € – 7 000 €", "Plus de 7 000 €"],
     ),
     "revenue_variability": (
         "Vos revenus sont-ils plutôt stables ou irréguliers (pics de saisonnalité) ?",
@@ -97,16 +127,26 @@ au profil déjà connu.
 """
 
 
+def _field_is_missing(profile: UserProfile, field: str) -> bool:
+    if field == "secondary_activity_types":
+        if profile.has_secondary_activity is not True:
+            return False
+    return getattr(profile, field) in (None, [])
+
+
 def next_missing_field(profile: UserProfile) -> str | None:
     for field in FIELD_PRIORITY:
-        if getattr(profile, field) in (None, []):
+        if _field_is_missing(profile, field):
             return field
     return None
 
 
 def completeness_ratio(profile: UserProfile) -> float:
-    filled = sum(1 for f in FIELD_PRIORITY if getattr(profile, f) not in (None, []))
-    return filled / len(FIELD_PRIORITY)
+    applicable = [
+        f for f in FIELD_PRIORITY if f != "secondary_activity_types" or profile.has_secondary_activity is True
+    ]
+    filled = sum(1 for f in applicable if not _field_is_missing(profile, f))
+    return filled / len(applicable) if applicable else 1.0
 
 
 async def generate_question_for_field(
@@ -116,11 +156,9 @@ async def generate_question_for_field(
     *,
     preface: str | None = None,
 ) -> tuple[str, list[str]]:
-    """LLM phrases the question dynamically; falls back on error."""
     fallback_q, fallback_qr = _FALLBACK_QUESTIONS.get(
         field, (f"Peux-tu me dire {_FIELD_DESCRIPTIONS.get(field, field)} ?", [])
     )
-
     known = {
         k: getattr(profile, k)
         for k in FIELD_PRIORITY
@@ -129,8 +167,7 @@ async def generate_question_for_field(
     context_block = json.dumps(known, ensure_ascii=False)
     if verification_context:
         context_block += (
-            f"\n\nContexte registre (SIRENE/RNE) :\n"
-            f"{json.dumps(verification_context, ensure_ascii=False)}"
+            f"\n\nContexte registre :\n{json.dumps(verification_context, ensure_ascii=False)}"
         )
 
     prompt = _QUESTION_INSTRUCTION.format(

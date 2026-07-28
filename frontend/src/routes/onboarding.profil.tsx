@@ -7,7 +7,7 @@ import {
   fetchUserProfile,
   orchestratorTurn,
   type UserProfile,
-} from "@/lib/api-mock";
+} from "@/lib/api";
 
 export const Route = createFileRoute("/onboarding/profil")({
   head: () => ({
@@ -27,16 +27,20 @@ export const Route = createFileRoute("/onboarding/profil")({
 function isIntakeComplete(profile: UserProfile): boolean {
   const questionsDone =
     profile.activity_types.length > 0 &&
+    profile.main_activity_commercial !== null &&
+    profile.has_secondary_activity !== null &&
+    (profile.has_secondary_activity !== true || profile.secondary_activity_types.length > 0) &&
     profile.revenue_sources.length > 0 &&
     profile.international_clients !== null &&
     profile.currencies.length > 0 &&
     profile.estimated_monthly_revenue !== null &&
+    profile.estimated_annual_revenue !== null &&
     profile.revenue_variability !== null &&
     profile.invoices_already_issued !== null &&
     profile.has_recurring_contracts !== null &&
     profile.in_kind_gifts !== null &&
     profile.first_income_date !== null;
-  return questionsDone || profile.tax_category !== null;
+  return questionsDone || profile.tax_category !== null || profile.fiscal_classification_status === "requires_expert";
 }
 
 function ProfilPage() {
@@ -176,6 +180,16 @@ function ProfilPage() {
                     Régime : {profile.recommended_regime} ({profile.tax_category}) — {profile.regime_plafond}
                   </p>
                 )}
+              </div>
+            )}
+
+            {profile.fiscal_classification_status === "requires_expert" && (
+              <div className="rounded-2xl bg-coral/10 border border-coral/30 p-5">
+                <p className="font-semibold text-coral">Classification bloquée — incohérence détectée</p>
+                <p className="text-sm text-ink/70 mt-2">
+                  {profile.fiscal_inconsistency_reason ??
+                    "Contactez votre SIE ou demandez un rescrit fiscal via impots.gouv.fr."}
+                </p>
               </div>
             )}
 

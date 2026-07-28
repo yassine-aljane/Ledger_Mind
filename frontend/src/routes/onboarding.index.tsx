@@ -54,7 +54,7 @@ function Gate() {
             Commençons par <span className="italic font-normal">l'essentiel.</span>
           </h1>
           <p className="mt-8 text-lg text-ink/60 text-pretty max-w-lg mx-auto">
-            Avez-vous déjà un statut administratif ou un SIRET enregistré pour votre activité ?
+            Avez-vous déjà un statut administratif ou un numéro SIREN / SIRET enregistré pour votre activité ?
           </p>
 
           <div className="mt-12 grid sm:grid-cols-2 gap-4">
@@ -65,12 +65,12 @@ function Gate() {
               <div className="size-10 rounded-full bg-teal-dark/10 text-teal-dark font-mono text-sm font-semibold grid place-items-center group-hover:bg-teal-dark group-hover:text-background transition-colors">
                 A
               </div>
-              <p className="mt-6 font-semibold text-lg">Oui, j'ai un SIRET</p>
+              <p className="mt-6 font-semibold text-lg">Oui, j'ai un SIREN / SIRET</p>
               <p className="mt-2 text-sm text-ink/60 leading-relaxed">
                 Vérification automatique auprès de l'INSEE et du RNE en 30 secondes.
               </p>
               <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-teal-dark">
-                Vérifier mon SIRET →
+                Vérifier mon numéro →
               </span>
             </Link>
 
@@ -83,7 +83,7 @@ function Gate() {
               </div>
               <p className="mt-6 font-semibold text-lg">Non / Je ne sais pas</p>
               <p className="mt-2 text-sm text-ink/60 leading-relaxed">
-                Diagnostic guidé sans jargon pour faire le point sur votre situation.
+                Diagnostic guidé pour devenir légal et actif — sans créer de profil fiscal.
               </p>
               <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-teal-dark">
                 Lancer le diagnostic →

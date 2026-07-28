@@ -16,9 +16,13 @@ logger = logging.getLogger(__name__)
 
 _PROFILE_QUESTION_FIELDS = {
     "activity_types",
+    "main_activity_commercial",
+    "has_secondary_activity",
+    "secondary_activity_types",
     "revenue_sources",
     "currencies",
     "estimated_monthly_revenue",
+    "estimated_annual_revenue",
     "revenue_variability",
     "invoices_already_issued",
     "first_income_date",
@@ -27,8 +31,15 @@ _PROFILE_QUESTION_FIELDS = {
     "international_clients",
 }
 
-LIST_FIELDS = {"activity_types", "revenue_sources", "currencies"}
-BOOL_FIELDS = {"invoices_already_issued", "has_recurring_contracts", "in_kind_gifts", "international_clients"}
+LIST_FIELDS = {"activity_types", "revenue_sources", "currencies", "secondary_activity_types"}
+BOOL_FIELDS = {
+    "invoices_already_issued",
+    "has_recurring_contracts",
+    "in_kind_gifts",
+    "international_clients",
+    "has_secondary_activity",
+    "main_activity_commercial",
+}
 
 _CONFUSION_RE = re.compile(
     r"("
@@ -98,9 +109,9 @@ def _value_from_raw_answer(field: str, last_answer: str, current_profile: UserPr
         return _coerce_value(field, [answer], current_profile)
 
     if field in BOOL_FIELDS:
-        if any(k in ans_lower for k in ("oui", "yes", "vrai", "régulièrement", "parfois", "chaque")):
+        if any(k in ans_lower for k in ("oui", "yes", "vrai", "régulièrement", "parfois", "chaque", "commercial")):
             return True
-        if any(k in ans_lower for k in ("non", "no", "faux", "jamais")):
+        if any(k in ans_lower for k in ("non", "no", "faux", "jamais", "seule")):
             return False
         return None
 
@@ -139,16 +150,3 @@ def apply_updates(
     except Exception as e:
         logger.error("Validation error when merging profile updates: %s", e)
         return profile
-
-
-# Kept for older call sites / router compat
-async def extract_fields_from_answer(
-    profile: UserProfile,
-    last_question: str,
-    last_answer: str,
-    target_field: str | None = None,
-) -> UserProfile:
-    del last_question
-    if is_confused_answer(last_answer):
-        return profile
-    return apply_updates(profile, {}, target_field=target_field, last_answer=last_answer)

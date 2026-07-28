@@ -58,10 +58,14 @@ Réponds UNIQUEMENT avec un objet JSON (commence par {{) :
 
 _FIELD_HINTS = {
     "activity_types": "type d'activité (sponsoring, affiliation, UGC, vente…)",
+    "main_activity_commercial": "activité commerciale ou non (oui/non)",
+    "has_secondary_activity": "activité secondaire en parallèle (oui/non)",
+    "secondary_activity_types": "type d'activité secondaire (vente produits, conseil, formation…)",
     "revenue_sources": "sources / plateformes de revenus",
     "international_clients": "clients ou plateformes à l'étranger (oui/non)",
     "currencies": "devises de paiement",
     "estimated_monthly_revenue": "estimation revenus mensuels",
+    "estimated_annual_revenue": "chiffre d'affaires annuel estimé",
     "revenue_variability": "revenus stables ou irréguliers",
     "invoices_already_issued": "émet déjà des factures (oui/non)",
     "has_recurring_contracts": "contrats récurrents (oui/non)",

@@ -14,8 +14,18 @@ router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"])
 
 @router.post("/start", response_model=OrchestratorTurnResponse)
 async def start(payload: OrchestratorStartRequest):
+    if not payload.siret or not payload.siret.strip():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Un numéro SIRET ou SIREN est requis pour créer un profil. "
+                "Utilisez le diagnostic de régularisation si vous n'êtes pas encore immatriculé."
+            ),
+        )
     try:
         return await start_orchestrator(payload.siret, payload.company_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 

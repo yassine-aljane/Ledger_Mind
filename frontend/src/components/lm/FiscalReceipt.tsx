@@ -1,5 +1,5 @@
-import type { Calcul, Qualification } from "@/lib/api-mock";
-import { formatMoney } from "@/lib/api-mock";
+import { formatMoney } from "@/lib/api";
+import type { Calcul, Qualification } from "@/lib/api-mocks";
 
 export function FiscalReceipt({
   qualification,

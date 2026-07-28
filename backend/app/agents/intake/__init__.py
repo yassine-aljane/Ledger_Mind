@@ -1,30 +1,31 @@
 """
-Intake agent — SIRET verification + profile questions + tax/compliance.
-
-Layout:
-  agent.py       — public API
-  questions.py   — LLM question phrasing (Gemini)
-  understand.py  — LLM answer understanding (Gemini)
-  llm.py         — shared Gemini client
-  tools/         — LLM-free (verification, extract, classify_tax, check_compliance)
+Intake agent — SIREN verification (steps 1–3) + profile questions (4–5) + classification (6).
 """
 
 from app.agents.intake.agent import (
+    apply_registry_document,
+    apply_sirene_document,
     apply_verification_to_profile,
     ask_next_question,
     finalize_profile,
     handle_profile_answer,
     run_verification,
-    skip_verification,
+    verification_complete,
     verification_context,
+    REGISTRY_DOC_MESSAGE,
+    SIRENE_UPLOAD_MESSAGE,
 )
 
 __all__ = [
+    "apply_registry_document",
+    "apply_sirene_document",
     "apply_verification_to_profile",
     "ask_next_question",
     "finalize_profile",
     "handle_profile_answer",
     "run_verification",
-    "skip_verification",
+    "verification_complete",
     "verification_context",
+    "REGISTRY_DOC_MESSAGE",
+    "SIRENE_UPLOAD_MESSAGE",
 ]

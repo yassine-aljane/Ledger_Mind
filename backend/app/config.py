@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     mistral_model: str = "mistral/mistral-large-latest"
 
     frontend_origin: str = "http://localhost:3000"
-    session_db_path: str = "sessions.db"
+    mongo_uri: str = "mongodb://localhost:27017"
+    mongo_db_name: str = "ledgermind"
 
     class Config:
         env_file = ".env"

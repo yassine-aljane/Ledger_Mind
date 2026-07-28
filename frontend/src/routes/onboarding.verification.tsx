@@ -5,18 +5,18 @@ import {
   ocrExtractSiret,
   startOrchestrator,
   orchestratorTurn,
+  uploadRegistryDocument,
+  uploadSireneAvis,
   getStoredSessionId,
   type OrchestratorTurnResponse,
   type UserProfile,
-} from "@/lib/api-mock";
+} from "@/lib/api";
 
 export const Route = createFileRoute("/onboarding/verification")({
   head: () => ({
     meta: [
-      { title: "Vérification SIRET — LedgerMind" },
-      { name: "description", content: "Vérifions votre numéro SIRET en 30 secondes." },
-      { property: "og:title", content: "Vérification SIRET — LedgerMind" },
-      { property: "og:description", content: "Vérifions votre numéro SIRET en 30 secondes." },
+      { title: "Vérification SIREN — LedgerMind" },
+      { name: "description", content: "Vérification registre, test Kbis et archivage SIRENE." },
     ],
   }),
   component: VerificationPage,
@@ -24,35 +24,52 @@ export const Route = createFileRoute("/onboarding/verification")({
 
 type Tab = "manual" | "upload";
 
+function formatSiren(siren: string): string {
+  const d = siren.replace(/\D/g, "");
+  if (d.length !== 9) return siren;
+  return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
+}
+
+function formatSiret(siret: string): string {
+  const d = siret.replace(/\D/g, "");
+  if (d.length !== 14) return siret;
+  return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)} ${d.slice(9)}`;
+}
+
+function verificationReady(profile: UserProfile): boolean {
+  if (profile.verification_status !== "verified") return false;
+  if (profile.registry_document_required && !profile.registry_document_uploaded) return false;
+  if (!profile.sirene_document_uploaded) return false;
+  return true;
+}
+
 function VerificationPage() {
   const [tab, setTab] = useState<Tab>("manual");
   const [siret, setSiret] = useState("");
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
+  const [registryUploadError, setRegistryUploadError] = useState<string | null>(null);
+  const [sireneUploadError, setSireneUploadError] = useState<string | null>(null);
+  const [turnError, setTurnError] = useState<string | null>(null);
   const [orchestratorResult, setOrchestratorResult] = useState<OrchestratorTurnResponse | null>(null);
-  const [prefetchedTurn, setPrefetchedTurn] = useState<OrchestratorTurnResponse | null>(null);
+  const [activeTurn, setActiveTurn] = useState<OrchestratorTurnResponse | null>(null);
   const navigate = useNavigate();
 
   const digits = siret.replace(/\D/g, "");
   const digitCount = digits.length;
-  const isValid = digitCount === 14;
+  const isValid = digitCount === 9 || digitCount === 14;
   const showError = touched && !isValid;
 
-  const profile: UserProfile | null = orchestratorResult?.profile ?? null;
+  const profile: UserProfile | null = activeTurn?.profile ?? orchestratorResult?.profile ?? null;
+  const sessionId = getStoredSessionId() ?? orchestratorResult?.session_id ?? activeTurn?.session_id;
 
   const runVerify = async (value: string) => {
     setLoading(true);
-    setPrefetchedTurn(null);
+    setActiveTurn(null);
     try {
       const r = await startOrchestrator(value);
       setOrchestratorResult(r);
-      // Prefetch first profile question while the user reads the verification card
-      if (r.profile.verification_status === "verified") {
-        orchestratorTurn(r.session_id, undefined)
-          .then(setPrefetchedTurn)
-          .catch((err) => console.error("Prefetch first question failed:", err));
-      }
     } catch (error) {
       console.error(error);
       setOrchestratorResult(null);
@@ -61,33 +78,55 @@ function VerificationPage() {
     }
   };
 
-  const handleContinue = async () => {
-    const sessionId = getStoredSessionId() ?? orchestratorResult?.session_id;
+  const advanceVerification = async (answer?: string) => {
     if (!sessionId) return;
-
-    if (prefetchedTurn?.ui_action === "ask_question") {
-      navigate({
-        to: "/onboarding/profil",
-        state: {
-          initialQuestion: prefetchedTurn.message ?? undefined,
-          initialQuickReplies: prefetchedTurn.quick_replies,
-        } as Record<string, unknown>,
-      });
-      return;
-    }
-
     setLoading(true);
+    setTurnError(null);
     try {
-      const turn = await orchestratorTurn(sessionId, undefined);
-      navigate({
-        to: "/onboarding/profil",
-        state: {
-          initialQuestion: turn.message ?? undefined,
-          initialQuickReplies: turn.quick_replies,
-        } as Record<string, unknown>,
-      });
+      const turn = await orchestratorTurn(sessionId, answer);
+      setActiveTurn(turn);
+      setOrchestratorResult((prev) => (prev ? { ...prev, profile: turn.profile } : prev));
+
+      if (turn.phase === "profile_questions" && turn.ui_action === "ask_question") {
+        navigate({
+          to: "/onboarding/profil",
+          state: {
+            initialQuestion: turn.message ?? undefined,
+            initialQuickReplies: turn.quick_replies,
+          } as Record<string, unknown>,
+        });
+      }
     } catch (error) {
       console.error(error);
+      setTurnError(error instanceof Error ? error.message : "Erreur lors de l'étape de vérification.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegistryUpload = async (file: File) => {
+    if (!sessionId) return;
+    setLoading(true);
+    setRegistryUploadError(null);
+    try {
+      await uploadRegistryDocument(sessionId, file);
+      await advanceVerification();
+    } catch (error) {
+      setRegistryUploadError(error instanceof Error ? error.message : "Erreur d'upload.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSireneUpload = async (file: File) => {
+    if (!sessionId) return;
+    setLoading(true);
+    setSireneUploadError(null);
+    try {
+      await uploadSireneAvis(sessionId, file);
+      await advanceVerification();
+    } catch (error) {
+      setSireneUploadError(error instanceof Error ? error.message : "Erreur d'upload.");
     } finally {
       setLoading(false);
     }
@@ -102,13 +141,23 @@ function VerificationPage() {
       setTouched(true);
       setTab("manual");
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Erreur lors de l'extraction.";
-      setOcrError(msg);
-      console.error(error);
+      setOcrError(error instanceof Error ? error.message : "Erreur lors de l'extraction.");
     } finally {
       setLoading(false);
     }
   };
+
+  const showRegistryDocStep =
+    profile?.verification_status === "verified" &&
+    profile.registry_document_required &&
+    !profile.registry_document_uploaded;
+
+  const showSireneUploadStep =
+    profile?.verification_status === "verified" &&
+    !showRegistryDocStep &&
+    !profile.sirene_document_uploaded;
+
+  const showContinueToProfil = profile && verificationReady(profile);
 
   return (
     <div className="min-h-screen px-6 py-16 max-w-3xl mx-auto animate-slide-up">
@@ -124,10 +173,10 @@ function VerificationPage() {
           Étape 02 · Vérification
         </p>
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-balance">
-          Vérifions votre <span className="italic font-normal">SIRET</span>.
+          Vérifions votre <span className="italic font-normal">SIREN / SIRET</span>.
         </h1>
         <p className="mt-4 text-ink/60 text-lg text-pretty max-w-xl">
-          Saisissez-le directement, ou déposez un justificatif — on l'extrait pour vous.
+          Identité registre, vérification RCS/RNE et archivage de votre avis SIRENE.
         </p>
       </div>
 
@@ -162,23 +211,9 @@ function VerificationPage() {
               className="bg-white border border-border rounded-2xl p-8 space-y-6"
             >
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-xs font-semibold uppercase tracking-widest text-ink/50">
-                    Numéro SIRET
-                  </label>
-                  <span
-                    className="font-mono text-xs transition-colors"
-                    style={{
-                      color: isValid
-                        ? "var(--teal-dark)"
-                        : showError
-                        ? "var(--coral)"
-                        : "color-mix(in oklab, var(--ink) 35%, transparent)",
-                    }}
-                  >
-                    {digitCount}/14
-                  </span>
-                </div>
+                <label className="text-xs font-semibold uppercase tracking-widest text-ink/50">
+                  Numéro SIREN / SIRET
+                </label>
                 <input
                   value={siret}
                   onChange={(e) => {
@@ -189,162 +224,196 @@ function VerificationPage() {
                   placeholder="832 174 902 00019"
                   maxLength={19}
                   inputMode="numeric"
-                  style={{
-                    borderBottomColor: isValid
-                      ? "var(--teal-dark)"
-                      : showError
-                      ? "var(--coral)"
-                      : "var(--border)",
-                  }}
-                  className="w-full px-0 py-3 bg-transparent border-b-2 font-mono text-2xl focus:outline-none transition-colors placeholder:text-ink/20"
+                  className="w-full mt-3 px-0 py-3 bg-transparent border-b-2 border-border font-mono text-2xl focus:outline-none focus:border-teal-dark"
                 />
-                <div className="mt-2 min-h-[18px]">
-                  {showError ? (
-                    <p
-                      className="text-xs font-medium flex items-center gap-1.5 animate-fade-in"
-                      style={{ color: "var(--coral)" }}
-                    >
-                      <span>⚠</span>
-                      {digitCount === 0
-                        ? "Veuillez saisir votre numéro SIRET (14 chiffres)."
-                        : digitCount < 14
-                        ? `Il manque ${14 - digitCount} chiffre${14 - digitCount > 1 ? "s" : ""}.`
-                        : `Trop de chiffres — le SIRET fait exactement 14 chiffres.`}
-                    </p>
-                  ) : isValid ? (
-                    <p
-                      className="text-xs font-medium flex items-center gap-1.5 animate-fade-in"
-                      style={{ color: "var(--teal-dark)" }}
-                    >
-                      <span>✓</span> Format valide — prêt à vérifier.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-ink/40">14 chiffres, avec ou sans espaces.</p>
-                  )}
-                </div>
+                {showError && (
+                  <p className="text-xs text-coral mt-2">SIREN (9) ou SIRET (14 chiffres) requis.</p>
+                )}
               </div>
               <button
                 type="submit"
                 disabled={loading || !isValid}
-                className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
               >
-                {loading ? "Vérification en cours…" : "Vérifier mon SIRET"}
+                {loading ? "Vérification…" : "Étape 1 — Vérifier mon numéro"}
               </button>
             </form>
           )}
 
           {tab === "upload" && (
-            <div className="space-y-4">
-              <label
-                className={`block bg-white border-2 border-dashed transition-colors rounded-2xl p-16 text-center cursor-pointer ${
-                  loading
-                    ? "border-teal-dark/40 opacity-70"
-                    : ocrError
-                    ? "border-coral/50 hover:border-coral"
-                    : "border-border hover:border-teal-dark"
-                }`}
-              >
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="sr-only"
-                  disabled={loading}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                  }}
-                />
-                {loading ? (
-                  <>
-                    <div className="mx-auto size-14 rounded-full bg-teal-dark/10 grid place-items-center mb-6 animate-pulse">
-                      <span className="text-2xl text-teal-dark">⟳</span>
-                    </div>
-                    <p className="font-semibold text-ink">Extraction en cours…</p>
-                  </>
-                ) : ocrError ? (
-                  <>
-                    <p className="font-semibold" style={{ color: "var(--coral)" }}>Extraction échouée</p>
-                    <p className="text-sm mt-2" style={{ color: "var(--coral)", opacity: 0.8 }}>{ocrError}</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="mx-auto size-14 rounded-full bg-teal-dark/10 grid place-items-center mb-6">
-                      <span className="text-2xl text-teal-dark">↑</span>
-                    </div>
-                    <p className="font-semibold text-ink">Déposez votre justificatif</p>
-                    <p className="text-sm text-ink/50 mt-2">PDF ou image · Max 20 Mo</p>
-                  </>
-                )}
-              </label>
-            </div>
+            <label className="block bg-white border-2 border-dashed border-border hover:border-teal-dark rounded-2xl p-16 text-center cursor-pointer">
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="sr-only"
+                disabled={loading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                }}
+              />
+              <p className="font-semibold">{loading ? "Extraction…" : "Déposez votre justificatif"}</p>
+              {ocrError && <p className="text-sm text-coral mt-2">{ocrError}</p>}
+            </label>
           )}
         </>
       )}
 
       {orchestratorResult && profile && (
-        <div className="bg-white border border-border rounded-2xl p-8 animate-slide-up">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="size-8 rounded-full bg-teal-light grid place-items-center text-background text-sm">
-              {profile.verification_status === "verified" ? "✓" : "!"}
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-widest text-teal-dark font-semibold">
-                {profile.verification_status === "verified" ? "SIRET vérifié" : "SIRET non vérifié"}
+        <div className="space-y-6">
+          <section className="bg-white border border-border rounded-2xl p-8">
+            <p className="font-mono text-[11px] uppercase tracking-widest text-teal-dark mb-4">
+              Étape 1 · Identité registre
+            </p>
+            <dl className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <dt className="text-xs uppercase text-ink/40">SIREN</dt>
+                <dd className="font-semibold font-mono">
+                  {profile.siren ? formatSiren(profile.siren) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-ink/40">SIRET</dt>
+                <dd className="font-semibold font-mono">
+                  {profile.siret ? formatSiret(profile.siret) : profile.siren ? "(siège)" : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-ink/40">Dénomination</dt>
+                <dd className="font-semibold">{profile.denomination ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-ink/40">Forme juridique</dt>
+                <dd className="font-semibold">{profile.legal_form ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-ink/40">Code NAF (statistique)</dt>
+                <dd className="font-semibold">{profile.ape_code ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-ink/40">Micro-éligible</dt>
+                <dd className="font-semibold">{profile.micro_eligible ? "Oui (EI)" : "—"}</dd>
+              </div>
+              {profile.registry_tax_base && !profile.registry_document_required && (
+                <div className="col-span-2">
+                  <dt className="text-xs uppercase text-ink/40">Base fiscale registre</dt>
+                  <dd className="font-semibold text-teal-dark">{profile.registry_tax_base}</dd>
+                </div>
+              )}
+            </dl>
+            <p className="mt-4 text-sm text-ink/60">{orchestratorResult.message}</p>
+          </section>
+
+          {profile.verification_status === "verified" && (
+            <section className="bg-white border border-border rounded-2xl p-8">
+              <p className="font-mono text-[11px] uppercase tracking-widest text-teal-dark mb-4">
+                Étape 2 · Vérification RCS / RNE
               </p>
-              <p className="font-mono text-sm text-ink/60">{profile.siret}</p>
-            </div>
-          </div>
+              {profile.registry_document_uploaded ? (
+                <p className="text-sm">
+                  {profile.registry_document_type === "kbis"
+                    ? "✓ Kbis détecté — inscription RCS confirmée → BIC"
+                    : "✓ Extrait RNE détecté — inscription RNE seule → BNC"}
+                </p>
+              ) : profile.registry_document_required ? (
+                <>
+                  <p className="text-sm text-ink/70 mb-4">
+                    Déposez votre Kbis (greffe / RCS) ou votre extrait RNE (INPI). Nous vérifions
+                    automatiquement le type de document et le SIREN.
+                  </p>
+                  <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark">
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      className="sr-only"
+                      disabled={loading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleRegistryUpload(f);
+                      }}
+                    />
+                    <span className="text-sm font-semibold">
+                      {loading ? "Analyse…" : "Déposer Kbis ou extrait RNE (PDF)"}
+                    </span>
+                  </label>
+                  {registryUploadError && (
+                    <p className="text-xs text-coral mt-2">{registryUploadError}</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-ink/70">
+                  Société commerciale détectée — inscription RCS confirmée → BIC (pas de document
+                  requis).
+                </p>
+              )}
+            </section>
+          )}
 
-          <dl className="grid grid-cols-2 gap-6 mb-8">
-            <div>
-              <dt className="text-xs uppercase tracking-widest text-ink/40">Dénomination</dt>
-              <dd className="mt-1 font-semibold">{profile.denomination ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-widest text-ink/40">Forme juridique</dt>
-              <dd className="mt-1 font-semibold">{profile.legal_form ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-widest text-ink/40">Code APE</dt>
-              <dd className="mt-1 font-semibold">{profile.ape_code ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-widest text-ink/40">Statut administratif</dt>
-              <dd className="mt-1 font-semibold">{profile.administrative_status ?? "—"}</dd>
-            </div>
-            <div className="col-span-2">
-              <dt className="text-xs uppercase tracking-widest text-ink/40">Activité déclarée</dt>
-              <dd className="mt-1 font-semibold">{profile.activity_declared ?? "—"}</dd>
-            </div>
-            <div className="col-span-2">
-              <dt className="text-xs uppercase tracking-widest text-ink/40">Explication</dt>
-              <dd className="mt-1 text-sm text-ink/70">{orchestratorResult.message}</dd>
-            </div>
-          </dl>
+          {profile.verification_status === "verified" && !showRegistryDocStep && (
+            <section className="bg-white border border-border rounded-2xl p-8">
+              <p className="font-mono text-[11px] uppercase tracking-widest text-teal-dark mb-4">
+                Étape 3 · Avis de situation SIRENE
+              </p>
+              {profile.sirene_document_uploaded ? (
+                <div className="text-sm space-y-1">
+                  <p>✓ Document archivé</p>
+                  {profile.sirene_document_activity_label && (
+                    <p className="text-ink/60">Activité : {profile.sirene_document_activity_label}</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-ink/70 mb-4">
+                    Téléchargez votre avis sur{" "}
+                    <a
+                      href="https://avis-situation-sirene.insee.fr/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline text-teal-dark"
+                    >
+                      avis-situation-sirene.insee.fr
+                    </a>{" "}
+                    puis déposez-le ici.
+                  </p>
+                  <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark">
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      className="sr-only"
+                      disabled={loading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleSireneUpload(f);
+                      }}
+                    />
+                    <span className="text-sm font-semibold">
+                      {loading ? "Archivage…" : "Déposer l'avis SIRENE (PDF)"}
+                    </span>
+                  </label>
+                  {sireneUploadError && <p className="text-xs text-coral mt-2">{sireneUploadError}</p>}
+                  {turnError && <p className="text-xs text-coral mt-2">{turnError}</p>}
+                </>
+              )}
+            </section>
+          )}
 
-          {profile.verification_status === "verified" ? (
+          {profile.verification_status === "verified" && !showRegistryDocStep && !showSireneUploadStep && (
             <button
-              onClick={handleContinue}
-              disabled={loading}
+              onClick={() => advanceVerification()}
+              disabled={loading || !showContinueToProfil}
               className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
             >
-              {loading ? "Chargement…" : "Continuer vers mon profil"}
+              {loading ? "Chargement…" : "Continuer vers mon profil →"}
             </button>
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-6 text-ink">
-                <p className="font-semibold">Ce SIRET n'a pas été vérifié.</p>
-                <p className="mt-2 text-sm text-ink/70">
-                  Vérifiez votre numéro ou contactez l'administration.
-                </p>
-              </div>
-              <button
-                onClick={() => setOrchestratorResult(null)}
-                className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
-              >
-                Réessayer
-              </button>
-            </div>
+          )}
+
+          {profile.verification_status !== "verified" && (
+            <button
+              onClick={() => setOrchestratorResult(null)}
+              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold"
+            >
+              Réessayer
+            </button>
           )}
         </div>
       )}

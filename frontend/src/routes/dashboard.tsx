@@ -6,10 +6,9 @@ import {
   fetchUserProfile,
   formatMoney,
   getStoredSessionId,
-  type Calcul,
-  type Qualification,
   type UserProfile,
-} from "@/lib/api-mock";
+} from "@/lib/api";
+import type { Calcul, Qualification } from "@/lib/api-mocks";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
-import { fetchUserProfile, getStoredSessionId, type UserProfile } from "@/lib/api-mock";
+import { fetchDiagnosticResult, type DiagnosticResult } from "@/lib/api-mocks";
 
 export const Route = createFileRoute("/onboarding/diagnostic/resultat")({
   head: () => ({
@@ -22,33 +22,14 @@ export const Route = createFileRoute("/onboarding/diagnostic/resultat")({
 });
 
 function ResultatPage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [result, setResult] = useState<DiagnosticResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sessionId = getStoredSessionId();
-    if (!sessionId) {
-      setError("Aucune session trouvée.");
-      return;
-    }
-    fetchUserProfile(sessionId)
-      .then(setProfile)
+    fetchDiagnosticResult()
+      .then(setResult)
       .catch((e) => setError(e instanceof Error ? e.message : "Erreur de chargement"));
   }, []);
-
-  const statutLabel =
-    profile?.verification_status === "skipped"
-      ? "Non immatriculé"
-      : profile?.verification_status === "verified"
-      ? "Immatriculé et vérifié"
-      : "Statut à confirmer";
-
-  const statutDescription =
-    profile?.verification_status === "skipped"
-      ? "Vous n'avez pas encore de SIRET. Nous allons vous guider pour créer votre statut."
-      : profile?.activity_mismatch
-      ? "Un écart entre votre activité déclarée et votre code APE a été détecté — une régularisation est recommandée."
-      : profile?.tax_category_reason ?? "Votre profil a été analysé avec succès.";
 
   return (
     <div className="min-h-screen px-6 py-16 max-w-6xl mx-auto">
@@ -65,37 +46,29 @@ function ResultatPage() {
       </header>
 
       {error && <div className="text-coral font-mono text-sm">{error}</div>}
-      {!profile && !error ? (
+      {!result && !error ? (
         <div className="text-ink/40 font-mono text-sm">Analyse en cours…</div>
-      ) : profile ? (
+      ) : result ? (
         <>
           <div className="grid lg:grid-cols-2 gap-6">
             <Card index="01" label="Fiche de situation">
               <dl className="space-y-4">
-                <Row
-                  k="Activité"
-                  v={profile.activity_types.join(", ") || "Non précisée"}
-                />
-                <Row
-                  k="Revenus estimés"
-                  v={profile.estimated_monthly_revenue ?? "Non précisé"}
-                />
-                <Row k="Ancienneté" v={profile.first_income_date ?? "Non précisé"} />
+                <Row k="Activité" v={result.situation.activite} />
+                <Row k="Revenus estimés" v={result.situation.revenus_estimes} />
+                <Row k="Ancienneté" v={result.situation.anciennete} />
                 <div>
                   <dt className="text-xs uppercase tracking-widest text-ink/40 mb-2">
                     Sources de revenus
                   </dt>
                   <dd className="flex flex-wrap gap-2">
-                    {(profile.revenue_sources.length > 0 ? profile.revenue_sources : ["Non précisé"]).map(
-                      (s) => (
-                        <span
-                          key={s}
-                          className="px-3 py-1 bg-background border border-border rounded-full text-xs font-medium"
-                        >
-                          {s}
-                        </span>
-                      ),
-                    )}
+                    {result.situation.sources.map((s) => (
+                      <span
+                        key={s}
+                        className="px-3 py-1 bg-background border border-border rounded-full text-xs font-medium"
+                      >
+                        {s}
+                      </span>
+                    ))}
                   </dd>
                 </div>
               </dl>
@@ -103,31 +76,17 @@ function ResultatPage() {
 
             <Card index="02" label="Statut actuel">
               <div className="flex items-center gap-3 mb-4">
-                <div
-                  className={`size-2.5 rounded-full ${
-                    profile.activity_mismatch ? "bg-coral" : "bg-amber-fiscal"
-                  }`}
-                />
-                <p className="text-lg font-semibold">{statutLabel}</p>
+                <div className="size-2.5 rounded-full bg-amber-fiscal" />
+                <p className="text-lg font-semibold">{result.statut_actuel.label}</p>
               </div>
-              <p className="text-ink/60 text-pretty leading-relaxed">{statutDescription}</p>
-              {profile.compliance_alerts.length > 0 && (
-                <ul className="mt-4 space-y-2">
-                  {profile.compliance_alerts.map((a, i) => (
-                    <li key={i} className="text-sm text-ink/70">
-                      [{a.severity}] {a.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <p className="text-ink/60 text-pretty leading-relaxed">
+                {result.statut_actuel.description}
+              </p>
             </Card>
 
             <Card index="03" label="Plan de régularisation" span="lg:col-span-2">
               <ol className="space-y-4">
-                {(profile.recommended_actions.length > 0
-                  ? profile.recommended_actions
-                  : [{ step: 1, title: "Continuer le suivi", description: "Accédez à votre dashboard LedgerMind." }]
-                ).map((s) => (
+                {result.plan.map((s) => (
                   <li key={s.step} className="flex gap-5">
                     <div className="shrink-0 size-10 rounded-full bg-background border border-border font-mono grid place-items-center text-sm font-medium">
                       {s.step.toString().padStart(2, "0")}
@@ -151,16 +110,16 @@ function ResultatPage() {
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                   <h2 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
-                    {profile.recommended_regime ?? profile.tax_category ?? "—"}
+                    {result.regime_recommande.nom}
                   </h2>
                   <p className="mt-4 text-background/80 max-w-xl text-pretty leading-relaxed">
-                    {profile.tax_category_reason ?? "Classification en cours."}
+                    {result.regime_recommande.pourquoi}
                   </p>
                 </div>
                 <div className="shrink-0">
                   <p className="text-xs uppercase tracking-widest opacity-70">Plafond</p>
                   <p className="font-mono text-2xl font-medium mt-1">
-                    {profile.regime_plafond ?? "—"}
+                    {result.regime_recommande.plafond}
                   </p>
                 </div>
               </div>
