@@ -1,0 +1,118 @@
+# ============================================================================
+#  SEUILS ET TAUX FISCAUX / SOCIAUX — SOURCE DE VÉRITÉ UNIQUE (France)
+# ============================================================================
+#  ⚠️  À RÉVISER À CHAQUE LOI DE FINANCES (et à chaque revalorisation triennale
+#      des seuils micro / à chaque évolution des taux URSSAF).
+#
+#  Règle du projet : AUCUN seuil, taux, coût ou URL ne doit être codé en dur
+#  dans la logique. Toute valeur fiscale vit ici, avec sa source officielle et
+#  sa date de vérification. Le code ne fait que lire ce fichier.
+#
+#  Chaque bloc porte : valeur(s), annee (validité), source (URL officielle),
+#  date_verif (date du dernier contrôle auprès de la source).
+# ============================================================================
+
+annee: 2026
+date_verif: "2026-07-23"
+
+# --- Plafonds du régime micro (revenus 2026) -------------------------------
+micro:
+  # Micro-BNC : prestations libérales (création de contenu / influence = BNC).
+  bnc:
+    seuil: 83600
+    abattement: 0.34
+    abattement_min: 305
+    annee: 2026
+    source: "https://entreprendre.service-public.gouv.fr/vosdroits/F32353"  # CGI art. 102 ter
+    date_verif: "2026-07-23"
+  # Micro-BIC prestations de services.
+  bic_services:
+    seuil: 83600
+    abattement: 0.50
+    annee: 2026
+    source: "https://entreprendre.service-public.gouv.fr/vosdroits/F32919"
+    date_verif: "2026-07-23"
+  # Micro-BIC vente de marchandises / fourniture de logement.
+  bic_vente:
+    seuil: 203100
+    abattement: 0.71
+    annee: 2026
+    source: "https://entreprendre.service-public.gouv.fr/vosdroits/F32919"
+    date_verif: "2026-07-23"
+  # Activité mixte (vente BIC + prestations BNC/BIC) : DEUX plafonds cumulés.
+  mixte:
+    seuil_global: 203100        # CA total (vente + prestations)
+    seuil_services: 83600       # dont la part prestations de services
+    abattement_min: 610         # minimum d'abattement doublé en activité mixte
+    annee: 2026
+    source: "https://www.economie.gouv.fr/entreprises/gerer-sa-micro-entreprise/micro-entreprise-peut-exercer-plusieurs-activites"
+    date_verif: "2026-07-23"
+
+# --- Règle de franchissement du plafond micro ------------------------------
+#  POINT DÉTERMINANT : un dépassement sur UNE seule année n'exclut PAS du micro.
+#  Sortie du régime micro seulement si l'un des seuils est dépassé pendant
+#  2 ANNÉES CONSÉCUTIVES (N-1 ET N-2), avec effet au 1er janvier suivant.
+franchissement:
+  annees_consecutives: 2
+  effet: "1er janvier de l'année suivant deux dépassements consécutifs"
+  annee: 2026
+  source: "https://entreprendre.service-public.gouv.fr/vosdroits/F32353"
+  date_verif: "2026-07-23"
+
+# --- Prorata temporis la première année d'activité -------------------------
+prorata_temporis:
+  formule: "seuil x (jours d'existence en N) / 365"
+  annee: 2026
+  source: "https://entreprendre.service-public.gouv.fr/vosdroits/F32353"
+  date_verif: "2026-07-23"
+
+# --- Franchise en base de TVA (saute AVANT le plafond micro) ----------------
+#  Dépassement du seuil de base  -> redevable TVA au 1er janvier suivant.
+#  Dépassement du seuil majoré   -> redevable TVA dès le 1er jour du dépassement.
+#  Réforme du seuil unique à 25 000 € : ABANDONNÉE / suspendue (LF 2025 puis 2026).
+tva_franchise:
+  services:
+    seuil_base: 37500
+    seuil_majore: 41250
+    annee: 2026
+    source: "https://www.impots.gouv.fr/professionnel/questions/en-tant-que-micro-entrepreneur-puis-je-etre-redevable-de-la-tva"
+    date_verif: "2026-07-23"
+  vente:
+    seuil_base: 85000
+    seuil_majore: 93500
+    annee: 2026
+    source: "https://www.impots.gouv.fr/professionnel/questions/en-tant-que-micro-entrepreneur-puis-je-etre-redevable-de-la-tva"
+    date_verif: "2026-07-23"
+  reforme_seuil_unique_25000: "abandonnee"
+  annee: 2026
+  source: "https://entreprendre.service-public.gouv.fr/vosdroits/F21746"
+  source_reforme: "https://presse.economie.gouv.fr/reforme-de-la-franchise-en-base-de-tva-le-gouvernement-fait-le-choix-de-lecoute-et-du-dialogue-en-suspendant-la-reforme-dans-lattente-de-lexamen-du-prochain-budget/"
+  date_verif: "2026-07-23"
+
+# --- Cotisations sociales (micro-social) au 01/01/2026 ---------------------
+micro_social:
+  vente: 0.123                  # vente de marchandises (BIC)
+  services_bic: 0.212          # prestations de services BIC
+  bnc_regime_general: 0.256    # prestations BNC affiliées au régime général (24,6 -> 25,6 au 01/01/2026)
+  bnc_cipav: 0.261             # prestations BNC affiliées à la Cipav
+  annee: 2026
+  source: "https://www.urssaf.fr/accueil/actualites/taux-cotisations-autoentrepeneur.html"
+  date_verif: "2026-07-23"
+
+# --- Versement libératoire de l'IR (option) --------------------------------
+versement_liberatoire:
+  vente: 0.01
+  services_bic: 0.017
+  bnc: 0.022
+  rfr_max_par_part: 29315      # RFR N-2 (2024) par part pour une option en 2026
+  annee: 2026
+  source: "https://www.economie.gouv.fr/entreprises/gerer-sa-micro-entreprise/micro-entreprise-comment-fonctionne-le-versement-liberatoire-de-limpot-sur-le-revenu"
+  date_verif: "2026-07-23"
+
+# --- Compte bancaire dédié -------------------------------------------------
+compte_bancaire_dedie:
+  seuil: 10000
+  annees_consecutives: 2       # obligatoire si CA > 10 000 € pendant 2 années consécutives
+  annee: 2026
+  source: "https://entreprendre.service-public.gouv.fr/vosdroits/F35991"
+  date_verif: "2026-07-23"

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/onboarding/")({
   head: () => ({
@@ -19,15 +20,18 @@ function useSessionGuard() {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    try {
-      if (!localStorage.getItem("lm.session")) {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (!data.session) {
         navigate({ to: "/auth", replace: true });
         return;
       }
-    } catch {
-      /* noop */
-    }
-    setReady(true);
+      setReady(true);
+    });
+    return () => {
+      active = false;
+    };
   }, [navigate]);
   return ready;
 }

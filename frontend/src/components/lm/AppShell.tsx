@@ -1,5 +1,7 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard" },
@@ -10,13 +12,22 @@ const nav = [
 ];
 
 export function LogoutBubble() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  async function handleSignOut() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  }
   return (
-    <Link
-      to="/"
+    <button
+      type="button"
+      onClick={handleSignOut}
       className="px-4 py-1.5 rounded-full border border-border text-[13px] font-medium text-ink/70 hover:border-ink hover:text-ink transition-colors"
     >
       Déconnexion
-    </Link>
+    </button>
   );
 }
 
