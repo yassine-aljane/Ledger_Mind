@@ -1,0 +1,70 @@
+# Registre des sources du corpus RAG (fiscalité française créateurs/influenceurs).
+# autorite : 1 = loi/décret (Légifrance)  2 = doctrine officielle (BOFiP/URSSAF/impots)  3 = guide/privé
+# Le script scripts/seed_corpus.py télécharge et ingère ces pages au premier lancement.
+
+sources:
+  - titre: "Loi n° 2023-451 du 9 juin 2023 (loi Influenceurs)"
+    url: "https://www.legifrance.gouv.fr/loda/id/JORFTEXT000047663185"
+    source: "Légifrance"
+    type_doc: "loi"
+    autorite: 1
+    concerne: ["influenceur"]
+
+  - titre: "Micro-entreprise — l'essentiel du statut"
+    url: "https://www.autoentrepreneur.urssaf.fr/portail/accueil/sinformer-sur-le-statut/lessentiel-du-statut.html"
+    source: "URSSAF"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "2026 — modification des seuils de chiffre d'affaires"
+    url: "https://www.autoentrepreneur.urssaf.fr/portail/accueil/sinformer-sur-le-statut/toutes-les-actualites/2026--modification-des-seuils-de.html"
+    source: "URSSAF"
+    type_doc: "actualite"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "Franchise en base de TVA"
+    url: "https://entreprendre.service-public.gouv.fr/vosdroits/F21746"
+    source: "Service-Public"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "Régime fiscal de la micro-entreprise (déclaration des revenus)"
+    url: "https://entreprendre.service-public.gouv.fr/vosdroits/F23267"
+    source: "Service-Public"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "Bénéfices non commerciaux (BNC) — régime réel d'imposition"
+    url: "https://entreprendre.service-public.gouv.fr/vosdroits/F32105"
+    source: "Service-Public"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "Créer une entreprise — Guichet unique (INPI)"
+    url: "https://entreprendre.service-public.fr/vosdroits/F32919"
+    source: "Service-Public"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "Influenceurs et créateurs de contenu — DGCCRF"
+    url: "https://www.economie.gouv.fr/dgccrf/influenceurs-et-createurs-de-contenu"
+    source: "DGCCRF"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["influenceur"]
+
+# Sources accessibles dynamiquement via les serveurs MCP (pas besoin de les figer ici) :
+#   - BOFiP (doctrine opposable) -> serveur mcp "bofip" (API Opendatasoft, dataset bofip-vigueur)
+#       ex : POST /mcp/ingest-bofip?requete=avantages en nature influenceur
+#   - CGI et Code de la consommation -> serveur mcp "legifrance", outil code_article
+#       ex : code_article(code="CGI", article="155 B")
+#   - Ordonnance du 6/11/2024 et décret du 28/11/2025 -> serveur mcp "legifrance", legifrance_search
+#
+# À enrichir manuellement si besoin (PDF officiels dans data/pdf/) :
+#   - articles précis du CGI sur les BNC (art. 92 et suivants)
