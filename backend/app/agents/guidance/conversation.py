@@ -83,7 +83,8 @@ def _ca_annuel(m: str) -> float | None:
 def _extraire_profil_regex(message: str) -> dict:
     """Extraction déterministe de repli, si l'extraction sémantique échoue."""
     m = message.lower()
-    out: dict = {}
+    # Une réponse rapide cliquée est interprétable telle quelle : elle prime sur les heuristiques.
+    out: dict = _reponse_rapide(message)
     for cle, libelle in _ACTIVITES:
         if cle in m:
             out["activite"] = libelle
@@ -94,7 +95,11 @@ def _extraire_profil_regex(message: str) -> dict:
     # La NÉGATION est testée en premier pour ne pas faire matcher « vente de » dans
     # « pas de vente de produits ». « produits gratuits » = cadeaux reçus, jamais une vente.
     if (re.search(r"\b(non|pas de|aucun|aucune|sans)\b[^.?!]*(?:produit|merch|vente|marchandise)", m)
-            or "pas de vente" in m or "que des prestations" in m):
+            or "pas de vente" in m
+            # « uniquement / seulement / que des prestations (de services) » : exclusivité
+            # exprimée sans aucun mot de négation, donc invisible au motif ci-dessus.
+            or re.search(r"\b(uniquement|seulement|que)\b\s+(?:des?\s+)?(?:prestations?|services?)", m)
+            or re.search(r"\b(prestations?|services?)\s+(uniquement|seulement)\b", m)):
         out["vend_produits"] = False
     elif any(w in m for w in ("merch", "boutique", "je vends", "vends des", "vends du",
                               "vente de", "revends", "e-commerce", "dropshipping")):
@@ -266,19 +271,46 @@ def questions_manquantes(profil: dict) -> list[dict]:
     return qs
 
 
+# Réponses rapides : le libellé proposé ET sa traduction en profil, dans la MÊME table.
+# C'est le backend qui propose ces boutons ; il doit donc savoir les relire sans l'aide du LLM,
+# sinon cliquer une réponse suggérée ne produit rien dès que le quota est épuisé — l'utilisateur
+# voit alors sa propre réponse ignorée et la question reposée à l'identique.
+# « Je ne sais pas encore » ne renseigne rien volontairement : c'est `_resoudre_question` qui
+# applique alors une hypothèse prudente.
+_REPONSES_RAPIDES: dict[str, list[tuple[str, dict]]] = {
+    "activite": [
+        ("Création de contenu", {"activite": "création de contenu"}),
+        ("Prestations freelance", {"activite": "freelance"}),
+        ("Vente de produits", {"activite": "vente de produits", "vend_produits": True}),
+    ],
+    "ca_estime": [
+        ("Je débute, presque rien", {"ca_estime": 0.0}),
+        ("Environ 1 500 € par mois", {"ca_estime": 18000.0}),
+        ("Je ne sais pas encore", {}),
+    ],
+    "vend_produits": [
+        ("Oui, je vends aussi des produits", {"vend_produits": True}),
+        ("Non, uniquement des prestations", {"vend_produits": False}),
+    ],
+}
+
+
 def suggestions_pour(profil: dict) -> list[str]:
     """Réponses rapides proposées sous la question courante (le front les rend en boutons)."""
     manquantes = questions_manquantes(profil)
     if not manquantes:
         return []
-    champ = manquantes[0]["champ"]
-    if champ == "activite":
-        return ["Création de contenu", "Prestations freelance", "Vente de produits"]
-    if champ == "ca_estime":
-        return ["Je débute, presque rien", "Environ 1 500 € par mois", "Je ne sais pas encore"]
-    if champ == "vend_produits":
-        return ["Oui, je vends aussi des produits", "Non, uniquement des prestations"]
-    return []
+    return [libelle for libelle, _ in _REPONSES_RAPIDES.get(manquantes[0]["champ"], [])]
+
+
+def _reponse_rapide(message: str) -> dict:
+    """Traduit le texte EXACT d'une réponse rapide en valeurs de profil, sans appel LLM."""
+    cle = message.strip().lower().rstrip(".!")
+    for choix in _REPONSES_RAPIDES.values():
+        for libelle, valeurs in choix:
+            if cle == libelle.lower():
+                return dict(valeurs)
+    return {}
 
 
 # ------------------------------------------- Interprétation d'une réponse (anti-boucle, LLM)

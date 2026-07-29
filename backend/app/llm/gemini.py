@@ -26,10 +26,20 @@ _SYSTEM = (
 )
 
 
-# Le palier gratuit Gemini limite le nombre d'appels par minute. Sans reprise, un dépassement
-# fait échouer l'extraction du profil ET son interprétation : l'agent ne comprend plus la réponse
-# de l'utilisateur et repose la même question indéfiniment, sans rien afficher de l'échec.
-_MAX_TENTATIVES = 4
+# Le palier gratuit Gemini limite le nombre d'appels par minute. Sans reprise, un simple
+# dépassement fait échouer l'extraction du profil ET son interprétation : l'agent ne comprend
+# plus la réponse de l'utilisateur et repose la même question indéfiniment.
+#
+# Mais ces appels servent une requête HTTP interactive : on ne peut pas faire patienter
+# l'utilisateur une minute. La reprise est donc VOLONTAIREMENT courte — une seule, et seulement
+# si l'API annonce un délai bref (creux passager). Quand elle réclame plus, le quota ne se
+# rouvrira pas à l'échelle d'un tour de conversation : mieux vaut rendre la main tout de suite au
+# repli déterministe, qui répond instantanément, que tenir la connexion ouverte pour rien.
+#
+# L'ingestion du corpus, elle, n'est pas interactive : `app.rag.embeddings` applique une politique
+# plus patiente, adaptée à un script qui tourne en fond.
+_MAX_TENTATIVES = 2
+_ATTENTE_MAX = 6.0
 _TRANSITOIRE = ("429", "resource_exhausted", "rate limit", "quota",
                 "500", "502", "503", "504", "timeout", "timed out", "overloaded")
 
@@ -56,10 +66,15 @@ async def _completion(**kwargs: Any):
             derniere = exc
             if not _est_transitoire(exc) or tentative == _MAX_TENTATIVES - 1:
                 raise
-            attente = _delai_conseille(exc) or min(2.0 * (2**tentative), 20.0)
-            logger.info("Gemini indisponible (%s) — reprise dans %.1fs (tentative %d/%d)",
-                        type(exc).__name__, attente, tentative + 1, _MAX_TENTATIVES)
-            await asyncio.sleep(attente + random.uniform(0, 0.8))
+            attente = _delai_conseille(exc) or 2.0
+            if attente > _ATTENTE_MAX:
+                # Quota durablement épuisé : inutile de faire attendre l'utilisateur.
+                logger.warning("Gemini demande %.0fs d'attente — abandon, repli déterministe.",
+                               attente)
+                raise
+            logger.info("Gemini indisponible (%s) — reprise dans %.1fs",
+                        type(exc).__name__, attente)
+            await asyncio.sleep(attente + random.uniform(0, 0.5))
     raise derniere  # type: ignore[misc]
 
 

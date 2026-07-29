@@ -215,3 +215,32 @@ def test_montant_reconnu_par_le_repli(message, attendu):
 ])
 def test_repli_ne_devine_pas_de_montant(message):
     assert C._ca_annuel(message.lower()) is None
+
+
+# ------------------------------------------------- Réponses rapides proposées par le backend
+# C'est le backend qui propose ces boutons : il doit savoir les relire SANS le LLM. Sinon,
+# quota épuisé, cliquer une réponse suggérée ne produit rien et la question est reposée telle
+# quelle — l'utilisateur voit sa propre réponse ignorée.
+def test_toute_reponse_rapide_proposee_est_relisible_sans_llm():
+    for champ, choix in C._REPONSES_RAPIDES.items():
+        for libelle, attendu in choix:
+            lu = C._reponse_rapide(libelle)
+            assert lu == attendu, f"« {libelle} » ({champ}) n'est pas relu correctement"
+
+
+def test_suggestions_et_table_ne_divergent_pas():
+    """Les libellés affichés viennent de la table qui sert aussi à les relire."""
+    suggestions = C.suggestions_pour({})
+    assert suggestions, "aucune suggestion sur un profil vierge"
+    for libelle in suggestions:
+        assert C._reponse_rapide(libelle) != {} or libelle.startswith("Je ne sais pas")
+
+
+@pytest.mark.parametrize("message", [
+    "Non, uniquement des prestations",
+    "uniquement des prestations",
+    "que des services",
+    "je fais seulement des prestations de services",
+])
+def test_exclusivite_prestations_sans_mot_de_negation(message):
+    assert C._extraire_profil_regex(message).get("vend_produits") is False
