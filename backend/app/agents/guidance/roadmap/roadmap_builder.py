@@ -22,14 +22,78 @@ from app.agents.guidance.roadmap import analyse_juridique as AJ
 from app.agents.guidance.roadmap import comparateur as C
 from app.agents.guidance.roadmap import presentation as P
 from app.agents.guidance.roadmap import seuils as S
+from app.agents.guidance.roadmap.analyse_juridique import DURABILITE_INDET
 from app.agents.guidance.roadmap.models import Fraicheur, Meta, Roadmap
 from app.agents.guidance.roadmap.presentation import PARCOURS_BASCULE, PARCOURS_MICRO, PARCOURS_SOCIETE
 
 __all__ = [
     "PARCOURS_MICRO", "PARCOURS_SOCIETE", "PARCOURS_BASCULE",
-    "build_roadmap",
+    "build_roadmap", "verdict_regime", "decide_regime",
     "valider_coherence", "RoadmapIncoherente",
 ]
+
+
+# ---------------------------------------------------------------------------
+#  Décision : analyse juridique + parcours UX en une structure
+# ---------------------------------------------------------------------------
+def decide_regime(profil: dict) -> dict:
+    """Décision déterministe : combine l'analyse juridique et le parcours UX.
+
+    Expose aussi l'objet `analyse` (AnalyseJuridique) pour les appelants qui veulent le verdict
+    légal pur, découplé de l'affichage.
+    """
+    analyse = AJ.analyser(profil)
+    parcours = P.choisir_parcours(analyse)
+    return {
+        "analyse": analyse,
+        "parcours": parcours,
+        "categorie": analyse.categorie,
+        "ca": analyse.ca_retenu.ca_global,
+        "seuil_micro": analyse.seuil_effectif,
+        "seuil_micro_plein": analyse.seuil_plein,
+        "seuil_micro_source": analyse.source_legale,
+        "prorata": analyse.prorata,
+        "ratio": analyse.ratio_legal,
+        "durabilite": analyse.durabilite,
+    }
+
+
+# ---------------------------------------------------------------------------
+#  Verdict injectable comme contrainte dans les réponses du LLM
+# ---------------------------------------------------------------------------
+def _question_manquante(analyse) -> str | None:
+    """La seule question qui empêche encore de trancher, s'il en reste une."""
+    if analyse.durabilite != DURABILITE_INDET:
+        return None
+    if analyse.categorie == "mixte" and not (analyse.ca_retenu.ca_prestations > 0
+                                             and analyse.ca_retenu.ca_vente > 0):
+        return ("Peux-tu préciser la répartition de ton chiffre d'affaires entre tes prestations "
+                "de services et ta vente de produits ?")
+    return ("Ton chiffre d'affaires de l'an dernier dépassait-il déjà le plafond micro ? "
+            "Cela détermine si la sortie du régime s'applique.")
+
+
+def verdict_regime(profil: dict) -> dict | None:
+    """Position DÉTERMINISTE sur le régime, à injecter comme contrainte dans les réponses LLM.
+
+    C'est ce qui empêche l'agent pédagogique de contredire la feuille de route : il doit
+    s'aligner sur ce verdict plutôt que raisonner librement sur les seuils.
+
+    None si le CA est inconnu ou nul : aucune décision n'est possible, donc aucune contrainte
+    n'est imposée.
+    """
+    if not float(profil.get("ca_estime_annuel") or 0):
+        return None
+    analyse = AJ.analyser(profil)
+    parcours = P.choisir_parcours(analyse)
+    return {
+        "parcours": parcours,
+        "categorie": analyse.categorie,
+        "seuil_micro": analyse.seuil_effectif,
+        "durabilite": analyse.durabilite,
+        "question_manquante": _question_manquante(analyse),
+        "phrase": P.phrase_regime(analyse, parcours),
+    }
 
 
 # ---------------------------------------------------------------------------

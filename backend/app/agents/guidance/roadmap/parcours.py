@@ -31,5 +31,7 @@ from app.agents.guidance.roadmap.presentation import (  # noqa: F401
 from app.agents.guidance.roadmap.roadmap_builder import (  # noqa: F401
     RoadmapIncoherente,
     build_roadmap,
+    decide_regime,
     valider_coherence,
+    verdict_regime,
 )

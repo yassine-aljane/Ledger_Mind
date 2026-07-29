@@ -1,7 +1,8 @@
 """Chargement de la source de vérité unique des seuils/taux fiscaux (data/seuils.yaml).
 
 Aucune valeur fiscale n'est codée en dur ailleurs : tout passe par ce module.
-Le YAML est lu une seule fois (cache mémoire).
+Le YAML est lu une seule fois (cache mémoire) ; `reload()` force une relecture (tests, ou
+modification du fichier à chaud).
 
 Chaque bloc du YAML porte sa `source` (URL officielle) et sa `date_verif`, de sorte
 que l'UI et le PDF peuvent afficher la provenance et la fraîcheur de chaque chiffre.
@@ -19,6 +20,17 @@ from app.core.paths import SEUILS_YAML as _YAML_PATH
 @lru_cache(maxsize=1)
 def _load() -> dict:
     return yaml.safe_load(_YAML_PATH.read_text(encoding="utf-8"))
+
+
+def reload() -> dict:
+    """Vide le cache et relit le fichier (utile si le YAML change à chaud, ou en test)."""
+    _load.cache_clear()
+    return _load()
+
+
+def seuils() -> dict:
+    """Renvoie l'intégralité de la table des seuils (dict issu du YAML)."""
+    return _load()
 
 
 def bloc(nom: str) -> dict:
