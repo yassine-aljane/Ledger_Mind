@@ -1,8 +1,7 @@
-import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
-import { Chatbot, type ChatTurn } from "@/components/lm/Chatbot";
-import { startOrchestrator, storeSessionId, type UserProfile } from "@/lib/api";
+import { GuidanceChat } from "@/components/lm/GuidanceChat";
 
 export const Route = createFileRoute("/onboarding/diagnostic")({
   head: () => ({
@@ -33,46 +32,12 @@ function DiagnosticPage() {
 }
 
 function DiagnosticChat() {
+  // Le diagnostic est CONVERSATIONNEL : la session est créée par le premier message, il n'y a
+  // donc rien à démarrer côté serveur avant d'entrer dans la discussion.
   const [started, setStarted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
-  const [initialQuestion, setInitialQuestion] = useState<string | undefined>();
-  const [initialQuickReplies, setInitialQuickReplies] = useState<string[]>([]);
-  const navigate = useNavigate();
-
-  const handleStart = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await startOrchestrator({
-        skip_verification: true,
-        branch: "guidance",
-      });
-      sessionIdRef.current = res.session_id;
-      setSessionId(res.session_id);
-      setInitialQuestion(res.message ?? undefined);
-      setInitialQuickReplies(res.quick_replies ?? []);
-      setStarted(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de démarrer le diagnostic.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFinish = (_profile: UserProfile, _transcript: ChatTurn[]) => {
-    const id = sessionIdRef.current || sessionId;
-    if (id) storeSessionId(id);
-    void navigate({
-      to: "/onboarding/diagnostic/resultat",
-      search: id ? { session: id } : {},
-    });
-  };
 
   return (
-    <div className="min-h-screen px-6 py-16 max-w-4xl mx-auto">
+    <div className="min-h-screen px-6 py-16 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-4">
         <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink">
           ← Retour
@@ -96,7 +61,7 @@ function DiagnosticChat() {
 
           <div className="mt-12 grid sm:grid-cols-3 gap-4 text-left">
             {[
-              { n: "6+", l: "questions ciblées" },
+              { n: "0", l: "formulaire à remplir" },
               { n: "3 min", l: "de discussion" },
               { n: "1", l: "feuille de route" },
             ].map((s) => (
@@ -107,30 +72,21 @@ function DiagnosticChat() {
             ))}
           </div>
 
-          {error && (
-            <p className="mt-6 text-sm text-coral font-mono">{error}</p>
-          )}
-
           <button
-            onClick={() => void handleStart()}
-            disabled={loading}
-            className="mt-12 px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-50"
+            onClick={() => setStarted(true)}
+            className="mt-12 px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
           >
-            {loading ? "Démarrage…" : "Commencer le diagnostic"}
+            Commencer le diagnostic
           </button>
         </section>
       ) : (
         <div className="mt-12">
-          {sessionId && (
-            <Chatbot
-              eyebrow="Diagnostic de régularisation"
-              orchestratorSessionId={sessionId}
-              initialQuestion={initialQuestion}
-              initialQuickReplies={initialQuickReplies}
-              onOrchestratorFinish={handleFinish}
-              intro="Quelques questions pour construire votre feuille de route de régularisation."
-            />
-          )}
+          <div className="flex items-center justify-between gap-6 mb-8">
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
+              Diagnostic de régularisation
+            </p>
+          </div>
+          <GuidanceChat />
         </div>
       )}
     </div>

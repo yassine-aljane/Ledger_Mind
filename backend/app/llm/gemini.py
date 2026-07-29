@@ -46,6 +46,58 @@ def _extract_json_object(text: str) -> dict:
     return data
 
 
+async def chat_text(
+    system: str,
+    prompt: str,
+    *,
+    temperature: float = 0.2,
+    max_tokens: int = 512,
+    timeout: float = 30.0,
+) -> str:
+    """Réponse LIBRE (non JSON) avec consigne système — rédaction, reformulation.
+
+    Utilisé par l'agent de guidance conversationnel, où le LLM ne fait que mettre en forme :
+    aucun chiffre, aucune décision de régime ne sort d'ici.
+    """
+    response = await _client.chat.completions.create(
+        model=settings.gemini_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=temperature,
+        max_tokens=max_tokens,
+        timeout=timeout,
+    )
+    return (response.choices[0].message.content or "").strip()
+
+
+async def chat_json_with_system(
+    system: str,
+    prompt: str,
+    *,
+    temperature: float = 0.0,
+    max_tokens: int = 512,
+    timeout: float = 30.0,
+) -> dict:
+    """Comme `chat_json`, mais avec une consigne système dédiée (extraction structurée)."""
+    response = await _client.chat.completions.create(
+        model=settings.gemini_model,
+        messages=[
+            {"role": "system", "content": f"{system}\n\n{_SYSTEM}"},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=temperature,
+        max_tokens=max_tokens,
+        timeout=timeout,
+        response_format={"type": "json_object"},
+    )
+    raw = response.choices[0].message.content or ""
+    if not raw.strip():
+        raise ValueError("Empty LLM response")
+    return _extract_json_object(raw)
+
+
 async def chat_json(
     prompt: str,
     *,

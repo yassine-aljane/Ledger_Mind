@@ -197,13 +197,30 @@ Route: `/onboarding/`
 4. Continue turns → profile questions (`Chatbot` on `/onboarding/profil`)  
 5. Finish → dashboard (shell pages exist; many are still placeholders)
 
-### Branch B — diagnostic → feuille de route
+### Branch B — diagnostic conversationnel → feuille de route
 
-1. Start diagnostic → `POST /api/orchestrator/start` with `skip_verification: true` / `branch: "guidance"`
-2. `Chatbot` asks static ordered questions; answers go to `POST /api/orchestrator/turn`
-3. When complete, API returns `ui_action: "show_roadmap"`
-4. CTA **Voir ma feuille de route** → `/onboarding/diagnostic/resultat`
-5. Result page loads session detail (API + client cache) and shows situation + steps + régime
+Branch B is **conversational**, not a questionnaire: the user describes their activity in their
+own words and the profile builds itself from the conversation. Endpoints live under
+`/api/guidance` (see §7); the orchestrator state machine is untouched and still serves Branch A.
+
+1. `/onboarding/diagnostic` renders `GuidanceChat` — no server call needed to start
+2. Each message → `POST /api/guidance/chat` (session created on the first message)
+3. The backend decides what is still missing; **the roadmap is never produced while a legally
+   required fact is missing**. When the profile is complete, the response carries `roadmap`
+4. CTA **Voir ma feuille de route** → `/onboarding/diagnostic/resultat`, plus a PDF export
+5. Then **J'ai déjà mon SIREN → vérification** hands over to `/onboarding/verification` —
+   the same screen Branch A users reach after answering "yes, I have a SIREN"
+
+Three UI pieces the user drives (`frontend/src/components/lm/`):
+
+| Component | Role |
+|---|---|
+| `GuidanceChat.tsx` | chat, opening **suggestions**, backend-driven clickable options |
+| `StatusCard.tsx` | **fiche de statut adaptative** — cards appear as facts are detected (pop-up confirmation), each editable/removable via a pop-up |
+| `ConversationHistory.tsx` | **historique** — reopen, rename, delete past conversations |
+
+Nothing fiscal is hard-coded in the frontend: questions, quick replies, options and the roadmap
+all come from the deterministic backend.
 
 > **Routing note:** `resultat` is a **child route** of `diagnostic`. The parent must render `<Outlet />` for `/resultat`, or the page stays blank.
 
@@ -296,6 +313,28 @@ Base URL: `http://localhost:8000`
 | `GET` | `/api/orchestrator/session/{id}/detail` | Profile + diagnostic + roadmap (result page) |
 | `GET` | `/api/orchestrator/session/{id}/roadmap` | Roadmap only |
 
+### Guidance (Branch B — conversational, no SIREN yet)
+
+Auth optional: without a token the space runs on the `demo` identity.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/guidance/chat` | One conversation turn — `{session_id?, message, mode?, action?}` |
+| `GET` | `/api/guidance/suggestions` | Opening suggestions, then contextual quick replies |
+| `GET` | `/api/guidance/conversations` | Conversation history (filtered by space) |
+| `GET` | `/api/guidance/chat/{id}` | Full conversation + profile + roadmap + checked steps |
+| `PATCH` | `/api/guidance/chat/{id}/rename` | Rename a conversation |
+| `DELETE` | `/api/guidance/chat/{id}` | Delete a conversation |
+| `GET` | `/api/guidance/profil` | Shared profile + deterministic verdict + what's still missing |
+| `PATCH` | `/api/guidance/profil` | Manual correction from the status card |
+| `DELETE` | `/api/guidance/profil/{field}` | Remove one fact from the status card |
+| `GET`/`PUT` | `/api/guidance/roadmap/state/{id}` | Checkbox state, persisted server-side |
+| `POST` | `/api/guidance/roadmap/pdf` | Roadmap as a downloadable PDF (`fpdf2`, WeasyPrint if available) |
+
+`POST /chat` returns `{session_id, reponse, profil, roadmap, options, suggestions, profil_complet}`.
+`options` is a generic clickable structure decided by the backend (e.g. micro vs société in the
+switching zone) — the frontend renders it without knowing the case.
+
 ### Auth
 
 | Method | Path | Description |
@@ -351,6 +390,20 @@ Base URL: `http://localhost:8000`
 - Document shape: `{ id, state_json, created_at, updated_at }`
 - Code: `backend/app/core/session_store.py`
 - Client never “owns” computed fiscal fields — server loads/saves `OrchestratorState` every turn
+
+**Guidance conversational memory** (`backend/app/core/conversation_store.py`) — ported from the
+SQLite store of the standalone agent onto the project's MongoDB, same public API:
+
+| Collection | Content |
+|---|---|
+| `guidance_conversations` | `{ id, uid, type, title, created_at, updated_at }` — `type` = `guidance` \| `pedagogue` |
+| `guidance_messages` | `{ conversation_id, role, content, sources, created_at }` |
+| `guidance_profiles` | one document per `uid` — the profile is **shared across spaces**, not per conversation |
+| `guidance_roadmaps` | `{ conversation_id, roadmap, checked }` — checkbox state persisted server-side |
+
+`uid` is the authenticated user id (falls back to `demo` without auth). Conversations inactive for
+30 days are purged. Profile normalisation stays **in code** (total CA = services + sales; in-kind
+gifts count as service revenue, never as sales) — never delegated to the LLM.
 
 ### Core models (`backend/app/schemas/orchestrator.py`)
 
