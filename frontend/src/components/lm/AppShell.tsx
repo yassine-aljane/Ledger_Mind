@@ -8,15 +8,16 @@ import {
   logout,
   type AuthUser,
 } from "@/lib/auth";
+import { usePlan } from "@/lib/plan";
 
 const nav = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/referral", label: "Expert-Comptable" },
-  { to: "/capture", label: "Documents" },
-  { to: "/simulateur", label: "Simulateur" },
-  { to: "/historique", label: "Historique" },
-  { to: "/education", label: "Éducation" },
-];
+  { to: "/dashboard", label: "Dashboard", premium: true },
+  { to: "/referral", label: "Expert-Comptable", premium: true },
+  { to: "/capture", label: "Documents", premium: true },
+  { to: "/simulateur", label: "Simulateur", premium: true },
+  { to: "/historique", label: "Historique", premium: true },
+  { to: "/education", label: "Éducation", premium: false },
+] as const;
 
 export function LogoutBubble() {
   const navigate = useNavigate();
