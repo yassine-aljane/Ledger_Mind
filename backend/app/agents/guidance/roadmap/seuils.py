@@ -10,12 +10,10 @@ from __future__ import annotations
 
 from datetime import date
 from functools import lru_cache
-from pathlib import Path
 
 import yaml
 
-# data/seuils.yaml à la racine du projet (…/app/roadmap/seuils.py -> racine = parents[1])
-_YAML_PATH = Path(__file__).resolve().parents[1] / "data" / "seuils.yaml"
+from app.core.paths import SEUILS_YAML as _YAML_PATH
 
 
 @lru_cache(maxsize=1)

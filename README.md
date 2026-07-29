@@ -96,8 +96,11 @@ ledgermind-assistant/
 │   │   ├── services/         ← recherche-entreprises, OCR, etc.
 │   │   └── core/             ← Mongo (users, sessions, conversation memory)
 │   ├── mcp_servers/          ← Légifrance/PISTE, BOFiP, web sources, INSEE, official docs
-│   ├── scripts/seed_corpus.py
+│   ├── scripts/              ← seed_corpus, enrich_corpus (MCP), enrich_legifrance (PISTE)
 │   └── tests/
+├── data/                     ← product data, reviewed by hand — not backend code
+│   ├── seuils.yaml           ← thresholds & rates, each sourced and dated
+│   └── sources.yaml          ← corpus seed list, with authority rank
 ├── frontend/
 │   ├── package.json
 │   └── src/
@@ -290,7 +293,11 @@ diagnostic_questions
 | `understand.py` | Extract into `DiagnosticProfile` (scoped per `target_field`; quick replies; regex; Gemini fallback) |
 | `accompaniment.py` | Short Gemini blurb for the roadmap (rejected if too short / bare label) |
 | `roadmap/` | **Deterministic** legal/UX engine |
-| `data/seuils.yaml` | Thresholds / sources (do not hardcode plafond values in prompts) |
+
+Thresholds and rates are **not** in this folder: they live in `data/seuils.yaml` at the repo root,
+each value carrying its official source and verification date. Read them through
+`roadmap/seuils.py` (which resolves the path via `app.core.paths`) — never hardcode a plafond in
+Python or in a prompt.
 
 Roadmap pipeline (conceptual):
 
@@ -523,7 +530,7 @@ Stack: **TanStack Start / Router**, React 19, Tailwind 4, Vite.
 
 ### E. Changing legal thresholds
 
-Edit `backend/app/agents/guidance/data/seuils.yaml` (and tests). Prefer YAML over hardcoding in Python or prompts.
+Edit `data/seuils.yaml` at the repo root (and tests). Prefer YAML over hardcoding in Python or prompts.
 
 ---
 

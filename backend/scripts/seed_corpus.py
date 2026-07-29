@@ -5,9 +5,9 @@ Usage (depuis la racine du dépôt, avec le venv actif) :
     python -m backend.scripts.seed_corpus
 
 Prérequis : `GEMINI_API_KEY` (embeddings) et `MONGO_URI` (stockage des vecteurs).
-Les sources sont listées dans `backend/app/agents/guidance/data/sources.yaml`, avec pour chacune
-son autorité (1 = loi/décret, 2 = doctrine officielle, 3 = guide) — c'est ce rang qui priorise
-les extraits lors de la recherche.
+Les sources sont listées dans `data/sources.yaml` (racine du dépôt), avec pour chacune son
+autorité (1 = loi/décret, 2 = doctrine officielle, 3 = guide) — c'est ce rang qui priorise les
+extraits lors de la recherche.
 """
 
 from __future__ import annotations
@@ -23,9 +23,8 @@ from bs4 import BeautifulSoup
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core.paths import SOURCES_YAML as _SOURCES  # noqa: E402
 from app.rag.ingest import ingest_document  # noqa: E402
-
-_SOURCES = Path(__file__).resolve().parents[1] / "app" / "agents" / "guidance" / "data" / "sources.yaml"
 
 # Évite UnicodeEncodeError sur les marqueurs quand la console Windows est en cp1252.
 try:
