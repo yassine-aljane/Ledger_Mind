@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { usePlan } from "@/lib/plan";
+import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { FiscalReceipt } from "@/components/lm/FiscalReceipt";
@@ -136,6 +138,7 @@ function formatCaLabel(diag: DiagnosticProfile | null, profile: UserProfile): st
 }
 
 function DashboardPage() {
+  if (usePlan() === "free") return <PremiumPagePlaceholder kind="dashboard" />;
   const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(getStoredUser());
   const [detail, setDetail] = useState<SessionDetail | null>(null);

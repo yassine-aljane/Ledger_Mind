@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { usePlan } from "@/lib/plan";
+import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { isAuthed } from "@/lib/auth";
@@ -20,6 +22,7 @@ export const Route = createFileRoute("/referral")({
 });
 
 function ReferralPage() {
+  if (usePlan() === "free") return <PremiumPagePlaceholder kind="referral" />;
   const [ville, setVille] = useState("");
   const [demande, setDemande] = useState(
     "Je suis auto-entrepreneur et je cherche un expert-comptable pour m'accompagner dans ma déclaration fiscale et mes obligations comptables.",
