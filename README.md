@@ -107,6 +107,8 @@ ledgermind-assistant/
 │       ├── routes/           ← file-based TanStack Router routes
 │       ├── components/       ← AuthPage, Chatbot, AppShell, GuidanceChat, StatusCard, …
 │       └── lib/              ← api.ts, guidance-api.ts, auth.ts
+├── docs/
+│   └── AGENT2-INSIGHTS.md    ← design doc for the post-registration insights agent
 ├── CONTRIBUTING.md           ← branching, conflicts, shared files
 └── .github/CODEOWNERS        ← who reviews what
 ```
