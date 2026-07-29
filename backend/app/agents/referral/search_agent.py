@@ -3,13 +3,13 @@ et complète les emails manquants. 100% gratuit (Nominatim + Overpass + API
 Recherche d'Entreprises + scraping léger des sites officiels).
 """
 from typing import List
-from config import MAX_RESULTS
-from state import AgentState, Comptable
-from tools.geocode import geocode_ville
-from tools.overpass import search_overpass
-from tools.entreprise_api import search_entreprise_api
-from tools.email_scraper import extract_email_from_website
-from tools.web_search import find_website
+from .config import MAX_RESULTS
+from .state import AgentState, Comptable
+from .tools.geocode import geocode_ville
+from .tools.overpass import search_overpass
+from .tools.entreprise_api import search_entreprise_api
+from .tools.email_scraper import extract_email_from_website
+from .tools.web_search import find_website
 
 
 def _dedupe(comptables: List[dict]) -> List[dict]:

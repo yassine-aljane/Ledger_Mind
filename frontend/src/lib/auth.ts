@@ -20,6 +20,15 @@ export type BranchAgentContext = {
 export type UserAgentContext = {
   intake: BranchAgentContext;
   guidance: BranchAgentContext;
+  capture?: {
+    last_thread_id: string | null;
+    last_document_id: string | null;
+    updated_at: string | null;
+    history: Record<string, unknown>[];
+  };
+  referral?: {
+    history: Record<string, unknown>[];
+  };
 };
 
 export type AuthUser = {

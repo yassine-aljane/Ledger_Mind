@@ -339,6 +339,157 @@ export async function ocrExtractSiret(file: File): Promise<string> {
   return data.siret as string;
 }
 
+// -------- Referral agent (expert-comptable) --------
+
+export type ReferralEmail = {
+  destinataire: string;
+  email: string | null;
+  objet: string;
+  corps: string;
+  statut: string;
+};
+
+export type ReferralResponse = {
+  status: "termine" | "echec";
+  error: string | null;
+  emails: ReferralEmail[];
+  cabinets_count: number;
+};
+
+export type ReferralHistoryEntry = {
+  ville: string;
+  demande: string;
+  status: string;
+  cabinets_count: number;
+  emails: ReferralEmail[];
+  created_at: string;
+};
+
+export async function generateReferralEmails(
+  ville: string,
+  demande: string,
+): Promise<ReferralResponse> {
+  const response = await fetch(`${API_BASE}/api/referral/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ ville, demande }),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export async function fetchReferralHistory(): Promise<ReferralHistoryEntry[]> {
+  const response = await fetch(`${API_BASE}/api/referral/history`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+// -------- Capture agent (document analysis) --------
+
+export type CaptureInvoice = {
+  invoice_number: string | null;
+  issuer_name: string | null;
+  issuer_tax_id: string | null;
+  client_name: string | null;
+  issue_date: string | null;
+  subtotal_ht: number | null;
+  vat_amount: number | null;
+  total_ttc: number | null;
+  currency: string | null;
+  paid: boolean | null;
+};
+
+export type CapturePending = {
+  type: string;
+  question: string;
+  field?: string | null;
+  suggestions?: string[] | null;
+};
+
+export type CaptureAnalyzeResult = {
+  status: "completed" | "en_attente_utilisateur" | "erreur";
+  thread_id: string;
+  document_id: string | null;
+  document_type?: string | null;
+  invoice?: CaptureInvoice | null;
+  analysis?: string | null;
+  expense_category?: string | null;
+  incoherences?: string[] | null;
+  paid?: boolean | null;
+  payment_date?: string | null;
+  payment_days_until?: number | null;
+  saved?: boolean | null;
+  duplicate_skipped?: boolean | null;
+  pending?: CapturePending | null;
+  error?: string | null;
+};
+
+export type CaptureInvoiceItem = {
+  document_id: string;
+  invoice: CaptureInvoice;
+  analysis?: string | null;
+  expense_category?: string | null;
+  incoherences?: string[] | null;
+  paid?: boolean | null;
+  payment_date?: string | null;
+  payment_days_until?: number | null;
+  created_at?: string | null;
+};
+
+export async function analyzeCapture(file: File, activite?: string): Promise<CaptureAnalyzeResult> {
+  const form = new FormData();
+  form.append("file", file);
+  if (activite) form.append("activite", activite);
+
+  const response = await fetch(`${API_BASE}/api/capture/analyze`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export async function answerCapture(threadId: string, answer: string): Promise<{
+  status: string;
+  thread_id: string;
+  document_id?: string | null;
+  analyze?: CaptureAnalyzeResult | null;
+  answer?: string | null;
+  error?: string | null;
+}> {
+  const response = await fetch(`${API_BASE}/api/capture/answer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ thread_id: threadId, answer }),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export async function askCaptureQuestion(
+  documentId: string,
+  question: string,
+): Promise<{ status: string; document_id: string; answer?: string; error?: string }> {
+  const response = await fetch(`${API_BASE}/api/capture/qa`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ document_id: documentId, question }),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export async function fetchCaptureInvoices(): Promise<CaptureInvoiceItem[]> {
+  const response = await fetch(`${API_BASE}/api/capture/invoices`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
 export function formatMoney(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

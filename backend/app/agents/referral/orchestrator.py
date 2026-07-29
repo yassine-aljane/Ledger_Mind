@@ -2,14 +2,16 @@
 recherche -> génération, avec routing sur les cas d'échec.
 """
 from langgraph.graph import StateGraph, END
-from state import AgentState
-from search_agent import search_agent_node
-from email_agent import email_agent_node
+from .state import AgentState
+from .search_agent import search_agent_node
+from .email_agent import email_agent_node
 
 
 def handle_failure_node(state: AgentState) -> AgentState:
     """Noeud terminal appelé quand la recherche échoue (aucun résultat,
     région trop vague, erreur de géocodage)."""
+    raw_err = str(state.get("error", "") or "")
+
     messages = {
         "region_trop_vague": (
             "La ville indiquée n'a pas pu être localisée. "
@@ -21,7 +23,13 @@ def handle_failure_node(state: AgentState) -> AgentState:
         ),
     }
     default_msg = "Une erreur est survenue pendant la recherche."
-    state["error"] = messages.get(state.get("error", ""), default_msg)
+
+    # Preserve useful details from the agent when we recognize the pattern.
+    if raw_err.startswith("erreur_geocodage:"):
+        # Example: "erreur_geocodage: Erreur de géocodage pour 'Lyon': ..."
+        state["error"] = raw_err.replace("erreur_geocodage:", "Géocodage:").strip()
+    else:
+        state["error"] = messages.get(raw_err, default_msg)
     return state
 
 

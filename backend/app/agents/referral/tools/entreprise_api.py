@@ -6,7 +6,7 @@ compléter/vérifier les résultats d'Overpass.
 """
 import requests
 from typing import List, Optional
-from config import ENTREPRISE_API_URL
+from ..config import ENTREPRISE_API_URL
 
 
 def search_entreprise_api(ville: str, code_postal: Optional[str] = None) -> List[dict]:

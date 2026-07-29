@@ -6,7 +6,7 @@ from typing import Optional
 from urllib.parse import urlparse
 import re
 from ddgs import DDGS
-from tools.text_utils import significant_tokens, clean_name
+from .text_utils import significant_tokens, clean_name
 
 # Domaines à ignorer : annuaires/agrégateurs qui ne sont pas le site du cabinet
 BLOCKLIST_DOMAINS = (
