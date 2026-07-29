@@ -81,23 +81,31 @@ ledgermind-assistant/
 │   │   ├── api/              ← HTTP routers
 │   │   │   ├── auth.py
 │   │   │   ├── orchestrator.py
+│   │   │   ├── guidance.py   ← Branch B: chat, memory, roadmap, PDF, corpus, watch
 │   │   │   └── verification.py
 │   │   ├── agents/
 │   │   │   ├── orchestrator.py
 │   │   │   ├── intake/       ← Branch A
-│   │   │   └── guidance/     ← Branch B (+ roadmap/)
-│   │   ├── llm/gemini.py     ← shared Gemini client
+│   │   │   ├── guidance/     ← Branch B (conversation.py, chat.py, roadmap/)
+│   │   │   └── pedagogue/    ← sourced fiscal Q&A (RAG)
+│   │   ├── rag/              ← corpus: embeddings, Mongo vector store, retriever
+│   │   ├── mcp/              ← MCP client (official sources)
+│   │   ├── veille/           ← regulatory watch + threshold checks
+│   │   ├── llm/gemini.py     ← shared Gemini client (chat, JSON, embeddings)
 │   │   ├── schemas/          ← Pydantic models (API + session state)
 │   │   ├── services/         ← recherche-entreprises, OCR, etc.
-│   │   └── core/             ← Mongo (users + sessions)
+│   │   └── core/             ← Mongo (users, sessions, conversation memory)
+│   ├── mcp_servers/          ← Légifrance/PISTE, BOFiP, web sources, INSEE, official docs
+│   ├── scripts/seed_corpus.py
 │   └── tests/
 ├── frontend/
 │   ├── package.json
 │   └── src/
 │       ├── routes/           ← file-based TanStack Router routes
-│       ├── components/       ← AuthPage, Chatbot, AppShell, …
-│       └── lib/              ← api.ts, auth.ts
-└── .gitignore
+│       ├── components/       ← AuthPage, Chatbot, AppShell, GuidanceChat, StatusCard, …
+│       └── lib/              ← api.ts, guidance-api.ts, auth.ts
+├── CONTRIBUTING.md           ← branching, conflicts, shared files
+└── .github/CODEOWNERS        ← who reviews what
 ```
 
 ---
@@ -335,6 +343,18 @@ Auth optional: without a token the space runs on the `demo` identity.
 `options` is a generic clickable structure decided by the backend (e.g. micro vs société in the
 switching zone) — the frontend renders it without knowing the case.
 
+### Assistant fiscal (RAG, sourced answers)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/guidance/ask` | One-off fiscal question — answer + cited sources |
+| `GET` | `/api/guidance/corpus` | Corpus status (indexed chunks) |
+| `POST` | `/api/guidance/veille/run` | Run one regulatory-watch cycle |
+| `GET` | `/api/guidance/veille/last` | Last watch report (news + threshold checks) |
+
+`POST /api/guidance/chat` with `mode: "pedagogue"` routes to the same agent while keeping the
+conversation history. UI: `/education` (`FiscalAssistant.tsx`).
+
 ### Auth
 
 | Method | Path | Description |
@@ -390,6 +410,14 @@ switching zone) — the frontend renders it without knowing the case.
 - Document shape: `{ id, state_json, created_at, updated_at }`
 - Code: `backend/app/core/session_store.py`
 - Client never “owns” computed fiscal fields — server loads/saves `OrchestratorState` every turn
+
+**Fiscal corpus (RAG)** — `corpus_chunks` collection: `{chunk_id, texte, embedding, source, url,
+autorite, date_verification, concerne}`. Embeddings come from `gemini-embedding-001` through the
+OpenAI-compatible endpoint already used for chat, so **no vector database and no local embedding
+model are added to the project**; cosine similarity is computed in `backend/app/rag/vectorstore.py`.
+Beyond ~50 000 chunks, switch to an Atlas `vectorSearch` index behind the same `query()` interface.
+
+Seed it once: `python -m backend.scripts.seed_corpus` (needs `GEMINI_API_KEY` + `MONGO_URI`).
 
 **Guidance conversational memory** (`backend/app/core/conversation_store.py`) — ported from the
 SQLite store of the standalone agent onto the project's MongoDB, same public API:

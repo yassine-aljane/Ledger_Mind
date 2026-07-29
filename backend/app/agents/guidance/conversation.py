@@ -428,6 +428,24 @@ async def respond(session_id: str | None, message: str, mode: str = "guidance",
     profil = store.patch_profil(uid, await extraire_profil(message, profil_avant))
     store.add_message(sid, "user", message)
 
+    # --- Espace « assistant fiscal » : Q&A sourcée sur le corpus, jamais de feuille de route ---
+    if stype == "pedagogue":
+        from app.agents import pedagogue
+
+        reformulee = await reformuler(message, historique, profil)
+        verdict = verdict_courant(profil) if profil.get("ca_estime") is not None else None
+        resultat = await pedagogue.answer(
+            reformulee, concerne=None, profil=profil,
+            historique=historique[-12:], regime_verdict=verdict,
+        )
+        return _paquet(
+            resultat["reponse"], resultat["sources"], None, None,
+            {"intention": "pedagogue", "question_reformulee": reformulee,
+             "avertissement_fraicheur": resultat.get("avertissement_fraicheur", False),
+             "bofip_live_utilise": resultat.get("bofip_live_utilise", False)},
+            suggestions=[],
+        )
+
     manquantes = questions_manquantes(profil)
     note: str | None = None
     if manquantes:

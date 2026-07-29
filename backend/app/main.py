@@ -20,6 +20,21 @@ app.include_router(orchestrator.router)
 app.include_router(guidance.router)
 
 
+_scheduler = None
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    """Planifie la veille réglementaire si elle est activée (désactivée par défaut).
+
+    Elle n'est jamais sur le chemin critique : son absence ne change rien au reste de l'app.
+    """
+    global _scheduler
+    from app.veille import scheduler
+
+    _scheduler = scheduler.start_scheduler()
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

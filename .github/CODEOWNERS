@@ -1,0 +1,39 @@
+# Propriété du code — qui doit relire quoi.
+#
+# GitHub demande automatiquement la relecture du propriétaire d'un dossier dès qu'une pull
+# request y touche. Objectif : qu'une intégration ne puisse plus réécrire ou supprimer le
+# travail d'une autre équipe sans que son auteur l'ait vu.
+#
+# Format : <chemin>  <@utilisateur ou @org/équipe>
+# La DERNIÈRE règle qui correspond gagne — les règles spécifiques vont donc en bas.
+
+# Par défaut, le mainteneur du dépôt.
+*                                       @karimdinari
+
+# --- Agents (un propriétaire par domaine) ---
+/backend/app/agents/guidance/           @ranyaTra
+/backend/app/agents/pedagogue/          @ranyaTra
+/backend/app/rag/                       @ranyaTra
+/backend/app/veille/                    @ranyaTra
+/backend/app/mcp/                       @ranyaTra
+/backend/mcp_servers/                   @ranyaTra
+/backend/app/core/conversation_store.py @ranyaTra
+/backend/app/api/guidance.py            @ranyaTra
+/backend/scripts/seed_corpus.py         @ranyaTra
+
+/backend/app/agents/intake/             @karimdinari
+/backend/app/api/verification.py        @karimdinari
+/backend/app/services/                  @karimdinari
+
+# --- Front : composants de l'espace guidance / assistant fiscal ---
+/frontend/src/components/lm/GuidanceChat.tsx        @ranyaTra
+/frontend/src/components/lm/StatusCard.tsx          @ranyaTra
+/frontend/src/components/lm/ConversationHistory.tsx @ranyaTra
+/frontend/src/components/lm/FiscalAssistant.tsx     @ranyaTra
+/frontend/src/lib/guidance-api.ts                   @ranyaTra
+
+# --- Fichiers partagés : toute modification est relue par le mainteneur ---
+/backend/app/main.py                    @karimdinari
+/backend/app/config.py                  @karimdinari
+/requirements.txt                       @karimdinari
+/frontend/src/lib/api.ts                @karimdinari

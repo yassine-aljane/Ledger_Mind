@@ -16,6 +16,17 @@ class Settings(BaseSettings):
     mongo_db_name: str = "ledgermind"
     freshness_max_days: int = 120
 
+    # Corpus fiscal (RAG) — embeddings via l'endpoint Gemini compatible OpenAI, vecteurs en Mongo.
+    # Aucune base vectorielle ni modèle local à installer.
+    embedding_model: str = "gemini-embedding-001"
+
+    # Veille réglementaire (Légifrance/PISTE, BOFiP, sources officielles via MCP).
+    # Sans clés PISTE, la veille fonctionne quand même : les autres sources restent accessibles.
+    piste_client_id: str = ""
+    piste_client_secret: str = ""
+    veille_enabled: bool = False
+    veille_cron_hour: int = 6
+
     # Auth (JWT) — change AUTH_SECRET in production (min 32 chars)
     auth_secret: str = "ledgermind-dev-secret-change-me-32b"
     auth_token_days: int = 14

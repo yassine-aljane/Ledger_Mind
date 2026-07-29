@@ -79,6 +79,11 @@ class RoadmapPdfRequest(BaseModel):
     profil: dict[str, Any] | None = None
 
 
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1)
+    concerne: str | None = Field(default=None, description="influenceur | freelance | None")
+
+
 # ------------------------------------------------------------------------------------ Chat
 @router.post("/chat")
 async def chat(payload: ChatRequest, user: UserPublic | None = Depends(get_current_user_optional)):
@@ -88,6 +93,45 @@ async def chat(payload: ChatRequest, user: UserPublic | None = Depends(get_curre
         payload.session_id, payload.message, payload.mode or "guidance",
         action=action, uid=_uid(user),
     )
+
+
+@router.post("/ask")
+async def ask(payload: AskRequest, user: UserPublic | None = Depends(get_current_user_optional)):
+    """Question fiscale ponctuelle, sans conversation : réponse ancrée sur le corpus et sourcée.
+
+    L'agent refuse d'inventer un chiffre absent des extraits et s'aligne sur le verdict
+    déterministe du régime quand le profil permet de le calculer.
+    """
+    from app.agents import pedagogue
+
+    profil = await store.async_get_profil(_uid(user))
+    verdict = conversation.verdict_courant(profil) if profil.get("ca_estime") is not None else None
+    return await pedagogue.answer(payload.question, concerne=payload.concerne,
+                                  profil=profil, regime_verdict=verdict)
+
+
+@router.get("/corpus")
+async def corpus_status():
+    """État du corpus documentaire (nombre de chunks indexés)."""
+    from app.rag import vectorstore
+
+    chunks = await asyncio.to_thread(vectorstore.count)
+    return {"chunks": chunks, "pret": chunks > 0}
+
+
+@router.post("/veille/run")
+async def veille_run():
+    """Déclenche un cycle de veille (collecte MCP, ré-ingestion, contrôle des seuils)."""
+    from app.veille import scheduler
+
+    return await scheduler.run_veille()
+
+
+@router.get("/veille/last")
+async def veille_last():
+    from app.veille import scheduler
+
+    return scheduler.dernier_rapport()
 
 
 @router.get("/suggestions")
