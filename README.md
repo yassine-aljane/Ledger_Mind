@@ -166,7 +166,7 @@ Defined in `backend/.env` (see `backend/.env.example`):
 | Variable | Purpose | Typical value |
 |----------|---------|----------------|
 | `GEMINI_API_KEY` | Gemini calls for NL | your key |
-| `GEMINI_MODEL` | Model id | `gemini-2.5-flash` |
+| `GEMINI_MODEL` | Model id — mind the free-tier daily cap (see `.env.example`) | `gemini-2.5-flash-lite` |
 | `AUTH_SECRET` | JWT signing key (≥ 32 chars) | see `.env.example` |
 | `AUTH_TOKEN_DAYS` | Token lifetime | `14` |
 | `MONGO_URI` | Session + **users** store | `mongodb://localhost:27017` |
