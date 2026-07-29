@@ -15,6 +15,7 @@ import logging
 import re
 
 import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
 
@@ -56,8 +57,15 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {settings.mistral_api_key}"}
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
 async def _completion(messages: list[dict], *, temperature: float, max_tokens: int,
                       json_mode: bool = False, timeout: float = 90.0) -> str:
+    """Appelle l'endpoint chat de Mistral.
+
+    Reprise bornée (3 tentatives, 1 à 8s) : ces appels servent une requête HTTP interactive,
+    contrairement à l'ingestion du corpus qui peut se permettre d'attendre plus longtemps
+    (voir `app.rag.embeddings`, dont la reprise respecte le délai annoncé par l'API).
+    """
     payload: dict = {
         "model": _modele(),
         "messages": messages,

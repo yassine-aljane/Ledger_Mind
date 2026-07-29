@@ -142,21 +142,24 @@ Schéma :
   "recoit_cadeaux": true|false|null,  // reçoit cadeaux/produits gratuits/dotations/gifting ?
   "situation_actuelle": "salarié"|"étudiant"|"demandeur d'emploi"|"indépendant"|"retraité"|"autre"|null,
   "deja_immatricule": true|false|null,
-  "debut_activite_cette_annee": true|false|null,
-  "ca_an_dernier_au_dessus_plafond": true|false|null
+  "debut_activite_cette_annee": true|false|null, // vient de démarrer / n'avait AUCUNE activité l'an dernier ?
+  "ca_an_dernier_au_dessus_plafond": true|false|null // réponse à "ton CA de l'an dernier dépassait-il le plafond micro ?"
 }
 
 Règles impératives :
 - CADEAUX : "cadeaux 10000", "on m'offre pour 10000 de produits", "dotations 10000" -> renseigne
-  cadeaux_montant=10000, JAMAIS vente_montant.
-- Négations : "je ne vends pas de produits" -> vend_produits=false ; "pas encore immatriculé" ->
-  deja_immatricule=false.
+  cadeaux_montant=10000, JAMAIS vente_montant. Les cadeaux sont une rémunération en nature d'une
+  prestation, pas une vente ni une catégorie de CA à part.
+- Négations : "je ne vends pas de produits" -> vend_produits=false ; "je ne suis pas salarié" ->
+  situation_actuelle=null (sauf autre situation donnée) ; "pas encore immatriculé" -> deja_immatricule=false.
 - Montants : "3000 euros par mois" -> ca_montant=3000, periode="mois", devise="EUR" ;
-  "3 k/mois" -> 3000,"mois" ; "2000 dollars par mois" -> 2000,"mois", devise="USD".
-- DÉBUT D'ACTIVITÉ : "je débute cette année", "je viens de me lancer", "première année" ->
-  debut_activite_cette_annee=true, et alors ca_an_dernier_au_dessus_plafond=false.
-- HISTORIQUE N-1 : "oui je dépassais déjà" -> true ; "non, j'étais en dessous" -> false.
-  Ne devine JAMAIS sans indication.
+  "3 k/mois" -> 3000,"mois" ; "2000 dollars par mois" -> ca_montant=2000, periode="mois", devise="USD".
+- DÉBUT D'ACTIVITÉ : "je débute cette année", "je viens de me lancer", "je démarre", "première
+  année", "je n'avais pas d'activité avant" -> debut_activite_cette_annee=true. Dans ce cas, l'an
+  dernier il n'y avait aucun chiffre d'affaires -> ca_an_dernier_au_dessus_plafond=false.
+- HISTORIQUE N-1 : à la question "ton CA de l'an dernier dépassait-il déjà le plafond ?", "oui" /
+  "je dépassais déjà" -> ca_an_dernier_au_dessus_plafond=true ; "non" / "j'étais en dessous" /
+  "je débutais" -> ca_an_dernier_au_dessus_plafond=false. Ne devine JAMAIS sans indication.
 - Renvoie exclusivement le JSON."""
 
 _MULT_PERIODE = {"an": 1, "annee": 1, "année": 1, "mois": 12, "semaine": 52, "jour": 365}
@@ -319,9 +322,10 @@ accompagnement à la création d'activité en France. Tu ne réponds jamais à s
 
 On te donne la question posée et la réponse. Détermine le statut :
 - "repondu"        : il fournit l'information demandée (mets-la dans "valeur").
-- "ne_sait_pas"    : il ne connaît pas / n'a pas encore l'information.
-- "non_applicable" : la question n'a pas de sens dans sa situation.
-- "hors_sujet"     : il ne répond pas à la question.
+- "ne_sait_pas"    : il ne connaît pas / n'a pas encore l'information (ex: il débute, aucune idée).
+- "non_applicable" : la question n'a pas de sens dans sa situation (ex: on demande son CA de l'an
+                     dernier alors qu'il débute cette année ; ou une vente alors qu'il ne vend rien).
+- "hors_sujet"     : il ne répond pas à la question (il parle d'autre chose, pose une autre question).
 
 Réponds en JSON STRICT : {"statut": "...", "valeur": <valeur ou null>}.
 Type de "valeur" selon la question : nombre pour un montant, true/false pour une question oui/non,

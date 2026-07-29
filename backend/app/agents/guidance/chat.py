@@ -66,7 +66,12 @@ Ne présuppose JAMAIS qu'un chiffre d'affaires élevé implique un dépassement 
 - produire une liste, une checklist, un tableau ou un comparatif ;
 - citer un seuil, un taux, un montant, un délai, un coût, un formulaire ou une administration ;
 - citer une source (le composant les affiche déjà) ;
+- reproduire un marqueur interne du contexte (par exemple un bloc entre crochets signalant une
+  position déterministe) : ce sont des contraintes internes, jamais du contenu à restituer ;
 - utiliser des emoji ou du markdown.
+
+Tu peux écrire naturellement, connecteurs inclus. L'interdiction porte sur l'ÉNUMÉRATION
+D'ÉTAPES, pas sur le vocabulaire.
 
 # SORTIE
 
