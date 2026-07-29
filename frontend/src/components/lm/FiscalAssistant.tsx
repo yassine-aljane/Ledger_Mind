@@ -29,8 +29,6 @@ const QUESTIONS_DEPART = [
   "Je reçois des produits gratuits de marques, dois-je les déclarer ?",
   "Quelle différence entre micro-BNC et micro-BIC ?",
   "Quand dois-je facturer la TVA ?",
-  "Comment facturer un client étranger ?",
-  "Mes cotisations URSSAF, comment sont-elles calculées ?",
 ];
 
 type Turn = {
@@ -153,21 +151,24 @@ export function FiscalAssistant() {
 
       <div className="min-w-0 space-y-6">
         {turns.length === 0 && (
-          <div className="grid md:grid-cols-2 gap-4">
-            {QUESTIONS_DEPART.map((q) => (
-              <button
-                key={q}
-                onClick={() => void ask(q)}
-                className="group bg-white border border-border rounded-2xl p-5 hover:border-teal-dark transition-colors text-left"
-              >
-                <p className="font-mono text-[10px] uppercase tracking-widest text-teal-dark mb-3">
-                  Question fréquente
-                </p>
-                <p className="text-[15px] font-medium text-balance leading-snug group-hover:text-teal-dark transition-colors">
+          <div className="bg-white border border-border rounded-2xl p-6 animate-fade-in">
+            <p className="text-sm text-ink/60 leading-relaxed">
+              Posez votre première question. Les réponses s&apos;appuient sur le corpus officiel
+              (Légifrance, BOFiP, URSSAF, impots.gouv.fr) et citent leurs sources. Si
+              l&apos;information n&apos;y figure pas, l&apos;assistant le dit plutôt que de
+              l&apos;inventer.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {QUESTIONS_DEPART.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => void ask(q)}
+                  className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-colors text-left"
+                >
                   {q}
-                </p>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

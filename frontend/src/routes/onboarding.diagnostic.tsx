@@ -6,16 +6,18 @@ import { GuidanceChat } from "@/components/lm/GuidanceChat";
 
 type Espace = "guidance" | "pedagogue";
 
-const ESPACES: { id: Espace; label: string; sous: string }[] = [
+const ESPACES: { id: Espace; label: string; titre: string; sous: string }[] = [
   {
     id: "guidance",
     label: "Guidance",
-    sous: "Décrivez votre activité : je vous profile pas à pas, puis je construis votre feuille de route.",
+    titre: "Chatbot de guidance",
+    sous: "Décrivez votre activité : je vous profile pas à pas, puis je construis votre feuille de route personnalisée.",
   },
   {
     id: "pedagogue",
     label: "Assistant fiscal",
-    sous: "Vos questions sur la fiscalité, les obligations et les seuils — réponses sourcées.",
+    titre: "Assistant fiscal",
+    sous: "Posez vos questions sur la fiscalité, les obligations, les seuils — réponses ancrées sur les sources officielles.",
   },
 ];
 
@@ -52,6 +54,7 @@ function DiagnosticChat() {
   // donc rien à démarrer côté serveur avant d'entrer dans la discussion.
   const [started, setStarted] = useState(false);
   const [espace, setEspace] = useState<Espace>("guidance");
+  const actuel = ESPACES.find((e) => e.id === espace) ?? ESPACES[0];
 
   return (
     <div className="min-h-screen px-6 py-16 max-w-7xl mx-auto">
@@ -102,7 +105,7 @@ function DiagnosticChat() {
               la guidance construit la feuille de route, l'assistant fiscal répond aux questions
               ponctuelles. Le profil et la mémoire sont partagés côté serveur — changer d'onglet
               ne perd rien. */}
-          <div className="flex flex-wrap items-center gap-2 mb-8">
+          <div className="flex flex-wrap items-center gap-2">
             {ESPACES.map((e) => {
               const actif = espace === e.id;
               return (
@@ -119,10 +122,14 @@ function DiagnosticChat() {
                 </button>
               );
             })}
-            <p className="ml-auto text-xs text-ink/40 max-w-xs text-right leading-snug">
-              {ESPACES.find((e) => e.id === espace)?.sous}
-            </p>
           </div>
+
+          <header className="mt-8 mb-8 animate-slide-up">
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tighter text-balance">
+              {actuel.titre}
+            </h1>
+            <p className="mt-2 text-ink/60 text-pretty max-w-2xl">{actuel.sous}</p>
+          </header>
 
           {espace === "guidance" ? <GuidanceChat /> : <FiscalAssistant />}
         </div>

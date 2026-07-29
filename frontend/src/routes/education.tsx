@@ -29,12 +29,6 @@ function EducationPage() {
         }
       />
 
-      <p className="max-w-2xl text-sm text-ink/60 leading-relaxed mb-8">
-        Posez votre question en français courant. Les réponses s&apos;appuient sur le corpus
-        officiel (Légifrance, BOFiP, URSSAF, impots.gouv.fr) et citent leurs sources. Si
-        l&apos;information n&apos;y figure pas, l&apos;assistant le dit plutôt que de l&apos;inventer.
-      </p>
-
       <FiscalAssistant />
     </AppShell>
   );

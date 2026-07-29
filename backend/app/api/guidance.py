@@ -144,11 +144,16 @@ async def suggestions(user: UserPublic | None = Depends(get_current_user_optiona
     profil = await asyncio.to_thread(store.get_profil, _uid(user))
     ouverture = [
         "Je débute sur Instagram et je gagne de l'argent, par où commencer ?",
-        "Je fais des vidéos YouTube, environ 3000 par mois",
+        "Je fais des vidéos YouTube, environ 3000 € par mois",
         "Je veux créer mon activité de freelance",
     ]
+    # Tant que rien n'est connu, on propose des AMORCES de récit — décrire son activité avec ses
+    # mots. Les réponses rapides (« Création de contenu »…) ne prennent le relais qu'une fois la
+    # conversation engagée, quand elles répondent à une question réellement posée.
+    vierge = not any(v is not None for v in (profil or {}).values())
     contextuelles = conversation.suggestions_pour(profil)
-    return {"suggestions": contextuelles or ouverture, "profil": profil,
+    return {"suggestions": ouverture if vierge else (contextuelles or ouverture),
+            "profil": profil,
             "profil_complet": not conversation.questions_manquantes(profil)}
 
 
