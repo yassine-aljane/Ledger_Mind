@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
+import { RoadmapView, type Roadmap } from "@/components/lm/RoadmapView";
 import {
   fetchSessionDetail,
   getStoredSessionId,
@@ -9,6 +10,11 @@ import {
   type SessionDetail,
   type UserProfile,
 } from "@/lib/api";
+import {
+  downloadRoadmapPdf,
+  fetchRoadmapState,
+  saveRoadmapState,
+} from "@/lib/guidance-api";
 
 export const Route = createFileRoute("/onboarding/diagnostic/resultat")({
   validateSearch: (search: Record<string, unknown>): { session?: string } => ({
@@ -79,6 +85,8 @@ function ResultatPage() {
   const { session: sessionFromUrl } = Route.useSearch();
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const cached = loadCachedDiagnosticResult();
@@ -93,6 +101,12 @@ function ResultatPage() {
       }
       return;
     }
+    setSessionId(id);
+
+    // Progression cochée : elle vit avec la conversation, on la retrouve d'un écran à l'autre.
+    fetchRoadmapState(id)
+      .then((s) => setChecked(s.checked ?? {}))
+      .catch(() => {});
 
     fetchSessionDetail(id)
       .then((d) => {
@@ -105,13 +119,18 @@ function ResultatPage() {
       });
   }, [sessionFromUrl]);
 
-  const roadmap = detail?.roadmap as {
-    bandeau?: RoadmapBandeau;
-    etapes?: RoadmapEtape[];
-    parcours?: string;
-    seuil_micro?: number;
-    seuils_profil?: { seuil?: number }[];
-  } | null | undefined;
+  const toggleStep = (stepId: string) => {
+    const next = { ...checked, [stepId]: !checked[stepId] };
+    setChecked(next);
+    if (sessionId) void saveRoadmapState(sessionId, next).catch(() => {});
+  };
+
+  const resetChecks = () => {
+    setChecked({});
+    if (sessionId) void saveRoadmapState(sessionId, {}).catch(() => {});
+  };
+
+  const roadmap = detail?.roadmap as (Roadmap & { seuil_micro?: number }) | null | undefined;
   const situation = detail
     ? situationFrom(detail.diagnostic_profile, detail.profile)
     : null;
@@ -120,7 +139,7 @@ function ResultatPage() {
       ? detail.profile.recommended_actions
       : (roadmap?.etapes || []).map((e, i) => ({
           step: i + 1,
-          title: e.titre || e.title || `Étape ${i + 1}`,
+          title: e.titre || `Étape ${i + 1}`,
           description: etapeDescription(e),
         }));
   const regimeNom =
@@ -207,27 +226,45 @@ function ResultatPage() {
               </p>
             </Card>
 
-            <Card index="03" label="Plan de régularisation" span="lg:col-span-2">
-              {plan.length === 0 ? (
-                <p className="text-ink/50 text-sm">Aucune étape disponible pour le moment.</p>
-              ) : (
-                <ol className="space-y-4">
-                  {plan.map((s) => (
-                    <li key={s.step} className="flex gap-5">
-                      <div className="shrink-0 size-10 rounded-full bg-background border border-border font-mono grid place-items-center text-sm font-medium">
-                        {s.step.toString().padStart(2, "0")}
-                      </div>
-                      <div className="pt-1">
-                        <p className="font-semibold">{s.title}</p>
-                        {s.description ? (
-                          <p className="text-sm text-ink/60 mt-1">{s.description}</p>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </Card>
+            {/* Feuille de route complète du moteur déterministe : phases, coûts, sources et
+                étapes cochables. On retombe sur la liste simple si la session ne porte que des
+                actions recommandées (parcours SIREN) sans feuille de route structurée. */}
+            {(roadmap?.phases?.length ?? 0) > 0 ? (
+              <div className="lg:col-span-2">
+                <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ink/40 mb-4">
+                  03 · Plan de régularisation
+                </p>
+                <RoadmapView
+                  roadmap={roadmap as Roadmap}
+                  checked={checked}
+                  onToggle={toggleStep}
+                  onReset={resetChecks}
+                  onPdf={() => downloadRoadmapPdf(sessionId)}
+                />
+              </div>
+            ) : (
+              <Card index="03" label="Plan de régularisation" span="lg:col-span-2">
+                {plan.length === 0 ? (
+                  <p className="text-ink/50 text-sm">Aucune étape disponible pour le moment.</p>
+                ) : (
+                  <ol className="space-y-4">
+                    {plan.map((s) => (
+                      <li key={s.step} className="flex gap-5">
+                        <div className="shrink-0 size-10 rounded-full bg-background border border-border font-mono grid place-items-center text-sm font-medium">
+                          {s.step.toString().padStart(2, "0")}
+                        </div>
+                        <div className="pt-1">
+                          <p className="font-semibold">{s.title}</p>
+                          {s.description ? (
+                            <p className="text-sm text-ink/60 mt-1">{s.description}</p>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </Card>
+            )}
           </div>
 
           <div className="mt-6 bg-teal-dark text-background rounded-2xl p-10 animate-slide-up relative overflow-hidden">

@@ -12,7 +12,7 @@ import random
 import time
 from typing import Any, Dict, List, Optional
 
-from mistralai.client import Mistral
+from mistralai import Mistral
 
 from .config import MODEL_OCR
 

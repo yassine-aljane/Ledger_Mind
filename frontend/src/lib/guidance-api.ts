@@ -48,6 +48,9 @@ export type ChatSource = {
   url?: string;
   source?: string;
   score?: number | null;
+  /** Extrait exact ayant servi à la réponse — déplié au clic sur la source. */
+  texte?: string;
+  extrait?: string;
 };
 
 /** Options cliquables décidées par le BACKEND — le front n'en code aucune en dur. */
@@ -160,6 +163,15 @@ export function saveRoadmapState(sessionId: string, checked: Record<string, bool
     method: "PUT",
     body: JSON.stringify({ checked }),
   });
+}
+
+/** Feuille de route persistée + cases cochées — pour rouvrir la progression depuis un autre écran. */
+export function fetchRoadmapState(sessionId: string): Promise<{
+  session_id: string;
+  roadmap: Record<string, any> | null;
+  checked: Record<string, boolean>;
+}> {
+  return request(`/roadmap/state/${encodeURIComponent(sessionId)}`);
 }
 
 /** Télécharge le PDF de la feuille de route affichée (identique à l'écran). */

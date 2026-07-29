@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     # Sans clés PISTE, la veille fonctionne quand même : les autres sources restent accessibles.
     piste_client_id: str = ""
     piste_client_secret: str = ""
-    veille_enabled: bool = False
+    # La veille tourne toute seule (cron quotidien, aucune interface) : rien ne se déclenche au
+    # démarrage, et l'échec d'une source est seulement journalisé. VEILLE_ENABLED=false la coupe.
+    veille_enabled: bool = True
     veille_cron_hour: int = 6
 
     # Auth (JWT) — change AUTH_SECRET in production (min 32 chars)

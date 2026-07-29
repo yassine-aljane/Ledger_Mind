@@ -13,6 +13,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ConversationHistory } from "@/components/lm/ConversationHistory";
+import { Markdown } from "@/components/lm/Markdown";
+import { RoadmapView, type Roadmap } from "@/components/lm/RoadmapView";
 import { StatusCard } from "@/components/lm/StatusCard";
 import { cacheDiagnosticResult, storeSessionId, type UserProfile } from "@/lib/api";
 import {
@@ -25,6 +27,7 @@ import {
   patchGuidanceProfile,
   clearGuidanceProfileField,
   renameConversation,
+  saveRoadmapState,
   sendGuidanceMessage,
   type ChatOptions,
   type ConversationSummary,
@@ -81,7 +84,8 @@ export function GuidanceChat() {
   const [manquantes, setManquantes] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [roadmap, setRoadmap] = useState<Record<string, any> | null>(null);
+  const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -106,7 +110,8 @@ export function GuidanceChat() {
         })),
       );
       setProfil(detail.profil);
-      setRoadmap(detail.roadmap);
+      setRoadmap(detail.roadmap as Roadmap | null);
+      setChecked(detail.checked ?? {});
       setManquantes([]);
       const p = await fetchGuidanceProfile();
       setManquantes(p.manquantes);
@@ -170,7 +175,7 @@ export function GuidanceChat() {
       setProfil(data.profil);
       setSuggestions(data.suggestions ?? []);
       setManquantes(data.profil_complet ? [] : manquantes);
-      if (data.roadmap) setRoadmap(data.roadmap);
+      if (data.roadmap) setRoadmap(data.roadmap as Roadmap);
       setTurns((prev) => [
         ...prev,
         {
@@ -214,6 +219,7 @@ export function GuidanceChat() {
     setSessionId(null);
     setTurns([]);
     setRoadmap(null);
+    setChecked({});
     localStorage.removeItem(SESSION_KEY);
     fetchSuggestions()
       .then((d) => setSuggestions(d.suggestions))
@@ -247,6 +253,18 @@ export function GuidanceChat() {
     } finally {
       setGenerating(false);
     }
+  };
+
+  /** Coche optimiste puis persistance serveur : la progression survit au rechargement. */
+  const toggleStep = (id: string) => {
+    const next = { ...checked, [id]: !checked[id] };
+    setChecked(next);
+    if (sessionId) void saveRoadmapState(sessionId, next).catch(() => {});
+  };
+
+  const resetChecks = () => {
+    setChecked({});
+    if (sessionId) void saveRoadmapState(sessionId, {}).catch(() => {});
   };
 
   const openRoadmap = () => {
@@ -302,11 +320,11 @@ export function GuidanceChat() {
             turn.role === "assistant" ? (
               <div key={turn.id} className="space-y-3">
                 <div className="flex flex-col gap-1 max-w-[85%] animate-slide-up">
-                  <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[15px] leading-relaxed text-ink shadow-sm whitespace-pre-wrap">
+                  <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[15px] leading-relaxed text-ink shadow-sm">
                     {turn.error ? (
                       <span className="text-coral">Erreur : {turn.error}</span>
                     ) : (
-                      turn.text
+                      <Markdown text={turn.text} />
                     )}
                   </div>
                   <span className="text-[10px] uppercase opacity-40 font-mono ml-1">Assistant</span>
@@ -362,41 +380,38 @@ export function GuidanceChat() {
           )}
 
           {roadmap && (
-            <div className="rounded-2xl border border-teal-dark/30 bg-teal-dark/5 p-6 space-y-4 animate-slide-up">
-              <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-                Feuille de route prête
-              </p>
-              <p className="text-sm text-ink/70 leading-relaxed">
-                {String((roadmap as any)?.bandeau?.titre ?? "Votre parcours")} — ouvrez le détail
-                étape par étape, ou emportez-le en PDF.
-              </p>
-              <div className="flex flex-wrap gap-3">
+            <div className="space-y-4">
+              {/* La feuille de route se parcourt sans quitter la conversation : chaque étape
+                  s'ouvre et se coche ici, la progression est persistée côté serveur. */}
+              <RoadmapView
+                roadmap={roadmap}
+                checked={checked}
+                onToggle={toggleStep}
+                onReset={resetChecks}
+                onPdf={() => downloadRoadmapPdf(sessionId, profil)}
+              />
+
+              <div className="rounded-2xl border border-teal-dark/30 bg-teal-dark/5 p-5 space-y-3 animate-slide-up">
                 <button
                   onClick={openRoadmap}
-                  className="px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
+                  className="px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
                 >
-                  Voir ma feuille de route →
+                  Ouvrir la vue détaillée →
                 </button>
-                <button
-                  onClick={() => void downloadRoadmapPdf(sessionId, profil)}
-                  className="px-6 py-3 bg-white border border-border rounded-xl text-sm font-semibold hover:border-teal-dark hover:text-teal-dark transition-colors"
-                >
-                  Télécharger le PDF
-                </button>
-              </div>
-              {/* Suite du parcours : une fois immatriculé, on rejoint la vérification SIREN/avis
-                  — le même écran que pour ceux qui avaient déjà un SIREN. */}
-              <div className="pt-3 border-t border-teal-dark/20">
-                <p className="text-xs text-ink/50 leading-relaxed">
-                  Une fois votre immatriculation obtenue, vérifiez votre SIREN et votre avis de
-                  situation pour activer le suivi complet.
-                </p>
-                <button
-                  onClick={() => void navigate({ to: "/onboarding/verification" })}
-                  className="mt-2 text-xs font-mono uppercase tracking-wider text-teal-dark hover:text-ink transition-colors"
-                >
-                  J&apos;ai déjà mon SIREN → vérification
-                </button>
+                {/* Suite du parcours : une fois immatriculé, on rejoint la vérification SIREN/avis
+                    — le même écran que pour ceux qui avaient déjà un SIREN. */}
+                <div className="pt-3 border-t border-teal-dark/20">
+                  <p className="text-xs text-ink/50 leading-relaxed">
+                    Une fois votre immatriculation obtenue, vérifiez votre SIREN et votre avis de
+                    situation pour activer le suivi complet.
+                  </p>
+                  <button
+                    onClick={() => void navigate({ to: "/onboarding/verification" })}
+                    className="mt-2 text-xs font-mono uppercase tracking-wider text-teal-dark hover:text-ink transition-colors"
+                  >
+                    J&apos;ai déjà mon SIREN → vérification
+                  </button>
+                </div>
               </div>
             </div>
           )}
