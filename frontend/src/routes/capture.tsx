@@ -1,4 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { usePlan } from "@/lib/plan";
+import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { isAuthed } from "@/lib/auth";
@@ -34,6 +36,7 @@ function pipelineStep(status: CaptureAnalyzeResult["status"] | null, idx: number
 }
 
 function CapturePage() {
+  if (usePlan() === "free") return <PremiumPagePlaceholder kind="capture" />;
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
