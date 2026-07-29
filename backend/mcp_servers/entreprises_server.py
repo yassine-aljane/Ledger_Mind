@@ -7,7 +7,6 @@ créateur a déjà un SIREN, récupérer son code APE/NAF, sa forme juridique, s
 INPI : le Guichet unique (formalites.entreprises.gouv.fr) n'expose pas d'API publique de contenu ;
 on fournit donc l'URL de démarche via inpi_guichet_unique() (lien fiable pour la roadmap).
 """
-from __future__ import annotations
 
 import httpx
 from mcp.server.fastmcp import FastMCP

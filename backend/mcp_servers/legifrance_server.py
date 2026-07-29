@@ -9,7 +9,6 @@ Transport stdio (le client MCP lance ce fichier en sous-processus).
 Identifiants PISTE via variables d'environnement PISTE_CLIENT_ID / PISTE_CLIENT_SECRET.
 Sans identifiants, les outils renvoient un message explicite plutôt que d'échouer.
 """
-from __future__ import annotations
 
 import os
 import re

@@ -9,7 +9,6 @@ Outils exposés :
 
 C'est la source qui tranche les cas pratiques (ex : avantages en nature des influenceurs).
 """
-from __future__ import annotations
 
 import re
 

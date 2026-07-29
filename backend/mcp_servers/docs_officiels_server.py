@@ -10,7 +10,6 @@ Regroupe les sources documentaires officielles hétérogènes :
 Fiabilité : Service-Public passe par l'API DILA (structurée). Le reste est du fetch officiel
 gouvernemental (domaines *.gouv.fr) avec extraction robuste ; les PDF sont extraits via pdfminer.
 """
-from __future__ import annotations
 
 import asyncio
 import io

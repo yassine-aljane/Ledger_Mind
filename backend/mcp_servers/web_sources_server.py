@@ -8,7 +8,6 @@ Outils exposés :
 C'est le connecteur "générique" pour tout ce qui n'a pas d'API structurée, dont l'ARPP
 (Certificat de l'Influence Responsable) et la DGCCRF (guide de bonnes pratiques).
 """
-from __future__ import annotations
 
 import asyncio
 import hashlib
