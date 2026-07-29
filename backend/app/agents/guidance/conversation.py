@@ -46,19 +46,37 @@ _NUM = r"(\d[\d\s ]*\d|\d)"
 
 
 def _montant(txt: str) -> float:
-    return float(txt.replace(" ", "").replace(" ", ""))
+    """Retire les séparateurs de milliers, y compris les espaces insécables (fine et normale)."""
+    return float(re.sub(r"[\s  ]", "", txt))
 
 
 def _ca_annuel(m: str) -> float | None:
     """Extrait un CA et l'annualise. Gère le suffixe 'k', le '€' optionnel et la période."""
+    # 1. Montant explicitement périodique : « 1 500 € par mois », « 3k/mois ».
     mm = re.search(
         _NUM + r"\s*(k)?\s*(?:€|euros?)?\s*(?:/|par\s+)\s*(mois|an|année|annee|semaine|jour)", m)
     if mm:
         val = _montant(mm.group(1)) * (1000 if mm.group(2) else 1)
         return val * _PERIODES[mm.group(3)]
+
+    # 2. Montant collé au mot « CA » : « mon ca : 45000 ».
     mm = re.search(r"(?:ca|chiffre d['’ ]affaires)\D{0,6}" + _NUM + r"\s*(k)?", m)
     if mm:
         return _montant(mm.group(1)) * (1000 if mm.group(2) else 1)
+
+    # 3. Montant nu libellé en euros : « environ 200 000 euros ». Le motif 2 exige que le nombre
+    #    suive « ca » de très près, ce qui rate toute phrase intercalant une description
+    #    (« j'ai un ca global en tant qu'instagrammeuse d'environ 200 000 euros »). Or ce repli
+    #    est le SEUL recours quand le LLM est indisponible : sans lui, la question est reposée
+    #    en boucle sans que l'utilisateur comprenne pourquoi.
+    mm = re.search(_NUM + r"\s*(k)?\s*(?:€|euros?(?![a-z]))", m)
+    if mm:
+        return _montant(mm.group(1)) * (1000 if mm.group(2) else 1)
+
+    # 4. Notation « 200k », sans unité — non ambiguë dans un échange sur les revenus.
+    mm = re.search(_NUM + r"\s*k(?![a-z])", m)
+    if mm:
+        return _montant(mm.group(1)) * 1000
     return None
 
 

@@ -188,3 +188,30 @@ def test_choix_de_parcours_en_zone_de_bascule(llm_muet):
                          action={"kind": "choix_parcours", "value": "micro"}, uid=UID))
     assert store.get_profil(UID)["choix_parcours"] == "micro"
     assert out["roadmap"] is not None
+
+
+# --------------------------------------------------- Repli déterministe d'extraction du montant
+# Ce repli est le SEUL recours quand le LLM est indisponible (quota dépassé, panne réseau).
+# S'il ne reconnaît pas un montant, l'agent repose la même question indéfiniment sans que rien
+# ne signale l'échec à l'utilisateur — le pire mode de dégradation possible.
+@pytest.mark.parametrize("message, attendu", [
+    # Le cas qui bouclait : une description s'intercale entre « ca » et le montant.
+    ("j'ai un ca global en tant qu'instagrammeuse d'environ 200 000 euros", 200000),
+    ("environ 200000€", 200000),
+    ("mon ca : 45000", 45000),
+    ("je fais 200k", 200000),
+    # Les montants périodiques restent annualisés.
+    ("1 500 € par mois", 18000),
+    ("3k/mois", 36000),
+])
+def test_montant_reconnu_par_le_repli(message, attendu):
+    assert C._ca_annuel(message.lower()) == attendu
+
+
+@pytest.mark.parametrize("message", [
+    "je débute, presque rien",
+    "je fais 200 km de vélo",      # « k » ne doit pas être lu comme un millier
+    "200 kg de matériel",
+])
+def test_repli_ne_devine_pas_de_montant(message):
+    assert C._ca_annuel(message.lower()) is None

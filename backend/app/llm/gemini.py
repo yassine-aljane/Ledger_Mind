@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import random
 import re
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -21,6 +24,43 @@ _SYSTEM = (
     "You are a JSON API. Reply with a single valid JSON object only. "
     "No markdown fences, no preamble, no explanation — first character must be '{'."
 )
+
+
+# Le palier gratuit Gemini limite le nombre d'appels par minute. Sans reprise, un dépassement
+# fait échouer l'extraction du profil ET son interprétation : l'agent ne comprend plus la réponse
+# de l'utilisateur et repose la même question indéfiniment, sans rien afficher de l'échec.
+_MAX_TENTATIVES = 4
+_TRANSITOIRE = ("429", "resource_exhausted", "rate limit", "quota",
+                "500", "502", "503", "504", "timeout", "timed out", "overloaded")
+
+
+def _est_transitoire(exc: Exception) -> bool:
+    return any(marqueur in str(exc).lower() for marqueur in _TRANSITOIRE)
+
+
+def _delai_conseille(exc: Exception) -> float | None:
+    """Délai que l'API demande d'attendre (`retryDelay: '23s'` / « retry in 23.6s »)."""
+    message = str(exc)
+    trouve = (re.search(r"retryDelay['\"]?:\s*['\"]?(\d+(?:\.\d+)?)s", message)
+              or re.search(r"retry in (\d+(?:\.\d+)?)s", message, re.IGNORECASE))
+    return float(trouve.group(1)) if trouve else None
+
+
+async def _completion(**kwargs: Any):
+    """Appel de complétion avec reprise sur quota et erreurs transitoires."""
+    derniere: Exception | None = None
+    for tentative in range(_MAX_TENTATIVES):
+        try:
+            return await _client.chat.completions.create(model=settings.gemini_model, **kwargs)
+        except Exception as exc:  # noqa: BLE001 — repropagé si non transitoire ou à bout
+            derniere = exc
+            if not _est_transitoire(exc) or tentative == _MAX_TENTATIVES - 1:
+                raise
+            attente = _delai_conseille(exc) or min(2.0 * (2**tentative), 20.0)
+            logger.info("Gemini indisponible (%s) — reprise dans %.1fs (tentative %d/%d)",
+                        type(exc).__name__, attente, tentative + 1, _MAX_TENTATIVES)
+            await asyncio.sleep(attente + random.uniform(0, 0.8))
+    raise derniere  # type: ignore[misc]
 
 
 def _strip_json_fences(text: str) -> str:
@@ -59,8 +99,7 @@ async def chat_text(
     Utilisé par l'agent de guidance conversationnel, où le LLM ne fait que mettre en forme :
     aucun chiffre, aucune décision de régime ne sort d'ici.
     """
-    response = await _client.chat.completions.create(
-        model=settings.gemini_model,
+    response = await _completion(
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
@@ -81,8 +120,7 @@ async def chat_json_with_system(
     timeout: float = 30.0,
 ) -> dict:
     """Comme `chat_json`, mais avec une consigne système dédiée (extraction structurée)."""
-    response = await _client.chat.completions.create(
-        model=settings.gemini_model,
+    response = await _completion(
         messages=[
             {"role": "system", "content": f"{system}\n\n{_SYSTEM}"},
             {"role": "user", "content": prompt},
@@ -106,8 +144,7 @@ async def chat_json(
     timeout: float = 30.0,
 ) -> dict:
     """Call Gemini and parse a JSON object response."""
-    response = await _client.chat.completions.create(
-        model=settings.gemini_model,
+    response = await _completion(
         messages=[
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": prompt},
