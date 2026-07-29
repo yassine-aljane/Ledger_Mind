@@ -1,7 +1,23 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
+import { FiscalAssistant } from "@/components/lm/FiscalAssistant";
 import { GuidanceChat } from "@/components/lm/GuidanceChat";
+
+type Espace = "guidance" | "pedagogue";
+
+const ESPACES: { id: Espace; label: string; sous: string }[] = [
+  {
+    id: "guidance",
+    label: "Guidance",
+    sous: "Décrivez votre activité : je vous profile pas à pas, puis je construis votre feuille de route.",
+  },
+  {
+    id: "pedagogue",
+    label: "Assistant fiscal",
+    sous: "Vos questions sur la fiscalité, les obligations et les seuils — réponses sourcées.",
+  },
+];
 
 export const Route = createFileRoute("/onboarding/diagnostic")({
   head: () => ({
@@ -35,6 +51,7 @@ function DiagnosticChat() {
   // Le diagnostic est CONVERSATIONNEL : la session est créée par le premier message, il n'y a
   // donc rien à démarrer côté serveur avant d'entrer dans la discussion.
   const [started, setStarted] = useState(false);
+  const [espace, setEspace] = useState<Espace>("guidance");
 
   return (
     <div className="min-h-screen px-6 py-16 max-w-7xl mx-auto">
@@ -81,12 +98,33 @@ function DiagnosticChat() {
         </section>
       ) : (
         <div className="mt-12">
-          <div className="flex items-center justify-between gap-6 mb-8">
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-              Diagnostic de régularisation
+          {/* Les deux espaces du parcours « pas encore immatriculé », accessibles sans SIREN :
+              la guidance construit la feuille de route, l'assistant fiscal répond aux questions
+              ponctuelles. Le profil et la mémoire sont partagés côté serveur — changer d'onglet
+              ne perd rien. */}
+          <div className="flex flex-wrap items-center gap-2 mb-8">
+            {ESPACES.map((e) => {
+              const actif = espace === e.id;
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => setEspace(e.id)}
+                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-colors ${
+                    actif
+                      ? "bg-ink text-background"
+                      : "bg-white border border-border text-ink/60 hover:border-teal-dark hover:text-teal-dark"
+                  }`}
+                >
+                  {e.label}
+                </button>
+              );
+            })}
+            <p className="ml-auto text-xs text-ink/40 max-w-xs text-right leading-snug">
+              {ESPACES.find((e) => e.id === espace)?.sous}
             </p>
           </div>
-          <GuidanceChat />
+
+          {espace === "guidance" ? <GuidanceChat /> : <FiscalAssistant />}
         </div>
       )}
     </div>
