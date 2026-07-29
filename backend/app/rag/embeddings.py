@@ -1,9 +1,10 @@
-"""Embeddings du corpus fiscal — `gemini-embedding-001` via l'endpoint compatible OpenAI.
+"""Embeddings du corpus fiscal — `mistral-embed`, comme dans le prototype d'origine.
 
-Choix d'intégration : l'agent d'origine utilisait un modèle local (sentence-transformers, ~2 Go
-à télécharger) et ChromaDB. Ici on réutilise la clé Gemini déjà présente et la base MongoDB déjà
-déployée : aucune dépendance lourde n'entre dans le projet, et le corpus vit avec le reste des
-données.
+Le prototype `ranyaTra/LedgerMind` vectorisait avec Mistral (ou un modèle local e5) et stockait
+dans ChromaDB. Ici on garde le fournisseur MISTRAL — même qualité de recherche, et surtout un
+quota distinct de celui de Gemini, qui sert à l'agent `intake` — mais les vecteurs vont dans la
+base MongoDB déjà déployée : aucune base vectorielle ni modèle local de plusieurs gigaoctets
+n'entre dans le projet.
 """
 
 from __future__ import annotations
@@ -13,16 +14,9 @@ import logging
 import random
 import re
 
-from openai import AsyncOpenAI
-
-from app.config import settings
+from app.llm import mistral
 
 logger = logging.getLogger(__name__)
-
-_client = AsyncOpenAI(
-    api_key=settings.gemini_api_key,
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-)
 
 # Taille de lot : au-delà, l'API rejette la requête. Les documents sont ingérés par paquets.
 _BATCH = 32
@@ -32,7 +26,7 @@ class EmbeddingIndisponible(RuntimeError):
     """L'API d'embeddings n'a pas répondu — l'appelant décide s'il dégrade ou s'il propage."""
 
 
-# Le palier gratuit plafonne à 100 requêtes d'embedding par minute : sur un corpus de plusieurs
+# Les paliers gratuits plafonnent le nombre de requêtes par minute : sur un corpus de plusieurs
 # centaines de chunks, le quota est atteint en cours d'ingestion. Sans reprise, le document en
 # cours est perdu et le corpus se retrouve troué — silencieusement.
 _MAX_TENTATIVES = 5
@@ -58,10 +52,7 @@ async def _embed_lot(lot: list[str]) -> list[list[float]]:
     derniere: Exception | None = None
     for tentative in range(_MAX_TENTATIVES):
         try:
-            reponse = await _client.embeddings.create(
-                model=settings.embedding_model, input=lot, timeout=60.0
-            )
-            return [item.embedding for item in reponse.data]
+            return await mistral.embed(lot)
         except Exception as exc:  # noqa: BLE001 — requalifié ci-dessous
             derniere = exc
             if not _est_transitoire(exc) or tentative == _MAX_TENTATIVES - 1:

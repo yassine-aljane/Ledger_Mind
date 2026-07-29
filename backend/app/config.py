@@ -7,18 +7,19 @@ class Settings(BaseSettings):
     gemini_api_key: str
     gemini_model: str = "gemini-2.5-flash"
 
-    # Legacy — ignored by intake; kept so old .env files still load
+    # Espace guidance / assistant fiscal / veille (Mistral) — chaîne du prototype d'origine.
+    # Quota distinct de celui de Gemini : l'épuisement d'un fournisseur n'éteint pas l'autre.
     mistral_api_key: str | None = None
-    mistral_model: str = "mistral/mistral-large-latest"
+    mistral_model: str = "mistral-small-latest"
 
     frontend_origin: str = "http://localhost:3000"
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_db_name: str = "ledgermind"
     freshness_max_days: int = 120
 
-    # Corpus fiscal (RAG) — embeddings via l'endpoint Gemini compatible OpenAI, vecteurs en Mongo.
+    # Corpus fiscal (RAG) — embeddings Mistral, vecteurs stockés dans MongoDB.
     # Aucune base vectorielle ni modèle local à installer.
-    embedding_model: str = "gemini-embedding-001"
+    embedding_model: str = "mistral-embed"
 
     # Veille réglementaire (Légifrance/PISTE, BOFiP, sources officielles via MCP).
     # Sans clés PISTE, la veille fonctionne quand même : les autres sources restent accessibles.

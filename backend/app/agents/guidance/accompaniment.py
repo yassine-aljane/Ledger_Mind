@@ -1,4 +1,11 @@
-"""Short Gemini accompaniment for the deterministic roadmap (no invented thresholds)."""
+"""Court accompagnement rédigé pour la feuille de route déterministe (aucun seuil inventé).
+
+Passe par `app.llm` (Mistral pour ce domaine) plutôt que d'appeler un fournisseur en dur : ce
+fichier avait son propre client OpenAI pointé sur Gemini, resté hors de la séparation de quota
+entre l'agent intake et l'espace guidance — l'accompagnement tombait donc en repli silencieux
+dès que le quota Gemini était épuisé, y compris quand tout le reste de la conversation
+fonctionnait déjà sur Mistral.
+"""
 
 from __future__ import annotations
 
@@ -6,16 +13,9 @@ import json
 import logging
 import re
 
-from openai import AsyncOpenAI
-
-from app.config import settings
+from app.llm import chat_text
 
 logger = logging.getLogger(__name__)
-
-_client = AsyncOpenAI(
-    api_key=settings.gemini_api_key,
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-)
 
 ROADMAP_SYSTEME = """# RÔLE
 
@@ -124,23 +124,14 @@ async def rediger_accompagnement(profil: dict, roadmap: dict, *, user_tone: str 
             )
         )
         try:
-            response = await _client.chat.completions.create(
-                model=settings.gemini_model,
-                messages=[
-                    {"role": "system", "content": ROADMAP_SYSTEME},
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Message de l'utilisateur (pour le ton) : {user_tone or 'vouvoiement'}\n\n"
-                            f"{contexte}{rappel}"
-                        ),
-                    },
-                ],
+            texte = await chat_text(
+                ROADMAP_SYSTEME,
+                f"Message de l'utilisateur (pour le ton) : {user_tone or 'vouvoiement'}\n\n"
+                f"{contexte}{rappel}",
                 temperature=0.2,
                 max_tokens=220,
                 timeout=30.0,
             )
-            texte = (response.choices[0].message.content or "").strip()
         except Exception as e:
             logger.warning("Accompagnement LLM failed: %s", e)
             return _ACCOMPAGNEMENT_REPLI

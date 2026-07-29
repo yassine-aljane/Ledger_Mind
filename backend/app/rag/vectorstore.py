@@ -10,12 +10,15 @@ Passage à l'échelle : au-delà de ~50 000 chunks, basculer sur un index `vecto
 
 from __future__ import annotations
 
+import logging
 import math
 import threading
 
 from pymongo import ASCENDING
 
 from app.core.mongo import get_db
+
+logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 _initialized = False
@@ -68,11 +71,24 @@ def query(embedding: list[float], n_results: int = 6, concerne: str | None = Non
         filtre = {"concerne": {"$in": [concerne, "tous"]}}
 
     resultats: list[dict] = []
+    incompatibles = 0
     for doc in collection().find(filtre, {"_id": 0}):
         vecteur = doc.get("embedding") or []
+        # Un chunk vectorisé par un AUTRE modèle n'est pas comparable : l'écarter plutôt que
+        # de lui donner une similarité nulle, sinon il remonte quand même — au hasard.
+        if len(vecteur) != len(embedding):
+            incompatibles += 1
+            continue
         similarite = _cosinus(embedding, vecteur)
         doc.pop("embedding", None)
         resultats.append({**doc, "distance": 1.0 - similarite})
+
+    if incompatibles:
+        logger.warning(
+            "%d chunk(s) vectorisés avec un autre modèle ont été ignorés — relancez "
+            "`python -m backend.scripts.reembed_corpus` pour réaligner le corpus.",
+            incompatibles,
+        )
 
     resultats.sort(key=lambda d: d["distance"])
     return resultats[:n_results]
