@@ -3,7 +3,7 @@ Gratuit, sans clé API. Donne parfois directement website/email/téléphone.
 """
 import requests
 from typing import List
-from config import OVERPASS_URL, SEARCH_RADIUS_M
+from ..config import OVERPASS_URL, SEARCH_RADIUS_M
 
 QUERY_TEMPLATE = """
 [out:json][timeout:25];

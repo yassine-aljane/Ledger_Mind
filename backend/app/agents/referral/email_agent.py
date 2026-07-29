@@ -4,8 +4,8 @@ des brouillons - aucun envoi automatique (validation humaine requise ensuite).
 """
 from langchain_mistralai import ChatMistralAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from config import MISTRAL_API_KEY, MODEL_NAME
-from state import AgentState, EmailGenere
+from .config import MISTRAL_API_KEY, MODEL_NAME
+from .state import AgentState, EmailGenere
 
 SYSTEM_PROMPT = """Tu rédiges des emails professionnels en français, au nom de \
 l'utilisateur, à destination d'experts-comptables. Consignes strictes :

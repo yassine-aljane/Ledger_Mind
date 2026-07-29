@@ -11,11 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CaptureRouteImport } from './routes/capture'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as EducationRouteImport } from './routes/education'
 import { Route as HistoriqueRouteImport } from './routes/historique'
 import { Route as ParametresRouteImport } from './routes/parametres'
+import { Route as ReferralRouteImport } from './routes/referral'
 import { Route as SimulateurRouteImport } from './routes/simulateur'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding.index'
 import { Route as OnboardingDiagnosticRouteImport } from './routes/onboarding.diagnostic'
@@ -33,14 +34,14 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CaptureRoute = CaptureRouteImport.update({
+  id: '/capture',
+  path: '/capture',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentsRoute = DocumentsRouteImport.update({
-  id: '/documents',
-  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EducationRoute = EducationRouteImport.update({
@@ -56,6 +57,11 @@ const HistoriqueRoute = HistoriqueRouteImport.update({
 const ParametresRoute = ParametresRouteImport.update({
   id: '/parametres',
   path: '/parametres',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReferralRoute = ReferralRouteImport.update({
+  id: '/referral',
+  path: '/referral',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SimulateurRoute = SimulateurRouteImport.update({
@@ -93,11 +99,12 @@ const OnboardingDiagnosticResultatRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
-  '/documents': typeof DocumentsRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
+  '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
   '/onboarding/profil': typeof OnboardingProfilRoute
@@ -108,11 +115,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
-  '/documents': typeof DocumentsRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
+  '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
   '/onboarding/profil': typeof OnboardingProfilRoute
@@ -124,11 +132,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
-  '/documents': typeof DocumentsRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
+  '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
   '/onboarding/profil': typeof OnboardingProfilRoute
@@ -141,11 +150,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
-    | '/documents'
     | '/education'
     | '/historique'
     | '/parametres'
+    | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
     | '/onboarding/profil'
@@ -156,11 +166,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
-    | '/documents'
     | '/education'
     | '/historique'
     | '/parametres'
+    | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
     | '/onboarding/profil'
@@ -171,11 +182,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
-    | '/documents'
     | '/education'
     | '/historique'
     | '/parametres'
+    | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
     | '/onboarding/profil'
@@ -187,11 +199,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  CaptureRoute: typeof CaptureRoute
   DashboardRoute: typeof DashboardRoute
-  DocumentsRoute: typeof DocumentsRoute
   EducationRoute: typeof EducationRoute
   HistoriqueRoute: typeof HistoriqueRoute
   ParametresRoute: typeof ParametresRoute
+  ReferralRoute: typeof ReferralRoute
   SimulateurRoute: typeof SimulateurRoute
   OnboardingDiagnosticRoute: typeof OnboardingDiagnosticRouteWithChildren
   OnboardingProfilRoute: typeof OnboardingProfilRoute
@@ -215,18 +228,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/capture': {
+      id: '/capture'
+      path: '/capture'
+      fullPath: '/capture'
+      preLoaderRoute: typeof CaptureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documents': {
-      id: '/documents'
-      path: '/documents'
-      fullPath: '/documents'
-      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/education': {
@@ -248,6 +261,13 @@ declare module '@tanstack/react-router' {
       path: '/parametres'
       fullPath: '/parametres'
       preLoaderRoute: typeof ParametresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/referral': {
+      id: '/referral'
+      path: '/referral'
+      fullPath: '/referral'
+      preLoaderRoute: typeof ReferralRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/simulateur': {
@@ -309,11 +329,12 @@ const OnboardingDiagnosticRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  CaptureRoute: CaptureRoute,
   DashboardRoute: DashboardRoute,
-  DocumentsRoute: DocumentsRoute,
   EducationRoute: EducationRoute,
   HistoriqueRoute: HistoriqueRoute,
   ParametresRoute: ParametresRoute,
+  ReferralRoute: ReferralRoute,
   SimulateurRoute: SimulateurRoute,
   OnboardingDiagnosticRoute: OnboardingDiagnosticRouteWithChildren,
   OnboardingProfilRoute: OnboardingProfilRoute,

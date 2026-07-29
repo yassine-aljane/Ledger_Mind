@@ -21,9 +21,26 @@ class BranchAgentContext(BaseModel):
     roadmap: dict[str, Any] | None = None
 
 
+class CaptureAgentContext(BaseModel):
+    """Snapshot of capture (document analysis) on the user."""
+
+    last_thread_id: str | None = None
+    last_document_id: str | None = None
+    updated_at: str | None = None
+    history: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ReferralAgentContext(BaseModel):
+    """Snapshot of referral (expert-comptable search) on the user."""
+
+    history: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class UserAgentContext(BaseModel):
     intake: BranchAgentContext = Field(default_factory=BranchAgentContext)
     guidance: BranchAgentContext = Field(default_factory=BranchAgentContext)
+    capture: CaptureAgentContext = Field(default_factory=CaptureAgentContext)
+    referral: ReferralAgentContext = Field(default_factory=ReferralAgentContext)
 
 
 class UserPublic(BaseModel):

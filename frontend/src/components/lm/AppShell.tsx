@@ -11,7 +11,8 @@ import {
 
 const nav = [
   { to: "/dashboard", label: "Dashboard" },
-  { to: "/documents", label: "Documents" },
+  { to: "/referral", label: "Expert-Comptable" },
+  { to: "/capture", label: "Documents" },
   { to: "/simulateur", label: "Simulateur" },
   { to: "/historique", label: "Historique" },
   { to: "/education", label: "Éducation" },
