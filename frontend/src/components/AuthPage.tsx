@@ -1,7 +1,13 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+import {
+  fetchMe,
+  getStoredUser,
+  isAuthed,
+  loginAccount,
+  postAuthPath,
+  registerAccount,
+} from "@/lib/auth";
 
 type Mode = "login" | "signup";
 
@@ -10,70 +16,50 @@ export function AuthPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
-  // If already signed in, skip straight to onboarding.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/onboarding", replace: true });
-    });
+    if (!isAuthed()) return;
+    const cached = getStoredUser();
+    if (cached) {
+      navigate({ to: postAuthPath(cached), replace: true });
+      return;
+    }
+    fetchMe()
+      .then((u) => navigate({ to: postAuthPath(u), replace: true }))
+      .catch(() => navigate({ to: "/onboarding", replace: true }));
   }, [navigate]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    setInfo(null);
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const name = String(form.get("name") ?? "").trim();
 
-    setLoading(true);
-    try {
-      if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: name },
-          },
-        });
-        if (error) throw error;
-        if (data.session) {
-          navigate({ to: "/onboarding", replace: true });
-        } else {
-          setInfo("Compte créé. Vérifiez votre email pour confirmer votre inscription.");
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/onboarding", replace: true });
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Une erreur est survenue.";
-      setError(translateError(msg));
-    } finally {
-      setLoading(false);
+    if (!email || !password) {
+      setError("Email et mot de passe requis.");
+      return;
     }
-  }
+    if (mode === "signup" && !name) {
+      setError("Indiquez votre nom complet.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
 
-  async function handleGoogle() {
-    setError(null);
     setLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (result.error) {
-        setError(translateError(result.error.message ?? "Google indisponible."));
-        setLoading(false);
-        return;
-      }
-      if (result.redirected) return;
-      navigate({ to: "/onboarding", replace: true });
+      const res =
+        mode === "signup"
+          ? await registerAccount({ email, password, name })
+          : await loginAccount({ email, password });
+      navigate({ to: postAuthPath(res.user), replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur Google.");
+      setError(err instanceof Error ? err.message : "Erreur d'authentification.");
+    } finally {
       setLoading(false);
     }
   }
@@ -97,8 +83,8 @@ export function AuthPage() {
             Espace membre
           </p>
           <blockquote className="text-2xl md:text-3xl font-extrabold tracking-tight text-balance leading-snug">
-            « LedgerMind a transformé ma gestion d'auto-entrepreneur en{" "}
-            <span className="italic font-normal">un jeu d'enfant.</span> »
+            « LedgerMind a transformé ma gestion d&apos;auto-entrepreneur en{" "}
+            <span className="italic font-normal">un jeu d&apos;enfant.</span> »
           </blockquote>
           <p className="mt-6 text-sm text-background/60 font-medium">
             Clara V. — Créatrice de contenu & Designer
@@ -149,7 +135,6 @@ export function AuthPage() {
               onClick={() => {
                 setMode("login");
                 setError(null);
-                setInfo(null);
               }}
               className={`relative z-10 py-2.5 rounded-full transition-colors ${
                 isLogin ? "text-background" : "text-ink/60"
@@ -162,7 +147,6 @@ export function AuthPage() {
               onClick={() => {
                 setMode("signup");
                 setError(null);
-                setInfo(null);
               }}
               className={`relative z-10 py-2.5 rounded-full transition-colors ${
                 !isLogin ? "text-background" : "text-ink/60"
@@ -172,7 +156,7 @@ export function AuthPage() {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          <form onSubmit={(e) => void handleSubmit(e)} className="mt-8 space-y-5">
             {!isLogin && (
               <Field
                 label="Nom complet"
@@ -207,11 +191,6 @@ export function AuthPage() {
                 {error}
               </div>
             )}
-            {info && (
-              <div className="rounded-lg border border-teal-dark/30 bg-teal-light/20 px-3 py-2 text-xs text-ink/80">
-                {info}
-              </div>
-            )}
 
             <button
               type="submit"
@@ -242,12 +221,12 @@ export function AuthPage() {
 
           <button
             type="button"
-            onClick={handleGoogle}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border bg-background hover:border-ink transition-colors text-sm font-medium disabled:opacity-60"
+            disabled
+            title="Bientôt disponible"
+            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border bg-background text-sm font-medium opacity-50 cursor-not-allowed"
           >
             <GoogleIcon />
-            Continuer avec Google
+            Continuer avec Google (bientôt)
           </button>
 
           <p className="mt-10 text-xs text-ink/50 text-center leading-relaxed">
@@ -265,16 +244,6 @@ export function AuthPage() {
       </main>
     </div>
   );
-}
-
-function translateError(msg: string): string {
-  const m = msg.toLowerCase();
-  if (m.includes("invalid login")) return "Email ou mot de passe incorrect.";
-  if (m.includes("already registered") || m.includes("already been registered"))
-    return "Un compte existe déjà avec cet email. Connectez-vous.";
-  if (m.includes("password") && m.includes("6")) return "Le mot de passe doit contenir au moins 6 caractères.";
-  if (m.includes("email") && m.includes("confirm")) return "Confirmez votre email avant de vous connecter.";
-  return msg;
 }
 
 function Field({
@@ -307,10 +276,10 @@ function Field({
 function GoogleIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden>
-      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.1 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.9 6.1C12.4 13.4 17.7 9.5 24 9.5z"/>
-      <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.4z"/>
-      <path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.7 0 20.2 0 24s1 7.3 2.6 10.7l7.9-6.1z"/>
-      <path fill="#34A853" d="M24 48c6.1 0 11.2-2 15-5.5l-7.6-5.9c-2.1 1.4-4.8 2.3-7.4 2.3-6.3 0-11.6-3.9-13.5-9.4l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/>
+      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.1 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.9 6.1C12.4 13.4 17.7 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.4z" />
+      <path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.7 0 20.2 0 24s1 7.3 2.6 10.7l7.9-6.1z" />
+      <path fill="#34A853" d="M24 48c6.1 0 11.2-2 15-5.5l-7.6-5.9c-2.1 1.4-4.8 2.3-7.4 2.3-6.3 0-11.6-3.9-13.5-9.4l-7.9 6.1C6.5 42.6 14.6 48 24 48z" />
     </svg>
   );
 }

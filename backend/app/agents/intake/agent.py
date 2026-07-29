@@ -1,5 +1,5 @@
 """
-Intake agent public API.
+Intake agent public API (branch A).
 
 Verification (steps 1–3): SIREN identity → RCS doc OCR (EI) → SIRENE avis upload.
 Profiling (steps 4–5): activity, mixed activity, revenue data for VAT tracking.
@@ -134,18 +134,6 @@ def apply_sirene_document(profile: UserProfile, doc: SireneAvisData) -> UserProf
     if doc.siren and not profile.siren:
         profile.siren = doc.siren
     return profile
-
-
-def verification_complete(profile: UserProfile) -> bool:
-    if profile.verification_status != "verified":
-        return False
-    if profile.registry_document_required and not profile.registry_document_uploaded:
-        return False
-    if profile.registry_tax_base is None:
-        return False
-    if not profile.sirene_document_uploaded:
-        return False
-    return True
 
 
 async def run_verification(siret: str, company_name: str | None = None) -> VerificationResult:

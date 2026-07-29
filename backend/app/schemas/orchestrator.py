@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Literal
+from pydantic import BaseModel, Field
+from typing import Any, Literal
 
 
 class Mismatch(BaseModel):
@@ -18,6 +18,25 @@ class RecommendedAction(BaseModel):
     step: int
     title: str
     description: str
+
+
+class DiagnosticProfile(BaseModel):
+    """Branch B (no SIREN) — guidance profile for deterministic roadmap."""
+
+    activite: str | None = None
+    ca_estime_annuel: float | None = None
+    vend_produits: bool | None = None
+    recoit_cadeaux: bool | None = None
+    type_activite: str | None = None  # prestation | vente | mixte
+    premiere_annee: bool | None = None
+    jours_activite: int | None = None
+    anciennete: str | None = None
+    ca_n_1_au_dessus_seuil: bool | None = None
+    ca_n_2_au_dessus_seuil: bool | None = None
+    situation_actuelle: str | None = None
+    ca_prestations: float | None = None
+    ca_vente: float | None = None
+    choix_parcours: str | None = None  # micro | societe (bascule zone)
 
 
 class UserProfile(BaseModel):
@@ -88,13 +107,20 @@ class OrchestratorState(BaseModel):
         "verification_registry_document",
         "verification_document",
         "profile_questions",
+        "diagnostic_questions",
+        "diagnostic_roadmap",
         "tax_classification",
         "compliance_check",
         "done",
     ]
     profile: UserProfile
+    branch: Literal["intake", "guidance"] = "intake"
+    user_id: str | None = None
     skip_verification: bool = False
+    diagnostic_profile: DiagnosticProfile = Field(default_factory=DiagnosticProfile)
+    roadmap: dict[str, Any] | None = None
     last_question: str | None = None
+    last_question_field: str | None = None
     quick_replies: list[str] = []
     profile_completeness: float = 0.0
     verification_message: str | None = None
@@ -103,6 +129,8 @@ class OrchestratorState(BaseModel):
 class OrchestratorStartRequest(BaseModel):
     siret: str | None = None
     company_name: str | None = None
+    branch: Literal["intake", "guidance"] | None = None
+    skip_verification: bool = False
 
 
 class OrchestratorTurnRequest(BaseModel):
@@ -120,9 +148,13 @@ class OrchestratorTurnResponse(BaseModel):
         "upload_sirene_document",
         "show_tax_result",
         "show_compliance",
+        "show_roadmap",
         "done",
         "requires_expert",
     ]
     message: str | None = None
     quick_replies: list[str] = []
     profile: UserProfile
+    profile_completeness: float = 0.0
+    roadmap: dict[str, Any] | None = None
+    diagnostic_profile: DiagnosticProfile | None = None

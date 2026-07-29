@@ -3,12 +3,23 @@ import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { FiscalReceipt } from "@/components/lm/FiscalReceipt";
 import {
-  fetchUserProfile,
+  displayFirstName,
+  fetchMe,
+  getStoredUser,
+  isAuthed,
+  type AuthUser,
+} from "@/lib/auth";
+import {
+  fetchMySessions,
+  fetchSessionDetail,
   formatMoney,
   getStoredSessionId,
+  storeSessionId,
+  type DiagnosticProfile,
+  type SessionDetail,
   type UserProfile,
 } from "@/lib/api";
-import type { Calcul, Qualification } from "@/lib/api-mocks";
+import type { Calcul, Qualification } from "@/lib/mocks";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -41,13 +52,18 @@ function profileToQualification(profile: UserProfile): Qualification {
 function profileToCalcul(profile: UserProfile): Calcul {
   const monthlyStr = profile.estimated_monthly_revenue ?? "0";
   const digits = monthlyStr.replace(/[^\d]/g, "");
-  const monthly = digits ? parseInt(digits, 10) : 2500;
+  const annualDigits = (profile.estimated_annual_revenue ?? "").replace(/[^\d]/g, "");
+  const monthly = digits
+    ? parseInt(digits, 10)
+    : annualDigits
+      ? Math.round(parseInt(annualDigits, 10) / 12)
+      : 2500;
   const ht = monthly * 3;
   const tva = profile.international_clients ? ht * 0.2 : 0;
   const rs = profile.tax_category === "BNC" ? ht * 0.1 : 0;
   return {
     reference: `LM-${profile.siren ?? "NEW"}-${new Date().getFullYear()}`,
-    client: profile.denomination ?? "Votre activité",
+    client: profile.denomination ?? profile.activity_types[0] ?? "Votre activité",
     date: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }),
     montant_ht: ht,
     tva,
@@ -58,28 +74,160 @@ function profileToCalcul(profile: UserProfile): Calcul {
   };
 }
 
+function emptyReceiptProfile(): UserProfile {
+  return {
+    siret: null,
+    siren: null,
+    denomination: null,
+    legal_form: null,
+    nature_juridique_code: null,
+    is_entrepreneur_individuel: null,
+    micro_eligible: null,
+    registry_address: null,
+    ape_code: null,
+    activity_declared: null,
+    creation_date: null,
+    administrative_status: null,
+    verification_status: null,
+    registry_document_required: null,
+    registry_document_uploaded: false,
+    registry_document_type: null,
+    kbis_obtained: null,
+    rcs_registered: null,
+    registry_tax_base: null,
+    sirene_document_uploaded: false,
+    sirene_document_activity_label: null,
+    sirene_document_address: null,
+    sirene_document_registration_date: null,
+    activity_types: [],
+    has_secondary_activity: null,
+    secondary_activity_types: [],
+    main_activity_commercial: null,
+    revenue_sources: [],
+    currencies: [],
+    estimated_monthly_revenue: null,
+    estimated_annual_revenue: null,
+    revenue_variability: null,
+    invoices_already_issued: null,
+    first_income_date: null,
+    has_recurring_contracts: null,
+    in_kind_gifts: null,
+    international_clients: null,
+    tax_category: null,
+    tax_category_reason: null,
+    recommended_regime: null,
+    regime_plafond: null,
+    fiscal_classification_status: null,
+    fiscal_inconsistency_reason: null,
+    activity_mismatch: false,
+    mismatches: [],
+    compliance_alerts: [],
+    recommended_actions: [],
+  };
+}
+
+function formatCaLabel(diag: DiagnosticProfile | null, profile: UserProfile): string {
+  if (diag?.ca_estime_annuel != null) {
+    return `≈ ${Math.round(diag.ca_estime_annuel).toLocaleString("fr-FR")} € / an`;
+  }
+  if (profile.estimated_annual_revenue) return profile.estimated_annual_revenue;
+  if (profile.estimated_monthly_revenue) return `${profile.estimated_monthly_revenue} / mois`;
+  return "—";
+}
+
 function DashboardPage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const navigate = useNavigate();
+  const [user, setUser] = useState<AuthUser | null>(getStoredUser());
+  const [detail, setDetail] = useState<SessionDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sessionId = getStoredSessionId();
-    if (!sessionId) {
-      navigate({ to: "/onboarding" });
+    if (!isAuthed()) {
+      navigate({ to: "/auth", replace: true });
       return;
     }
-    fetchUserProfile(sessionId)
-      .then(setProfile)
-      .catch(() => navigate({ to: "/onboarding" }));
+
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const me = await fetchMe();
+        if (cancelled) return;
+        setUser(me);
+
+        let sessionId = getStoredSessionId();
+        if (!sessionId) {
+          const fromCtx =
+            me.agent_context.guidance.last_session_id ||
+            me.agent_context.intake.last_session_id;
+          if (fromCtx) sessionId = fromCtx;
+        }
+        if (!sessionId) {
+          const sessions = await fetchMySessions();
+          sessionId = sessions[0]?.session_id ?? null;
+        }
+
+        if (!sessionId) {
+          if (!cancelled) {
+            setDetail(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        storeSessionId(sessionId);
+        const d = await fetchSessionDetail(sessionId);
+        if (!cancelled) {
+          setDetail(d);
+          setLoading(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Impossible de charger le dashboard.");
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
-  const greeting = profile?.denomination?.split(" ")[0] ?? "Créateur";
-  const hasAlerts = (profile?.compliance_alerts.length ?? 0) > 0;
-  const statusLabel = hasAlerts ? "des points à vérifier" : "à jour";
+  const profile = detail?.profile ?? null;
+  const diag = detail?.diagnostic_profile ?? null;
+  const branch = detail?.branch ?? null;
+  const isGuidance = branch === "guidance";
+  const greeting = displayFirstName(user);
 
-  const data = profile
-    ? { qualification: profileToQualification(profile), calcul: profileToCalcul(profile) }
-    : null;
+  const hasPlan = (profile?.recommended_actions.length ?? 0) > 0 || Boolean(profile?.recommended_regime);
+  const statusLabel = hasPlan || profile?.tax_category ? "à jour" : "en cours";
+
+  const data = {
+    qualification: profileToQualification(profile ?? emptyReceiptProfile()),
+    calcul: profileToCalcul(profile ?? emptyReceiptProfile()),
+  };
+
+  const pipeline = isGuidance
+    ? [
+        { l: "Diagnostic", done: true },
+        { l: "Feuille de route", done: Boolean(detail?.roadmap) || hasPlan },
+        { l: "Régime", done: Boolean(profile?.recommended_regime) },
+        { l: "Actions", done: (profile?.recommended_actions.length ?? 0) > 0 },
+      ]
+    : [
+        {
+          l: "Vérification",
+          done:
+            profile?.verification_status === "verified" ||
+            profile?.verification_status === "skipped",
+        },
+        { l: "Qualification", done: !!profile?.tax_category },
+        { l: "Conformité", done: !!profile?.tax_category },
+        { l: "Rapport", done: !!profile?.tax_category },
+      ];
 
   return (
     <AppShell>
@@ -92,26 +240,49 @@ function DashboardPage() {
         }
         description={
           profile?.recommended_regime
-            ? `Régime recommandé : ${profile.recommended_regime} (plafond ${profile.regime_plafond}).`
-            : "Voici votre dernier reçu fiscal et la provision recommandée pour vos prochaines échéances."
+            ? `Régime recommandé : ${profile.recommended_regime}${
+                profile.regime_plafond ? ` (plafond ${profile.regime_plafond})` : ""
+              }.`
+            : loading
+              ? "Chargement de votre dossier…"
+              : "Complétez le diagnostic ou la vérification SIREN pour alimenter ce tableau de bord."
         }
       />
+
+      {error && (
+        <p className="mb-8 text-sm text-coral font-mono">{error}</p>
+      )}
+
+      {!loading && !detail && !error && (
+        <div className="mb-10 rounded-2xl border border-border bg-white p-8 text-center space-y-4">
+          <p className="text-ink/60">Aucune session trouvée pour votre compte.</p>
+          <Link
+            to="/onboarding"
+            className="inline-block px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
+          >
+            Commencer l&apos;onboarding →
+          </Link>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-12 gap-12 items-start">
         <div className="lg:col-span-7 space-y-6">
           <div className="grid sm:grid-cols-2 gap-4">
             <Stat
               label="Catégorie fiscale"
-              value={profile?.tax_category ?? "—"}
+              value={profile?.tax_category ?? profile?.recommended_regime ?? "—"}
             />
             <Stat
               label="Provision estimée (trim.)"
-              value={data ? `${formatMoney(data.calcul.provision_conseillee)} €` : "—"}
+              value={`${formatMoney(data.calcul.provision_conseillee)} €`}
               accent
             />
             <Stat
               label="Revenu mensuel déclaré"
-              value={profile?.estimated_monthly_revenue ?? "—"}
+              value={
+                profile?.estimated_monthly_revenue ??
+                (profile ? formatCaLabel(diag, profile) : "—")
+              }
               mono={false}
             />
             <Stat
@@ -132,8 +303,8 @@ function DashboardPage() {
                         a.severity === "critical"
                           ? "bg-coral/10 text-coral"
                           : a.severity === "warning"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-teal-dark/10 text-teal-dark"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-teal-dark/10 text-teal-dark"
                       }`}
                     >
                       {a.severity}
@@ -149,16 +320,17 @@ function DashboardPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Pipeline de traitement</h2>
               <span className="text-[10px] font-mono uppercase tracking-widest text-teal-dark">
-                {profile?.tax_category ? "Opérationnel" : "En attente"}
+                {branch === "guidance"
+                  ? "Branche B · Guidance"
+                  : branch === "intake"
+                    ? "Branche A · Intake"
+                    : loading
+                      ? "…"
+                      : "En attente"}
               </span>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {[
-                { l: "Vérification", done: profile?.verification_status === "verified" || profile?.verification_status === "skipped" },
-                { l: "Qualification", done: !!profile?.tax_category },
-                { l: "Conformité", done: !!profile?.tax_category },
-                { l: "Rapport", done: !!profile?.tax_category },
-              ].map((p) => (
+              {pipeline.map((p) => (
                 <div key={p.l} className="space-y-2">
                   <div className={`h-1.5 rounded-full ${p.done ? "bg-teal-light" : "bg-border"}`} />
                   <span className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">
@@ -173,9 +345,17 @@ function DashboardPage() {
             <section className="bg-white border border-border rounded-2xl overflow-hidden">
               <div className="p-6 flex items-center justify-between border-b border-border">
                 <h2 className="text-lg font-semibold">Prochaines actions</h2>
+                {isGuidance && (
+                  <Link
+                    to="/parametres"
+                    className="text-xs font-semibold text-teal-dark hover:underline"
+                  >
+                    Voir le profil →
+                  </Link>
+                )}
               </div>
               <ul className="divide-y divide-border">
-                {profile.recommended_actions.map((item) => (
+                {profile.recommended_actions.slice(0, 6).map((item) => (
                   <li key={item.step} className="p-6 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-5 min-w-0">
                       <span className="font-mono text-xs text-ink/40 shrink-0">
@@ -183,7 +363,9 @@ function DashboardPage() {
                       </span>
                       <div className="min-w-0">
                         <p className="font-semibold truncate">{item.title}</p>
-                        <p className="text-sm text-ink/60 truncate">{item.description}</p>
+                        {item.description ? (
+                          <p className="text-sm text-ink/60 truncate">{item.description}</p>
+                        ) : null}
                       </div>
                     </div>
                   </li>
@@ -194,15 +376,15 @@ function DashboardPage() {
         </div>
 
         <div className="lg:col-span-5 lg:sticky lg:top-24 animate-slide-up">
-          {data ? (
+          {loading ? (
+            <div className="text-ink/40 font-mono text-sm text-center">Chargement…</div>
+          ) : (
             <>
               <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark text-center mb-6">
                 Dernier reçu fiscal
               </p>
               <FiscalReceipt qualification={data.qualification} calcul={data.calcul} />
             </>
-          ) : (
-            <div className="text-ink/40 font-mono text-sm text-center">Chargement…</div>
           )}
         </div>
       </div>

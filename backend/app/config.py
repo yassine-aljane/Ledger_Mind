@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3000"
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_db_name: str = "ledgermind"
+    freshness_max_days: int = 120
+
+    # Auth (JWT) — change AUTH_SECRET in production (min 32 chars)
+    auth_secret: str = "ledgermind-dev-secret-change-me-32b"
+    auth_token_days: int = 14
 
     class Config:
         env_file = ".env"

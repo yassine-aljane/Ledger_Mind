@@ -225,11 +225,6 @@ def _classify_from_text(text: str) -> RegistryDocData:
     )
 
 
-def classify_registry_document(data: bytes, filename: str, mime: str) -> RegistryDocData:
-    text = _extract_text_enriched(data, filename, mime)
-    return _classify_from_text(text)
-
-
 async def classify_registry_document_with_llm(
     data: bytes,
     filename: str,
@@ -243,7 +238,7 @@ async def classify_registry_document_with_llm(
         if len(text.strip()) < 20:
             raise heuristic_error
 
-        from app.agents.intake.llm import chat_json
+        from app.llm.gemini import chat_json
 
         try:
             result = await chat_json(

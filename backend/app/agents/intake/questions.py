@@ -7,7 +7,7 @@ Steps 4–5: activity, mixed activity, revenue data for VAT tracking.
 import json
 import logging
 
-from app.agents.intake.llm import chat_json
+from app.llm.gemini import chat_json
 from app.schemas.orchestrator import UserProfile
 
 logger = logging.getLogger(__name__)

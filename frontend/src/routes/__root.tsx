@@ -24,7 +24,7 @@ function NotFoundComponent() {
         </p>
         <div className="mt-8">
           <Link
-            to="/"
+            to="/onboarding"
             className="inline-flex items-center justify-center rounded-xl bg-ink px-6 py-3 text-sm font-semibold text-background transition-colors hover:bg-teal-dark"
           >
             Retour à l'accueil
@@ -55,7 +55,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             Réessayer
           </button>
           <a
-            href="/"
+            href="/onboarding"
             className="inline-flex items-center justify-center rounded-xl border border-border bg-background px-5 py-2.5 text-sm font-semibold text-ink hover:border-ink"
           >
             Accueil
@@ -118,20 +118,8 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const router = useRouter();
-  useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
-      router.invalidate();
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
-    });
-    return () => data.subscription.unsubscribe();
-  }, [router, queryClient]);
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-background text-ink relative">

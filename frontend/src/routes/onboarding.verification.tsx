@@ -62,7 +62,13 @@ function VerificationPage() {
   const showError = touched && !isValid;
 
   const profile: UserProfile | null = activeTurn?.profile ?? orchestratorResult?.profile ?? null;
-  const sessionId = getStoredSessionId() ?? orchestratorResult?.session_id ?? activeTurn?.session_id;
+  const sessionId = (() => {
+    try {
+      return getStoredSessionId() ?? orchestratorResult?.session_id ?? activeTurn?.session_id;
+    } catch {
+      return orchestratorResult?.session_id ?? activeTurn?.session_id ?? null;
+    }
+  })();
 
   const runVerify = async (value: string) => {
     setLoading(true);

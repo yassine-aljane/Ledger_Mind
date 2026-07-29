@@ -1,15 +1,41 @@
 // Real HTTP API client for the FastAPI backend.
 
+import { authHeaders, clearAuth } from "@/lib/auth";
+
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
 const SESSION_ID_KEY = "ledgermind_session_id";
 
+async function parseError(response: Response): Promise<string> {
+  if (response.status === 401) {
+    clearAuth();
+  }
+  const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+  const detail = err?.detail;
+  if (typeof detail === "string") return detail;
+  return `HTTP ${response.status}`;
+}
+
 export function getStoredSessionId(): string | null {
-  return localStorage.getItem(SESSION_ID_KEY);
+  try {
+    if (typeof window === "undefined") return null;
+    return (
+      sessionStorage.getItem(SESSION_ID_KEY) ||
+      localStorage.getItem(SESSION_ID_KEY)
+    );
+  } catch {
+    return null;
+  }
 }
 
 export function storeSessionId(id: string): void {
-  localStorage.setItem(SESSION_ID_KEY, id);
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(SESSION_ID_KEY, id);
+    sessionStorage.setItem(SESSION_ID_KEY, id);
+  } catch {
+    // ignore quota / private-mode failures
+  }
 }
 
 // -------- Orchestrator --------
@@ -82,6 +108,23 @@ export type UserProfile = {
   recommended_actions: RecommendedAction[];
 };
 
+export type DiagnosticProfile = {
+  activite: string | null;
+  ca_estime_annuel: number | null;
+  vend_produits: boolean | null;
+  recoit_cadeaux: boolean | null;
+  type_activite: string | null;
+  premiere_annee: boolean | null;
+  jours_activite: number | null;
+  anciennete: string | null;
+  ca_n_1_au_dessus_seuil: boolean | null;
+  ca_n_2_au_dessus_seuil: boolean | null;
+  situation_actuelle: string | null;
+  ca_prestations: number | null;
+  ca_vente: number | null;
+  choix_parcours: string | null;
+};
+
 export type OrchestratorTurnResponse = {
   session_id: string;
   phase: string;
@@ -92,26 +135,93 @@ export type OrchestratorTurnResponse = {
     | "upload_sirene_document"
     | "show_tax_result"
     | "show_compliance"
+    | "show_roadmap"
     | "done"
     | "requires_expert";
   message: string | null;
   quick_replies: string[];
   profile: UserProfile;
+  profile_completeness?: number;
+  roadmap?: Record<string, unknown> | null;
+  diagnostic_profile?: DiagnosticProfile | null;
 };
 
-export async function startOrchestrator(siret?: string): Promise<OrchestratorTurnResponse> {
+export type StartOrchestratorOptions = {
+  siret?: string | null;
+  skip_verification?: boolean;
+  branch?: "intake" | "guidance";
+  company_name?: string | null;
+};
+
+export async function startOrchestrator(
+  siretOrOptions?: string | StartOrchestratorOptions,
+): Promise<OrchestratorTurnResponse> {
+  const opts: StartOrchestratorOptions =
+    typeof siretOrOptions === "string" || siretOrOptions === undefined
+      ? { siret: siretOrOptions ?? null }
+      : siretOrOptions;
+
   const response = await fetch(`${API_BASE}/api/orchestrator/start`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ siret: siret?.replace(/\s/g, "") ?? null }),
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify({
+      siret: opts.siret ? opts.siret.replace(/\s/g, "") : null,
+      company_name: opts.company_name ?? null,
+      skip_verification: opts.skip_verification ?? false,
+      branch: opts.branch ?? null,
+    }),
   });
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
-    throw new Error(err.detail ?? `HTTP ${response.status}`);
+    throw new Error(await parseError(response));
   }
   const data: OrchestratorTurnResponse = await response.json();
   storeSessionId(data.session_id);
   return data;
+}
+
+export type SessionDetail = {
+  session_id: string;
+  phase: string;
+  branch: string;
+  profile: UserProfile;
+  diagnostic_profile: DiagnosticProfile | null;
+  roadmap: Record<string, unknown> | null;
+};
+
+const DIAGNOSTIC_RESULT_KEY = "ledgermind_diagnostic_result";
+
+export function cacheDiagnosticResult(detail: SessionDetail): void {
+  try {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(DIAGNOSTIC_RESULT_KEY, JSON.stringify(detail));
+    storeSessionId(detail.session_id);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadCachedDiagnosticResult(): SessionDetail | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = sessionStorage.getItem(DIAGNOSTIC_RESULT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SessionDetail;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchSessionDetail(sessionId: string): Promise<SessionDetail> {
+  const response = await fetch(`${API_BASE}/api/orchestrator/session/${sessionId}/detail`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+  return response.json();
 }
 
 export async function orchestratorTurn(
@@ -120,21 +230,36 @@ export async function orchestratorTurn(
 ): Promise<OrchestratorTurnResponse> {
   const response = await fetch(`${API_BASE}/api/orchestrator/turn`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
     body: JSON.stringify({ session_id: sessionId, user_answer: userAnswer ?? null }),
   });
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
-    throw new Error(err.detail ?? `HTTP ${response.status}`);
+    throw new Error(await parseError(response));
+  }
+  return response.json();
+}
+
+export async function fetchMySessions(): Promise<
+  { session_id: string; branch: string | null; phase: string | null; updated_at: string }[]
+> {
+  const response = await fetch(`${API_BASE}/api/orchestrator/my-sessions`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await parseError(response));
   }
   return response.json();
 }
 
 export async function fetchUserProfile(sessionId: string): Promise<UserProfile> {
-  const response = await fetch(`${API_BASE}/api/orchestrator/session/${sessionId}`);
+  const response = await fetch(`${API_BASE}/api/orchestrator/session/${sessionId}`, {
+    headers: authHeaders(),
+  });
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
-    throw new Error(err.detail ?? `HTTP ${response.status}`);
+    throw new Error(await parseError(response));
   }
   return response.json();
 }

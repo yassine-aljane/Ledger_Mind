@@ -1,7 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import {
+  fetchMe,
+  getStoredUser,
+  hasCompletedOnboarding,
+  isAuthed,
+} from "@/lib/auth";
 import { LogoutBubble } from "@/components/lm/AppShell";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/onboarding/")({
   head: () => ({
@@ -20,18 +25,24 @@ function useSessionGuard() {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      if (!data.session) {
-        navigate({ to: "/auth", replace: true });
-        return;
-      }
-      setReady(true);
-    });
-    return () => {
-      active = false;
-    };
+    if (!isAuthed()) {
+      navigate({ to: "/auth", replace: true });
+      return;
+    }
+    const cached = getStoredUser();
+    if (hasCompletedOnboarding(cached)) {
+      navigate({ to: "/dashboard", replace: true });
+      return;
+    }
+    fetchMe()
+      .then((u) => {
+        if (hasCompletedOnboarding(u)) {
+          navigate({ to: "/dashboard", replace: true });
+          return;
+        }
+        setReady(true);
+      })
+      .catch(() => setReady(true));
   }, [navigate]);
   return ready;
 }

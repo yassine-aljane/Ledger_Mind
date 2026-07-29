@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { orchestratorTurn, type UserProfile } from "@/lib/api";
+import {
+  cacheDiagnosticResult,
+  orchestratorTurn,
+  storeSessionId,
+  type UserProfile,
+} from "@/lib/api";
 
 export type ChatTurn = {
   id: string;
@@ -8,20 +13,11 @@ export type ChatTurn = {
   time: string;
 };
 
-export type ChatQuestion = {
-  step: number;
-  total: number;
-  question: string;
-  quickReplies: string[];
-};
-
 function nowTime() {
   return new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
 export function Chatbot({
-  onFinish,
-  fetchNext,
   eyebrow = "Diagnostic",
   intro,
   orchestratorSessionId,
@@ -29,11 +25,9 @@ export function Chatbot({
   initialQuestion,
   initialQuickReplies,
 }: {
-  onFinish?: (transcript: ChatTurn[]) => void;
-  fetchNext?: (step: number) => Promise<ChatQuestion | null>;
   eyebrow?: string;
   intro?: string;
-  orchestratorSessionId?: string;
+  orchestratorSessionId: string;
   onOrchestratorFinish?: (profile: UserProfile, transcript: ChatTurn[]) => void;
   initialQuestion?: string;
   initialQuickReplies?: string[];
@@ -42,11 +36,11 @@ export function Chatbot({
   const [orchestratorMessage, setOrchestratorMessage] = useState<string | null>(null);
   const [orchestratorQuickReplies, setOrchestratorQuickReplies] = useState<string[]>([]);
   const [orchestratorCompleteness, setOrchestratorCompleteness] = useState(0);
-  const [currentScriptQuestion, setCurrentScriptQuestion] = useState<ChatQuestion | null>(null);
-  const [step, setStep] = useState(0);
   const [thinking, setThinking] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [roadmapReady, setRoadmapReady] = useState(false);
+  const finishedProfileRef = useRef<UserProfile | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const lastCallRef = useRef<{ question: string | null; answer: string | null }>({
@@ -54,63 +48,65 @@ export function Chatbot({
     answer: null,
   });
 
-  const isOrchestrator = Boolean(orchestratorSessionId);
-
   useEffect(() => {
-    if (fetchNext) {
-      let cancelled = false;
-      setThinking(true);
-      fetchNext(step).then((q) => {
-        if (cancelled) return;
-        if (!q) {
-          setThinking(false);
-          onFinish?.(turns);
-          return;
-        }
-        setCurrentScriptQuestion(q);
-        setTurns((prev) => [
-          ...prev,
-          { id: `a-${step}`, role: "assistant", text: q.question, time: nowTime() },
-        ]);
-        setThinking(false);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (isOrchestrator) {
-      if (startedRef.current) return;
-      startedRef.current = true;
-      if (initialQuestion) {
-        setOrchestratorMessage(initialQuestion);
-        setOrchestratorQuickReplies(initialQuickReplies ?? []);
-        setTurns([{ id: "a-0", role: "assistant", text: initialQuestion, time: nowTime() }]);
-        setThinking(false);
-      } else {
-        void runOrchestratorTurn(null, null);
-      }
-      return;
+    if (startedRef.current) return;
+    startedRef.current = true;
+    if (initialQuestion) {
+      setOrchestratorMessage(initialQuestion);
+      setOrchestratorQuickReplies(initialQuickReplies ?? []);
+      setTurns([{ id: "a-0", role: "assistant", text: initialQuestion, time: nowTime() }]);
+      setThinking(false);
+    } else {
+      void runOrchestratorTurn(null, null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [turns, thinking, error]);
+  }, [turns, thinking, error, roadmapReady]);
 
   async function runOrchestratorTurn(lastQuestion: string | null, lastAnswer: string | null) {
-    if (!orchestratorSessionId) return;
     setError(null);
     setThinking(true);
     lastCallRef.current = { question: lastQuestion, answer: lastAnswer };
 
     try {
-      const result = await orchestratorTurn(
-        orchestratorSessionId,
-        lastAnswer ?? undefined,
-      );
+      const result = await orchestratorTurn(orchestratorSessionId, lastAnswer ?? undefined);
       setThinking(false);
+      if (result.session_id) storeSessionId(result.session_id);
+
+      if (result.ui_action === "show_roadmap") {
+        if (result.message) {
+          setTurns((prev) => [
+            ...prev,
+            {
+              id: `a-${prev.length}`,
+              role: "assistant",
+              text: result.message!,
+              time: nowTime(),
+            },
+          ]);
+        }
+        finishedProfileRef.current = result.profile;
+        cacheDiagnosticResult({
+          session_id: result.session_id,
+          phase: result.phase,
+          branch: "guidance",
+          profile: result.profile,
+          diagnostic_profile: result.diagnostic_profile ?? null,
+          roadmap: result.roadmap ?? null,
+        });
+        setOrchestratorCompleteness(1);
+        setRoadmapReady(true);
+        setOrchestratorMessage(result.message ?? "Votre feuille de route est prête.");
+        setOrchestratorQuickReplies(
+          result.quick_replies.length > 0
+            ? result.quick_replies
+            : ["Voir ma feuille de route"],
+        );
+        return;
+      }
 
       if (
         result.ui_action === "done" ||
@@ -118,8 +114,20 @@ export function Chatbot({
         result.ui_action === "show_tax_result" ||
         result.ui_action === "requires_expert"
       ) {
+        if (result.message) {
+          setTurns((prev) => [
+            ...prev,
+            {
+              id: `a-${prev.length}`,
+              role: "assistant",
+              text: result.message!,
+              time: nowTime(),
+            },
+          ]);
+        }
         setOrchestratorMessage(null);
         setOrchestratorQuickReplies([]);
+        setOrchestratorCompleteness(1);
         onOrchestratorFinish?.(result.profile, turns);
         return;
       }
@@ -127,19 +135,9 @@ export function Chatbot({
       if (result.ui_action === "ask_question" && result.message) {
         setOrchestratorMessage(result.message);
         setOrchestratorQuickReplies(result.quick_replies);
-        const filled = [
-          result.profile.activity_types.length > 0,
-          result.profile.revenue_sources.length > 0,
-          result.profile.international_clients !== null,
-          result.profile.currencies.length > 0,
-          result.profile.estimated_monthly_revenue !== null,
-          result.profile.revenue_variability !== null,
-          result.profile.invoices_already_issued !== null,
-          result.profile.has_recurring_contracts !== null,
-          result.profile.in_kind_gifts !== null,
-          result.profile.first_income_date !== null,
-        ].filter(Boolean).length;
-        setOrchestratorCompleteness(filled / 10);
+        if (typeof result.profile_completeness === "number") {
+          setOrchestratorCompleteness(result.profile_completeness);
+        }
 
         setTurns((prev) => {
           if (!lastAnswer) {
@@ -156,66 +154,107 @@ export function Chatbot({
             },
           ];
         });
+        return;
       }
+
+      // Unexpected response — don't leave the user without controls
+      setError("Réponse inattendue du serveur. Réessayez.");
+      if (lastQuestion) setOrchestratorMessage(lastQuestion);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur réseau — veuillez réessayer.";
       console.error("Orchestrator turn failed:", err);
       setThinking(false);
       setError(msg);
+      if (lastQuestion) setOrchestratorMessage(lastQuestion);
     }
   }
+
+  const openRoadmap = () => {
+    const profile = finishedProfileRef.current;
+    if (profile) {
+      onOrchestratorFinish?.(profile, turns);
+      return;
+    }
+    onOrchestratorFinish?.(
+      {
+        siret: null,
+        siren: null,
+        denomination: null,
+        legal_form: null,
+        nature_juridique_code: null,
+        is_entrepreneur_individuel: null,
+        micro_eligible: null,
+        registry_address: null,
+        ape_code: null,
+        activity_declared: null,
+        creation_date: null,
+        administrative_status: null,
+        verification_status: "skipped",
+        registry_document_required: null,
+        registry_document_uploaded: false,
+        registry_document_type: null,
+        kbis_obtained: null,
+        rcs_registered: null,
+        registry_tax_base: null,
+        sirene_document_uploaded: false,
+        sirene_document_activity_label: null,
+        sirene_document_address: null,
+        sirene_document_registration_date: null,
+        activity_types: [],
+        has_secondary_activity: null,
+        secondary_activity_types: [],
+        main_activity_commercial: null,
+        revenue_sources: [],
+        currencies: [],
+        estimated_monthly_revenue: null,
+        estimated_annual_revenue: null,
+        revenue_variability: null,
+        invoices_already_issued: null,
+        first_income_date: null,
+        has_recurring_contracts: null,
+        in_kind_gifts: null,
+        international_clients: null,
+        tax_category: null,
+        tax_category_reason: null,
+        recommended_regime: null,
+        regime_plafond: null,
+        fiscal_classification_status: null,
+        fiscal_inconsistency_reason: null,
+        activity_mismatch: false,
+        mismatches: [],
+        compliance_alerts: [],
+        recommended_actions: [],
+      },
+      turns,
+    );
+  };
 
   const handleAnswer = (text: string) => {
     if (!text.trim()) return;
     const answer = text.trim();
 
-    if (fetchNext) {
-      setTurns((prev) => [
-        ...prev,
-        { id: `u-${step}`, role: "user", text: answer, time: nowTime() },
-      ]);
-      setInput("");
-      setCurrentScriptQuestion(null);
-      setStep((s) => s + 1);
-    } else if (isOrchestrator) {
-      const question = orchestratorMessage;
-      if (!question) return;
-      setTurns((prev) => [
-        ...prev,
-        { id: `u-${prev.length}`, role: "user", text: answer, time: nowTime() },
-      ]);
-      setInput("");
-      setOrchestratorMessage(null);
-      void runOrchestratorTurn(question, answer);
+    if (roadmapReady) {
+      openRoadmap();
+      return;
     }
+
+    const question = orchestratorMessage;
+    if (!question) return;
+    setTurns((prev) => [
+      ...prev,
+      { id: `u-${prev.length}`, role: "user", text: answer, time: nowTime() },
+    ]);
+    setInput("");
+    setOrchestratorMessage(null);
+    void runOrchestratorTurn(question, answer);
   };
 
   const handleRetry = () => {
-    if (isOrchestrator) {
-      const { question, answer } = lastCallRef.current;
-      void runOrchestratorTurn(question, answer);
-    }
+    const { question, answer } = lastCallRef.current;
+    void runOrchestratorTurn(question, answer);
   };
 
-  const activeQuestionText = fetchNext
-    ? currentScriptQuestion?.question
-    : isOrchestrator
-      ? orchestratorMessage
-      : null;
-  const quickReplies = fetchNext
-    ? (currentScriptQuestion?.quickReplies ?? [])
-    : isOrchestrator
-      ? orchestratorQuickReplies
-      : [];
-  const progress = fetchNext
-    ? currentScriptQuestion
-      ? currentScriptQuestion.step / currentScriptQuestion.total
-      : 1
-    : isOrchestrator
-      ? orchestratorCompleteness
-      : thinking
-        ? 0
-        : 1;
+  const showComposer = Boolean(orchestratorMessage) && !thinking && !error;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-fade-in">
@@ -226,10 +265,12 @@ export function Chatbot({
         <div className="flex-1 h-[3px] bg-border rounded-full overflow-hidden max-w-xs">
           <div
             className="h-full bg-teal-dark transition-all duration-500 ease-out"
-            style={{ width: `${Math.round(progress * 100)}%` }}
+            style={{ width: `${Math.round(orchestratorCompleteness * 100)}%` }}
           />
         </div>
-        <p className="font-mono text-[11px] text-ink/50">{Math.round(progress * 100)}%</p>
+        <p className="font-mono text-[11px] text-ink/50">
+          {Math.round(orchestratorCompleteness * 100)}%
+        </p>
       </div>
 
       {intro && turns.length === 0 && <p className="text-ink/60 text-pretty">{intro}</p>}
@@ -263,7 +304,7 @@ export function Chatbot({
         {thinking && (
           <div className="flex items-center gap-2 text-ink/40 text-sm animate-fade-in">
             <span className="size-1.5 rounded-full bg-teal-dark animate-pulse" />
-            <span className="font-mono text-xs">L'assistant réfléchit…</span>
+            <span className="font-mono text-xs">L&apos;assistant réfléchit…</span>
           </div>
         )}
 
@@ -285,39 +326,60 @@ export function Chatbot({
         <div ref={bottomRef} />
       </div>
 
-      {activeQuestionText && !thinking && !error && (
+      {showComposer && (
         <div className="space-y-4 pt-2">
-          <div className="flex flex-wrap gap-2">
-            {quickReplies.map((r) => (
+          {roadmapReady ? (
+            <div className="rounded-2xl border border-teal-dark/30 bg-teal-dark/5 p-6 space-y-4 animate-slide-up">
+              <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
+                Feuille de route prête
+              </p>
+              <p className="text-sm text-ink/70 leading-relaxed">
+                Votre diagnostic est terminé. Ouvrez le résultat pour voir le régime recommandé
+                et le plan d&apos;étapes.
+              </p>
               <button
-                key={r}
-                onClick={() => handleAnswer(r)}
-                className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-colors"
+                type="button"
+                onClick={openRoadmap}
+                className="w-full sm:w-auto px-8 py-3.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
               >
-                {r}
+                {orchestratorQuickReplies[0] || "Voir ma feuille de route"} →
               </button>
-            ))}
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleAnswer(input);
-            }}
-            className="flex gap-2"
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ou tapez votre réponse librement…"
-              className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors"
-            />
-            <button
-              type="submit"
-              className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-colors"
-            >
-              Envoyer
-            </button>
-          </form>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {orchestratorQuickReplies.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => handleAnswer(r)}
+                    className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-colors"
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleAnswer(input);
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ou tapez votre réponse librement…"
+                  className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors"
+                />
+                <button
+                  type="submit"
+                  className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-colors"
+                >
+                  Envoyer
+                </button>
+              </form>
+            </>
+          )}
         </div>
       )}
     </div>

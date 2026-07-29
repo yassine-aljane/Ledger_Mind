@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from app.agents.intake.llm import chat_json
+from app.llm.gemini import chat_json
 from app.agents.intake.tools.extract_answer import apply_updates, is_confused_answer
 from app.schemas.orchestrator import UserProfile
 

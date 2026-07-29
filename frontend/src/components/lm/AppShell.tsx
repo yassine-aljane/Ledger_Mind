@@ -1,7 +1,13 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  displayShortName,
+  getStoredUser,
+  isAuthed,
+  logout,
+  type AuthUser,
+} from "@/lib/auth";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard" },
@@ -14,10 +20,9 @@ const nav = [
 export function LogoutBubble() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  async function handleSignOut() {
-    await queryClient.cancelQueries();
+  function handleSignOut() {
     queryClient.clear();
-    await supabase.auth.signOut();
+    logout();
     navigate({ to: "/auth", replace: true });
   }
   return (
@@ -33,6 +38,12 @@ export function LogoutBubble() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, [pathname]);
+
   return (
     <div className="min-h-screen">
       <nav className="fixed top-0 inset-x-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
@@ -63,9 +74,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <LogoutBubble />
             <Link
               to="/parametres"
-              className="px-4 py-1.5 bg-ink text-background rounded-full text-[13px] font-medium hover:bg-teal-dark transition-colors"
+              className="px-4 py-1.5 bg-ink text-background rounded-full text-[13px] font-medium hover:bg-teal-dark transition-colors max-w-[10rem] truncate"
+              title={user ? displayShortName(user) : "Compte"}
             >
-              Alexandre M.
+              {isAuthed() ? displayShortName(user) : "Compte"}
             </Link>
           </div>
         </div>

@@ -1,16 +1,15 @@
 """
 Orchestrator — deterministic step runner.
 
-Verification: identity (step 1) → registry doc OCR for EI (step 2) → SIRENE avis (step 3)
-Profiling: activity + mixed activity + revenue (steps 4–5)
-Finalize: classification + inconsistency (step 6)
+Branch A (SIREN): identity → registry doc → SIRENE avis → profile questions → done
+Branch B (no SIREN): diagnostic questions → roadmap → done
 """
 
 from __future__ import annotations
 
 import logging
 
-from app.agents import intake
+from app.agents import intake, guidance
 from app.core.session_store import async_create_session, async_get_session, async_save_session
 from app.schemas.orchestrator import (
     OrchestratorState,
@@ -18,8 +17,6 @@ from app.schemas.orchestrator import (
 )
 
 logger = logging.getLogger(__name__)
-
-PIPELINE: list[str] = ["intake"]
 
 
 def _response(
@@ -34,12 +31,16 @@ def _response(
         message=message,
         quick_replies=state.quick_replies,
         profile=state.profile,
+        profile_completeness=state.profile_completeness,
+        roadmap=state.roadmap,
+        diagnostic_profile=state.diagnostic_profile,
     )
 
 
 async def _finish_intake(state: OrchestratorState) -> OrchestratorTurnResponse:
     state.phase = "done"
     state.last_question = None
+    state.last_question_field = None
     state.quick_replies = []
     state.profile_completeness = 1.0
     await async_save_session(state.session_id, state)
@@ -60,6 +61,21 @@ async def _finish_intake(state: OrchestratorState) -> OrchestratorTurnResponse:
     )
 
 
+async def _finish_diagnostic(state: OrchestratorState) -> OrchestratorTurnResponse:
+    """Build roadmap and move to diagnostic_roadmap phase."""
+    result = await guidance.finalize_diagnostic(state.diagnostic_profile, state.profile)
+    state.diagnostic_profile = result.diagnostic_profile
+    state.profile = result.profile
+    state.roadmap = result.roadmap
+    state.phase = "diagnostic_roadmap"
+    state.last_question = None
+    state.last_question_field = None
+    state.quick_replies = ["Voir ma feuille de route"]
+    state.profile_completeness = 1.0
+    await async_save_session(state.session_id, state)
+    return _response(state, "show_roadmap", result.message)
+
+
 async def _intake_ask(state: OrchestratorState) -> OrchestratorTurnResponse:
     result = await intake.ask_next_question(state.profile)
     state.profile = result.profile
@@ -68,6 +84,21 @@ async def _intake_ask(state: OrchestratorState) -> OrchestratorTurnResponse:
 
     state.phase = "profile_questions"
     state.last_question = result.question
+    state.quick_replies = result.quick_replies
+    state.profile_completeness = result.completeness
+    await async_save_session(state.session_id, state)
+    return _response(state, "ask_question", result.question)
+
+
+async def _diagnostic_ask(state: OrchestratorState) -> OrchestratorTurnResponse:
+    result = guidance.ask_next_question(state.diagnostic_profile)
+    state.diagnostic_profile = result.diagnostic_profile
+    if result.is_complete:
+        return await _finish_diagnostic(state)
+
+    state.phase = "diagnostic_questions"
+    state.last_question = result.question
+    state.last_question_field = result.field
     state.quick_replies = result.quick_replies
     state.profile_completeness = result.completeness
     await async_save_session(state.session_id, state)
@@ -95,18 +126,33 @@ async def _advance_verification(state: OrchestratorState) -> OrchestratorTurnRes
 async def start_orchestrator(
     siret: str | None,
     company_name: str | None = None,
+    *,
+    skip_verification: bool = False,
+    branch: str | None = None,
+    user_id: str | None = None,
 ) -> OrchestratorTurnResponse:
-    session_id = await async_create_session()
+    session_id = await async_create_session(user_id=user_id)
     state = await async_get_session(session_id)
     if state is None:
         raise RuntimeError("Failed to create session")
 
-    if not siret or not siret.strip():
+    if skip_verification or branch == "guidance":
+        state.branch = "guidance"
+        state.user_id = user_id
+        state.skip_verification = True
+        state.phase = "diagnostic_questions"
+        state.profile.verification_status = "skipped"
+        await async_save_session(session_id, state)
+        return await _diagnostic_ask(state)
+
+    if not siret or not str(siret).strip():
         raise ValueError(
             "Un numéro SIRET ou SIREN est requis pour créer un profil. "
             "Utilisez l'agent de régularisation si vous n'êtes pas encore immatriculé."
         )
 
+    state.branch = "intake"
+    state.user_id = user_id
     result = await intake.run_verification(siret, company_name)
     state.profile = intake.apply_verification_to_profile(state.profile, result)
     state.verification_message = result.explanation
@@ -153,8 +199,39 @@ async def orchestrator_turn(
         await async_save_session(session_id, state)
         return _response(state, "ask_question", result.question)
 
+    if state.phase == "diagnostic_questions":
+        result = await guidance.handle_answer(
+            state.diagnostic_profile,
+            state.last_question,
+            user_answer,
+            target_field=state.last_question_field,
+        )
+        state.diagnostic_profile = result.diagnostic_profile
+        if result.is_complete:
+            return await _finish_diagnostic(state)
+
+        state.last_question = result.question
+        state.last_question_field = result.field
+        state.quick_replies = result.quick_replies
+        state.profile_completeness = result.completeness
+        await async_save_session(session_id, state)
+        return _response(state, "ask_question", result.question)
+
+    if state.phase == "diagnostic_roadmap":
+        state.phase = "done"
+        state.quick_replies = []
+        await async_save_session(session_id, state)
+        return _response(
+            state,
+            "done",
+            state.profile.recommended_regime
+            or "Diagnostic terminé — votre feuille de route est prête.",
+        )
+
     return _response(
         state,
         "done",
-        state.profile.tax_category_reason or state.verification_message,
+        state.profile.tax_category_reason
+        or state.profile.recommended_regime
+        or state.verification_message,
     )
