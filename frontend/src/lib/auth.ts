@@ -1,5 +1,7 @@
 /** Mongo-backed auth client (JWT). No Supabase. */
 
+import { setPlan } from "@/lib/plan";
+
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
 const TOKEN_KEY = "ledgermind_access_token";
@@ -156,6 +158,18 @@ export function isAuthed(): boolean {
 export function storeAuth(res: AuthResponse): void {
   const s = storage();
   if (!s) return;
+  // Le plan (démo) vit dans une clé localStorage globale au navigateur, pas au compte : sans ce
+  // garde-fou, un autre utilisateur connecté ensuite sur le même navigateur hérite du "premium"
+  // du compte précédent (ou d'un simple essai sur /premium), alors qu'il n'a rien débloqué lui-
+  // même. On ne réinitialise que si le compte change réellement.
+  let previousUserId: string | null = null;
+  try {
+    previousUserId = (JSON.parse(s.getItem(USER_KEY) ?? "null") as AuthUser | null)?.id ?? null;
+  } catch {
+    previousUserId = null;
+  }
+  if (previousUserId !== res.user.id) setPlan("free");
+
   s.setItem(TOKEN_KEY, res.access_token);
   s.setItem(USER_KEY, JSON.stringify(res.user));
   // Clear legacy mock flag
@@ -172,6 +186,7 @@ export function clearAuth(): void {
   if (!s) return;
   s.removeItem(TOKEN_KEY);
   s.removeItem(USER_KEY);
+  setPlan("free");
   try {
     s.removeItem(LEGACY_AUTH_KEY);
     sessionStorage.removeItem(LEGACY_AUTH_KEY);
