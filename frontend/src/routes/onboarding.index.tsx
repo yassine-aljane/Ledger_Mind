@@ -5,6 +5,7 @@ import {
   getStoredUser,
   hasCompletedOnboarding,
   isAuthed,
+  postAuthPath,
 } from "@/lib/auth";
 import { LogoutBubble } from "@/components/lm/AppShell";
 
@@ -31,13 +32,13 @@ function useSessionGuard() {
     }
     const cached = getStoredUser();
     if (hasCompletedOnboarding(cached)) {
-      navigate({ to: "/dashboard", replace: true });
+      navigate({ to: postAuthPath(cached), replace: true });
       return;
     }
     fetchMe()
       .then((u) => {
         if (hasCompletedOnboarding(u)) {
-          navigate({ to: "/dashboard", replace: true });
+          navigate({ to: postAuthPath(u), replace: true });
           return;
         }
         setReady(true);

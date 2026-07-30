@@ -146,9 +146,19 @@ export function isSirenVerified(user: AuthUser | null | undefined): boolean {
   return Boolean(profil.tax_category);
 }
 
-/** Post-login destination from saved agent context. */
-export function postAuthPath(user: AuthUser | null | undefined): "/dashboard" | "/onboarding" {
-  return hasCompletedOnboarding(user) ? "/dashboard" : "/onboarding";
+/**
+ * Post-login destination from saved agent context.
+ *
+ * Une feuille de route de branche B (guidance) ne vaut pas vérification SIREN : tant qu'elle
+ * n'est pas faite, l'utilisateur doit rester sur son parcours guidage (roadmap, avancement,
+ * checklist), pas sur le dashboard "immatriculé" — même si un diagnostic complet est déjà là.
+ */
+export function postAuthPath(
+  user: AuthUser | null | undefined,
+): "/dashboard" | "/onboarding" | "/onboarding/diagnostic/resultat" {
+  if (isSirenVerified(user)) return "/dashboard";
+  if (hasCompletedOnboarding(user)) return "/onboarding/diagnostic/resultat";
+  return "/onboarding";
 }
 
 export function isAuthed(): boolean {
