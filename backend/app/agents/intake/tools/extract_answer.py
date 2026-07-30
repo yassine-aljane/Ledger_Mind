@@ -109,9 +109,24 @@ def _value_from_raw_answer(field: str, last_answer: str, current_profile: UserPr
         return _coerce_value(field, [answer], current_profile)
 
     if field in BOOL_FIELDS:
-        if any(k in ans_lower for k in ("oui", "yes", "vrai", "régulièrement", "parfois", "chaque", "commercial")):
+        # Mots-clés génériques (oui/non explicites) + vocabulaire concret des exemples donnés
+        # dans les questions (ex: "partenariats rémunérés, vente, monétisation directe") :
+        # décrire sa situation avec ces mots revient à confirmer la question, même sans "oui"
+        # explicite — utile en filet de secours quand le LLM d'extraction est indisponible
+        # (ex: quota API épuisé), pour ne pas boucler sur une réponse pourtant valable.
+        if any(
+            k in ans_lower
+            for k in (
+                "oui", "yes", "vrai", "régulièrement", "parfois", "chaque", "commercial",
+                "partenariat", "sponsoring", "affiliation", "monétisation", "monetisation",
+                "vente", "rémunér", "remunér", "publicité", "publicite", "collab",
+            )
+        ):
             return True
-        if any(k in ans_lower for k in ("non", "no", "faux", "jamais", "seule")):
+        if any(
+            k in ans_lower
+            for k in ("non", "no", "faux", "jamais", "seule", "aucun", "aucune", "rien")
+        ):
             return False
         return None
 
