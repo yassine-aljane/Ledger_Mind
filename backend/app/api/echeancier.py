@@ -11,8 +11,14 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.agents.declaration import store as declaration_store
 from app.agents.echeancier import moteur
-from app.agents.echeancier.profil import mettre_a_jour_parametres, profil_verifie
-from app.agents.echeancier.schemas import AgendaResponse, HistoriqueItem, MarquerPayeRequest, ParametresCalendrier
+from app.agents.echeancier.profil import concerne_pour_profil, mettre_a_jour_parametres, profil_verifie
+from app.agents.echeancier.schemas import (
+    AgendaResponse,
+    HistoriqueItem,
+    MarquerPayeRequest,
+    ParametresCalendrier,
+    VeilleResponse,
+)
 from app.agents.echeancier.store import marquer_regularisee
 from app.agents.facture import store as facture_store
 from app.api.deps import get_current_user
@@ -26,6 +32,25 @@ async def agenda(user: UserPublic = Depends(get_current_user)):
     profil = profil_verifie(user)
     echeances = moteur.generer_agenda(user.id, profil)
     return AgendaResponse(echeances=echeances, parametres_manquants=moteur.parametres_manquants(profil))
+
+
+@router.get("/veille", response_model=VeilleResponse)
+async def veille_personnalisee(user: UserPublic = Depends(get_current_user)):
+    """Actualités réglementaires du dernier cycle de veille, filtrées selon l'activité déclarée.
+
+    Ne déclenche jamais de cycle elle-même (la veille tourne à part, voir `app.veille.scheduler`,
+    désactivée par défaut) : cette route ne fait que lire + filtrer le dernier rapport en mémoire.
+    """
+    from app.veille import scheduler
+
+    profil = profil_verifie(user)
+    tags = set(concerne_pour_profil(profil))
+    rapport = scheduler.dernier_rapport()
+    nouveautes = [
+        n for n in rapport.get("nouveautes", [])
+        if set(n.get("concerne") or ["tous"]) & tags
+    ]
+    return VeilleResponse(date=rapport.get("date"), nouveautes=nouveautes)
 
 
 @router.patch("/parametres")

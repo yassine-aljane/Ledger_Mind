@@ -84,3 +84,20 @@ export function marquerPaye(obligationId: string, periode: string): Promise<{ st
 export function fetchHistorique(): Promise<HistoriqueItem[]> {
   return request("/historique");
 }
+
+export type VeilleNouveaute = {
+  titre: string;
+  source: string;
+  url: string;
+  resume: string;
+  impact: string;
+};
+
+export type VeilleResponse = {
+  date: string | null;
+  nouveautes: VeilleNouveaute[];
+};
+
+export function fetchVeille(): Promise<VeilleResponse> {
+  return request("/veille");
+}

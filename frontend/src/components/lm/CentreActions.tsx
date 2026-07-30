@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
 import { usePlan } from "@/lib/plan";
 import {
   fetchAgenda,
   fetchHistorique,
+  fetchVeille,
   marquerPaye,
   mettreAJourParametres,
   type AgendaResponse,
   type Echeance,
   type HistoriqueItem,
+  type VeilleNouveaute,
 } from "@/lib/echeancier-api";
 
 type Vue = "agenda" | "veille" | "historique";
@@ -259,11 +262,72 @@ function VueHistorique({ onRetour }: { onRetour: () => void }) {
   );
 }
 
-function VueVeille() {
+function VeilleCard({ n }: { n: VeilleNouveaute }) {
   return (
-    <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-ink/50">
-      La veille réglementaire personnalisée arrive dans un prochain chantier — vous verrez ici
-      uniquement les nouveautés qui ont une réelle valeur pour votre situation.
+    <div className="bg-white border border-border rounded-2xl p-5 space-y-2 card-hover">
+      <p className="font-semibold text-sm">{n.titre}</p>
+      {n.resume && <p className="text-sm text-ink/70 leading-relaxed">{n.resume}</p>}
+      {n.impact && (
+        <p className="text-xs text-teal-dark bg-teal-dark/5 rounded-lg px-3 py-2">{n.impact}</p>
+      )}
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">
+          {n.source}
+        </span>
+        <a
+          href={n.url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-teal-dark font-medium hover:underline"
+        >
+          Voir la source →
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function VueVeille() {
+  const [data, setData] = useState<{ date: string | null; nouveautes: VeilleNouveaute[] } | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchVeille()
+      .then(setData)
+      .catch((e) => setErreur(e instanceof Error ? e.message : "Erreur de chargement."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-sm text-ink/40 text-center py-10">Chargement de la veille…</p>;
+
+  if (erreur) {
+    return (
+      <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-ink/50">
+        {erreur}
+      </div>
+    );
+  }
+
+  if (!data || data.nouveautes.length === 0) {
+    return (
+      <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-ink/50">
+        Aucune nouveauté réglementaire pour votre activité pour l'instant — vous ne verrez ici que
+        les actualités qui ont une réelle valeur pour votre situation.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {data.date && (
+        <p className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">
+          Dernière vérification : {new Date(data.date).toLocaleDateString("fr-FR")}
+        </p>
+      )}
+      {data.nouveautes.map((n, i) => (
+        <VeilleCard key={`${n.url}-${i}`} n={n} />
+      ))}
     </div>
   );
 }
@@ -285,17 +349,23 @@ export function CentreActionsButton() {
           <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       </button>
-      {ouvert && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="absolute inset-0 bg-ink/30 backdrop-blur-sm"
-            onClick={() => setOuvert(false)}
-          />
-          <div className="relative w-full max-w-md h-full bg-background border-l border-border shadow-2xl overflow-y-auto animate-slide-up">
-            <PanneauCentreActions plan={plan} onFermer={() => setOuvert(false)} />
-          </div>
-        </div>
-      )}
+      {ouvert &&
+        createPortal(
+          // Rendu en portail dans <body> : le <nav> parent a un fond flouté (`backdrop-blur`),
+          // qui en CSS établit un « containing block » pour tout descendant en `position: fixed`.
+          // Sans le portail, ce panneau se retrouvait donc contraint à la boîte du <nav> (64px de
+          // haut) au lieu de couvrir tout l'écran — il semblait « coincé dans la barre de nav ».
+          <div className="fixed inset-0 z-50 flex justify-end">
+            <div
+              className="absolute inset-0 bg-ink/30 backdrop-blur-sm"
+              onClick={() => setOuvert(false)}
+            />
+            <div className="relative w-full max-w-md h-full bg-background border-l border-border shadow-2xl overflow-y-auto animate-slide-in-right">
+              <PanneauCentreActions plan={plan} onFermer={() => setOuvert(false)} />
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

@@ -31,6 +31,23 @@ def profil_verifie(user: UserPublic) -> UserProfile:
     return profil
 
 
+_MOTS_INFLUENCEUR = ("sponsoring", "affiliation", "ugc", "partenariat", "contenu", "influenc")
+_MOTS_FREELANCE = ("freelance", "conseil", "prestation", "service")
+
+
+def concerne_pour_profil(profil: UserProfile) -> list[str]:
+    """Étiquettes de personnalisation de la veille (« influenceur »/« freelance »/« tous »),
+    déduites de l'activité déclarée. « tous » est toujours inclus : en cas d'activité mixte ou
+    non reconnue, mieux vaut montrer une actualité de trop qu'en cacher une pertinente."""
+    textes = " ".join((profil.activity_types or []) + (profil.secondary_activity_types or [])).lower()
+    tags = {"tous"}
+    if any(mot in textes for mot in _MOTS_INFLUENCEUR):
+        tags.add("influenceur")
+    if any(mot in textes for mot in _MOTS_FREELANCE):
+        tags.add("freelance")
+    return sorted(tags)
+
+
 async def mettre_a_jour_parametres(user: UserPublic, valeurs: dict) -> UserProfile:
     session_id = user.agent_context.intake.last_session_id
     if not session_id:

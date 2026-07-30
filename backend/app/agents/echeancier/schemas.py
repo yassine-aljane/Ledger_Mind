@@ -49,3 +49,16 @@ class HistoriqueItem(BaseModel):
     date: str
     statut: str
     montant: float | None = None
+
+
+class VeilleNouveaute(BaseModel):
+    titre: str
+    source: str
+    url: str
+    resume: str
+    impact: str
+
+
+class VeilleResponse(BaseModel):
+    date: str | None = None
+    nouveautes: list[VeilleNouveaute]
