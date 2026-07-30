@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
-import { RoadmapView, type Roadmap } from "@/components/lm/RoadmapView";
+import { RoadmapStepper, type Roadmap } from "@/components/lm/RoadmapView";
 import {
   fetchSessionDetail,
   getStoredSessionId,
@@ -10,11 +10,7 @@ import {
   type SessionDetail,
   type UserProfile,
 } from "@/lib/api";
-import {
-  downloadRoadmapPdf,
-  fetchRoadmapState,
-  saveRoadmapState,
-} from "@/lib/guidance-api";
+import { fetchRoadmapState } from "@/lib/guidance-api";
 
 export const Route = createFileRoute("/onboarding/diagnostic/resultat")({
   validateSearch: (search: Record<string, unknown>): { session?: string } => ({
@@ -57,23 +53,52 @@ function formatCa(n: number | null | undefined): string {
   return `≈ ${Math.round(n).toLocaleString("fr-FR")} € / an`;
 }
 
+/** Une ligne de la fiche de situation, affichée seulement si l'information est connue —
+ * comme la fiche de statut de la conversation, jamais un formulaire à champs vides. */
+type LigneSituation = { label: string; valeur: string };
+
 function situationFrom(
   diag: DiagnosticProfile | null,
   profile: UserProfile,
-): { activite: string; revenus: string; anciennete: string; sources: string[] } {
+): { activite: string; revenus: string; anciennete: string; sources: string[]; details: LigneSituation[] } {
   const sources: string[] = [];
   if (diag?.vend_produits) sources.push("Vente de produits");
-  if (diag?.recoit_cadeaux) sources.push("Cadeaux / dotations");
+  if (diag?.recoit_cadeaux || profile.in_kind_gifts) sources.push("Cadeaux / dotations");
   if (diag?.activite) sources.push(diag.activite);
   const activityTypes = profile.activity_types ?? [];
   if (sources.length === 0 && activityTypes.length) {
     sources.push(...activityTypes);
   }
+
+  // Détail chiffré : uniquement ce qui est réellement connu, dans le même esprit que la fiche
+  // de statut de la conversation (chaque carte n'apparaît que si l'information existe).
+  const details: LigneSituation[] = [];
+  if (diag?.ca_prestations != null) {
+    details.push({ label: "Prestations / an", valeur: formatCa(diag.ca_prestations) });
+  }
+  if (diag?.ca_vente != null) {
+    details.push({ label: "Ventes / an", valeur: formatCa(diag.ca_vente) });
+  }
+  if (diag?.vend_produits != null) {
+    details.push({ label: "Vend des produits", valeur: diag.vend_produits ? "Oui" : "Non" });
+  }
+  if (diag?.recoit_cadeaux != null || profile.in_kind_gifts != null) {
+    const recoit = diag?.recoit_cadeaux ?? profile.in_kind_gifts;
+    details.push({ label: "Reçoit des cadeaux", valeur: recoit ? "Oui" : "Non" });
+  }
+  if (diag?.situation_actuelle) {
+    details.push({ label: "Situation actuelle", valeur: diag.situation_actuelle });
+  }
+  if (diag?.choix_parcours) {
+    details.push({ label: "Parcours choisi", valeur: diag.choix_parcours });
+  }
+
   return {
     activite: diag?.activite || activityTypes[0] || "Activité créative / freelance",
     revenus: formatCa(diag?.ca_estime_annuel) || profile.estimated_annual_revenue || "Non renseigné",
     anciennete: diag?.anciennete || "Non renseignée",
     sources: sources.length ? sources : ["À préciser"],
+    details,
   };
 }
 
@@ -118,17 +143,6 @@ function ResultatPage() {
         setError(e instanceof Error ? e.message : "Erreur de chargement");
       });
   }, [sessionFromUrl]);
-
-  const toggleStep = (stepId: string) => {
-    const next = { ...checked, [stepId]: !checked[stepId] };
-    setChecked(next);
-    if (sessionId) void saveRoadmapState(sessionId, next).catch(() => {});
-  };
-
-  const resetChecks = () => {
-    setChecked({});
-    if (sessionId) void saveRoadmapState(sessionId, {}).catch(() => {});
-  };
 
   const roadmap = detail?.roadmap as (Roadmap & { seuil_micro?: number }) | null | undefined;
   const situation = detail
@@ -187,12 +201,51 @@ function ResultatPage() {
         <div className="text-ink/40 font-mono text-sm">Analyse en cours…</div>
       ) : detail && situation ? (
         <>
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card index="01" label="Fiche de situation">
+          {/* Le régime ouvre la page : c'est la conclusion du diagnostic, elle doit se voir
+              avant le détail qui la justifie. */}
+          <div className="bg-teal-dark text-background rounded-2xl p-10 animate-slide-up relative overflow-hidden">
+            <div className="absolute -top-24 -right-24 size-64 rounded-full bg-teal-light/30 blur-3xl" />
+            <div className="relative">
+              <p className="font-mono text-[11px] uppercase tracking-[0.3em] opacity-70 mb-4">
+                01 · Régime recommandé
+              </p>
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                  <h2 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
+                    {regimeNom}
+                  </h2>
+                  <p className="mt-4 text-background/80 max-w-xl text-pretty leading-relaxed">
+                    {regimePourquoi}
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  <p className="text-xs uppercase tracking-widest opacity-70">Plafond</p>
+                  <p className="font-mono text-2xl font-medium mt-1">{plafond}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Progression : où en est l'utilisateur dans sa feuille de route — visualisation
+              seule, la coche se fait depuis la conversation ou le PDF déjà proposés ailleurs. */}
+          {roadmap && (roadmap.etapes?.length ?? 0) > 0 && (
+            <div className="mt-6">
+              <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ink/40 mb-4">
+                02 · Progression du plan de régularisation
+              </p>
+              <RoadmapStepper roadmap={roadmap} checked={checked} />
+            </div>
+          )}
+
+          <div className="mt-6 grid lg:grid-cols-2 gap-6">
+            <Card index="03" label="Fiche de situation">
               <dl className="space-y-4">
                 <Row k="Activité" v={situation.activite} />
                 <Row k="Revenus estimés" v={situation.revenus} />
                 <Row k="Ancienneté" v={situation.anciennete} />
+                {situation.details.map((d) => (
+                  <Row key={d.label} k={d.label} v={d.valeur} />
+                ))}
                 <div>
                   <dt className="text-xs uppercase tracking-widest text-ink/40 mb-2">
                     Sources / nature
@@ -211,7 +264,7 @@ function ResultatPage() {
               </dl>
             </Card>
 
-            <Card index="02" label="Statut actuel">
+            <Card index="04" label="Statut actuel">
               <div className="flex items-center gap-3 mb-4">
                 <div className="size-2.5 rounded-full bg-amber-fiscal" />
                 <p className="text-lg font-semibold">
@@ -222,28 +275,14 @@ function ResultatPage() {
               </div>
               <p className="text-ink/60 text-pretty leading-relaxed">
                 Votre activité n&apos;est pas encore rattachée à un SIREN. Ce n&apos;est pas grave —
-                la feuille de route ci-dessous détaille les étapes pour régulariser.
+                la feuille de route détaille les étapes pour régulariser.
               </p>
             </Card>
 
-            {/* Feuille de route complète du moteur déterministe : phases, coûts, sources et
-                étapes cochables. On retombe sur la liste simple si la session ne porte que des
-                actions recommandées (parcours SIREN) sans feuille de route structurée. */}
-            {(roadmap?.phases?.length ?? 0) > 0 ? (
-              <div className="lg:col-span-2">
-                <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ink/40 mb-4">
-                  03 · Plan de régularisation
-                </p>
-                <RoadmapView
-                  roadmap={roadmap as Roadmap}
-                  checked={checked}
-                  onToggle={toggleStep}
-                  onReset={resetChecks}
-                  onPdf={() => downloadRoadmapPdf(sessionId)}
-                />
-              </div>
-            ) : (
-              <Card index="03" label="Plan de régularisation" span="lg:col-span-2">
+            {/* Repli : aucune feuille de route structurée (session issue de la seule branche
+                SIREN), on retombe sur la liste simple d'actions recommandées. */}
+            {!roadmap && (
+              <Card index="05" label="Plan de régularisation" span="lg:col-span-2">
                 {plan.length === 0 ? (
                   <p className="text-ink/50 text-sm">Aucune étape disponible pour le moment.</p>
                 ) : (
@@ -265,29 +304,6 @@ function ResultatPage() {
                 )}
               </Card>
             )}
-          </div>
-
-          <div className="mt-6 bg-teal-dark text-background rounded-2xl p-10 animate-slide-up relative overflow-hidden">
-            <div className="absolute -top-24 -right-24 size-64 rounded-full bg-teal-light/30 blur-3xl" />
-            <div className="relative">
-              <p className="font-mono text-[11px] uppercase tracking-[0.3em] opacity-70 mb-4">
-                04 · Régime recommandé
-              </p>
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                  <h2 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
-                    {regimeNom}
-                  </h2>
-                  <p className="mt-4 text-background/80 max-w-xl text-pretty leading-relaxed">
-                    {regimePourquoi}
-                  </p>
-                </div>
-                <div className="shrink-0">
-                  <p className="text-xs uppercase tracking-widest opacity-70">Plafond</p>
-                  <p className="font-mono text-2xl font-medium mt-1">{plafond}</p>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="mt-12 flex justify-center gap-4">

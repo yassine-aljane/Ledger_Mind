@@ -118,6 +118,61 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
   );
 }
 
+/** Sources légales du verdict — chiffres, textes et taux, chacun daté et sourcé.
+ *
+ * Repris à l'identique du style des sources de l'assistant fiscal (chip, contraste de couleur,
+ * flèche), plutôt qu'une liste repliée : ce sont les textes qui justifient le régime retenu,
+ * ils doivent être visibles d'emblée, pas cachés derrière un clic supplémentaire.
+ */
+function LegalSources({
+  sources,
+}: {
+  sources: { label: string; valeur: string; annee: string; source: string; date_verif: string }[];
+}) {
+  const [open, setOpen] = useState<number | null>(null);
+  return (
+    <div className="pt-1">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-2">
+        Sources légales ({sources.length})
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {sources.map((s, i) => {
+          const actif = open === i;
+          return (
+            <button
+              key={i}
+              onClick={() => setOpen(actif ? null : i)}
+              title="Voir le détail de cette source"
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] transition-colors ${
+                "bg-teal-light/10 border-teal-dark/30 text-teal-dark"
+              } ${actif ? "ring-1 ring-teal-dark/40" : "hover:border-teal-dark/50"}`}
+            >
+              <span className="font-semibold">{s.label}</span>
+              <span className="font-mono tabular-nums opacity-70">{s.valeur}</span>
+              <a
+                href={s.source}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="opacity-70 hover:opacity-100"
+                aria-label={`Ouvrir la source de ${s.label}`}
+              >
+                ↗
+              </a>
+            </button>
+          );
+        })}
+      </div>
+      {open != null && sources[open] && (
+        <div className="mt-2.5 rounded-lg bg-background border border-border p-3 animate-fade-in text-[11px] text-ink/60 leading-relaxed">
+          <span className="font-semibold text-ink/80">{sources[open].label}</span> : {sources[open].valeur}{" "}
+          ({sources[open].annee}) — vérifié le {sources[open].date_verif}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StepCard({
   step,
   index,
@@ -311,28 +366,7 @@ export function RoadmapView({
         )}
 
         {(roadmap.legal_sources?.length ?? 0) > 0 && (
-          <details className="group">
-            <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.2em] text-ink/40 hover:text-teal-dark transition-colors">
-              Sources légales ({roadmap.legal_sources!.length})
-            </summary>
-            <ul className="mt-2 space-y-1.5">
-              {roadmap.legal_sources!.map((s, i) => (
-                <li key={i} className="text-[11px] text-ink/60 leading-relaxed">
-                  <span className="font-semibold text-ink/80">{s.label}</span> : {s.valeur} ({s.annee}){" "}
-                  —{" "}
-                  <a
-                    href={s.source}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-teal-dark hover:underline"
-                  >
-                    source
-                  </a>{" "}
-                  <span className="text-ink/35">vérifié {s.date_verif}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
+          <LegalSources sources={roadmap.legal_sources!} />
         )}
       </div>
 
@@ -435,6 +469,82 @@ export function RoadmapView({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Vue de progression en lecture seule — « où en suis-je dans ma feuille de route ? »
+ *
+ * Contrairement à `RoadmapView`, aucune étape ne se coche ici et rien ne se télécharge : cette
+ * vue sert à visualiser l'avancement (déjà géré depuis la conversation ou la page résultat elle-
+ * même), pas à le modifier. Les étapes s'alignent dans leur ordre, chacune portant une barre
+ * verticale — verte si faite, neutre sinon — à côté de son nom.
+ */
+export function RoadmapStepper({
+  roadmap,
+  checked = {},
+}: {
+  roadmap: Roadmap;
+  checked?: Record<string, boolean>;
+}) {
+  const etapes = roadmap.etapes ?? [];
+  const done = etapes.filter((e) => checked[e.id]).length;
+  if (etapes.length === 0) return null;
+
+  return (
+    <div className="bg-white border border-border rounded-2xl p-6 space-y-5 animate-slide-up">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-semibold text-ink">Votre progression</p>
+        <p className="font-mono text-xs text-ink/50 tabular-nums">
+          {done}/{etapes.length} étapes faites
+        </p>
+      </div>
+
+      <div className="chat-scroll overflow-x-auto pb-1">
+        <div className="flex items-stretch min-w-max px-1">
+          {etapes.map((etape, i) => {
+            const isDone = Boolean(checked[etape.id]);
+            const isLast = i === etapes.length - 1;
+            return (
+              <div key={etape.id} className="flex items-stretch">
+                <div className="flex items-stretch gap-2.5 w-44 shrink-0 px-2">
+                  <div
+                    aria-hidden
+                    className={`w-1.5 rounded-full shrink-0 ${isDone ? "bg-teal-dark" : "bg-border"}`}
+                  />
+                  <div className="min-w-0 py-0.5">
+                    <p
+                      className={`font-mono text-[10px] tracking-wider uppercase ${
+                        isDone ? "text-teal-dark" : "text-ink/40"
+                      }`}
+                    >
+                      {isDone ? "✓ Fait" : `Étape ${String(i + 1).padStart(2, "0")}`}
+                    </p>
+                    <p
+                      className={`mt-1 text-sm font-medium leading-snug ${
+                        isDone ? "text-ink" : "text-ink/70"
+                      }`}
+                    >
+                      {stripEmoji(etape.titre ?? "")}
+                    </p>
+                    {etape.obligatoire && (
+                      <span className="mt-1.5 inline-block px-1.5 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider bg-amber-fiscal/15 text-amber-fiscal">
+                        Obligatoire
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {!isLast && (
+                  <div
+                    aria-hidden
+                    className={`w-6 self-center h-0.5 shrink-0 ${isDone ? "bg-teal-dark" : "bg-border"}`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

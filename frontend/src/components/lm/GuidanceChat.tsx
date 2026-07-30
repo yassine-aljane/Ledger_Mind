@@ -16,7 +16,12 @@ import { ConversationHistory } from "@/components/lm/ConversationHistory";
 import { Markdown } from "@/components/lm/Markdown";
 import { RoadmapView, type Roadmap } from "@/components/lm/RoadmapView";
 import { StatusCard } from "@/components/lm/StatusCard";
-import { cacheDiagnosticResult, storeSessionId, type UserProfile } from "@/lib/api";
+import {
+  cacheDiagnosticResult,
+  storeSessionId,
+  type DiagnosticProfile,
+  type UserProfile,
+} from "@/lib/api";
 import {
   deleteConversation,
   downloadRoadmapPdf,
@@ -75,6 +80,28 @@ function toUserProfile(profil: GuidanceProfile, regime: string | null): UserProf
   };
 }
 
+/** Le profil de guidance porte davantage d'informations que le UserProfile ci-dessus (CA
+ * détaillé, devise, immatriculation…) — mis en cache comme DiagnosticProfile pour que la fiche
+ * de situation de la page résultat les affiche, plutôt que de les perdre en cachant `null`. */
+function toDiagnosticProfile(profil: GuidanceProfile): DiagnosticProfile {
+  return {
+    activite: profil.activite ?? null,
+    ca_estime_annuel: profil.ca_estime ?? null,
+    vend_produits: profil.vend_produits ?? null,
+    recoit_cadeaux: profil.recoit_cadeaux ?? null,
+    type_activite: null,
+    premiere_annee: null,
+    jours_activite: null,
+    anciennete: null,
+    ca_n_1_au_dessus_seuil: profil.ca_n_1_au_dessus_seuil ?? null,
+    ca_n_2_au_dessus_seuil: null,
+    situation_actuelle: profil.situation_actuelle ?? null,
+    ca_prestations: profil.ca_prestations ?? null,
+    ca_vente: profil.ca_vente ?? null,
+    choix_parcours: profil.choix_parcours ?? null,
+  };
+}
+
 export function GuidanceChat() {
   const navigate = useNavigate();
 
@@ -113,6 +140,7 @@ export function GuidanceChat() {
       setRoadmap(detail.roadmap as Roadmap | null);
       setChecked(detail.checked ?? {});
       setManquantes([]);
+      if (detail.roadmap) setSuggestions([]);
       const p = await fetchGuidanceProfile();
       setManquantes(p.manquantes);
     } catch (e) {
@@ -200,7 +228,7 @@ export function GuidanceChat() {
           phase: "diagnostic_roadmap",
           branch: "guidance",
           profile: toUserProfile(data.profil, regime),
-          diagnostic_profile: null,
+          diagnostic_profile: toDiagnosticProfile(data.profil),
           roadmap: data.roadmap,
         });
       }
@@ -294,8 +322,11 @@ export function GuidanceChat() {
         }}
       />
 
-      <div className="min-w-0">
-        <div className="space-y-6 min-h-[420px]">
+      <div className="min-w-0 flex flex-col h-[75vh] min-h-[520px]">
+        {/* Cadre de conversation à hauteur fixe : les anciens messages défilent ici, dans leur
+            propre cadre, pendant que la saisie reste toujours visible en bas de l'écran — plutôt
+            que de faire défiler toute la page à mesure que la discussion s'allonge. */}
+        <div className="chat-scroll flex-1 overflow-y-auto pr-2 space-y-6">
           {empty && (
             <div className="bg-white border border-border rounded-2xl p-6 animate-fade-in">
               <p className="text-sm text-ink/60 leading-relaxed">
@@ -400,16 +431,16 @@ export function GuidanceChat() {
                 </button>
                 {/* Suite du parcours : une fois immatriculé, on rejoint la vérification SIREN/avis
                     — le même écran que pour ceux qui avaient déjà un SIREN. */}
-                <div className="pt-3 border-t border-teal-dark/20">
-                  <p className="text-xs text-ink/50 leading-relaxed">
+                <div className="pt-4 border-t border-teal-dark/20">
+                  <p className="text-xs text-ink/50 leading-relaxed mb-3">
                     Une fois votre immatriculation obtenue, vérifiez votre SIREN et votre avis de
                     situation pour activer le suivi complet.
                   </p>
                   <button
                     onClick={() => void navigate({ to: "/onboarding/verification" })}
-                    className="mt-2 text-xs font-mono uppercase tracking-wider text-teal-dark hover:text-ink transition-colors"
+                    className="px-5 py-2.5 bg-white border border-teal-dark/40 text-teal-dark rounded-xl text-sm font-semibold hover:bg-teal-dark hover:text-background transition-colors"
                   >
-                    J&apos;ai déjà mon SIREN → vérification
+                    J&apos;ai déjà mon SIREN → Vérification
                   </button>
                 </div>
               </div>
@@ -423,9 +454,12 @@ export function GuidanceChat() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Réponses rapides contextuelles (décidées par le backend) + saisie libre. */}
-        <div className="mt-6 space-y-3">
-          {!empty && suggestions.length > 0 && !busy && (
+        {/* Réponses rapides contextuelles (décidées par le backend) + saisie libre.
+            Une fois la feuille de route générée, il n'y a plus de question en attente : les
+            suggestions n'ont plus de sens et ne doivent pas réapparaître (y compris en rouvrant
+            une conversation dont le profil était déjà complet). */}
+        <div className="shrink-0 mt-4 pt-4 border-t border-border space-y-3">
+          {!empty && !roadmap && suggestions.length > 0 && !busy && (
             <div className="flex flex-wrap gap-2">
               {suggestions.map((s) => (
                 <button

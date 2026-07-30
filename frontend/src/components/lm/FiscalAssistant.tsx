@@ -149,7 +149,10 @@ export function FiscalAssistant() {
         }}
       />
 
-      <div className="min-w-0 space-y-6">
+      <div className="min-w-0 flex flex-col h-[75vh] min-h-[520px]">
+        {/* Même cadre à hauteur fixe que la guidance : les échanges défilent dans leur propre
+            zone, la saisie reste toujours visible en bas. */}
+        <div className="chat-scroll flex-1 overflow-y-auto pr-2 space-y-6">
         {turns.length === 0 && (
           <div className="bg-white border border-border rounded-2xl p-6 animate-fade-in">
             <p className="text-sm text-ink/60 leading-relaxed">
@@ -215,28 +218,31 @@ export function FiscalAssistant() {
           )}
           <div ref={bottomRef} />
         </div>
+        </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void ask(input);
-          }}
-          className="flex gap-2"
-        >
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Posez votre question fiscale…"
-            className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors"
-          />
-          <button
-            type="submit"
-            disabled={busy || !input.trim()}
-            className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+        <div className="shrink-0 mt-4 pt-4 border-t border-border">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void ask(input);
+            }}
+            className="flex gap-2"
           >
-            Demander
-          </button>
-        </form>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Posez votre question fiscale…"
+              className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={busy || !input.trim()}
+              className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+            >
+              Demander
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
