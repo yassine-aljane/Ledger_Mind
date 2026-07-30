@@ -161,6 +161,114 @@ function FormulaireParametres({
   );
 }
 
+// -------- Calendrier fiscal (vue mensuelle, dates en retard/urgentes en rouge, à venir en orange) --------
+function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const j = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${j}`;
+}
+
+function grilleMoisCourant(): { jours: (Date | null)[]; label: string } {
+  const maintenant = new Date();
+  const annee = maintenant.getFullYear();
+  const mois = maintenant.getMonth();
+  const premierJour = new Date(annee, mois, 1);
+  const nbJours = new Date(annee, mois + 1, 0).getDate();
+  const decalage = (premierJour.getDay() + 6) % 7; // grille Lundi -> Dimanche
+  const jours: (Date | null)[] = Array(decalage).fill(null);
+  for (let j = 1; j <= nbJours; j++) jours.push(new Date(annee, mois, j));
+  return { jours, label: premierJour.toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) };
+}
+
+/** Rouge = échéance en retard ou urgente (imminente) ; orange = échéance à venir plus loin. */
+function couleursParDate(echeances: Echeance[]): Record<string, "rouge" | "orange"> {
+  const map: Record<string, "rouge" | "orange"> = {};
+  for (const e of echeances) {
+    if (!e.date_limite) continue;
+    const cle = e.date_limite.slice(0, 10);
+    if (e.statut === "en_retard" || e.statut === "urgent") map[cle] = "rouge";
+    else if (e.statut === "a_venir" && map[cle] !== "rouge") map[cle] = "orange";
+  }
+  return map;
+}
+
+function CalendrierFiscal({ echeances }: { echeances: Echeance[] }) {
+  const { jours, label } = grilleMoisCourant();
+  const couleurs = couleursParDate(echeances);
+  const aujourdHui = toISODate(new Date());
+  const joursDuMois = new Set(jours.filter((j): j is Date => j !== null).map(toISODate));
+
+  const horsMois = echeances
+    .filter((e) => e.date_limite && !joursDuMois.has(e.date_limite.slice(0, 10)))
+    .filter((e) => e.statut === "en_retard" || e.statut === "urgent" || e.statut === "a_venir")
+    .sort((a, b) => (a.date_limite ?? "").localeCompare(b.date_limite ?? ""))
+    .slice(0, 6);
+
+  return (
+    <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="font-semibold text-sm capitalize">{label}</p>
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-ink/50 font-semibold">
+          <span className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-coral" />
+            En retard / urgent
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-amber-fiscal" />À venir
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {["L", "M", "M", "J", "V", "S", "D"].map((j, i) => (
+          <span key={i} className="text-center text-[10px] font-semibold text-ink/40 pb-1">
+            {j}
+          </span>
+        ))}
+        {jours.map((jour, i) => {
+          if (!jour) return <span key={i} />;
+          const iso = toISODate(jour);
+          const couleur = couleurs[iso];
+          return (
+            <div
+              key={i}
+              className={`aspect-square rounded-lg grid place-items-center text-xs font-medium transition-all duration-200 ${
+                couleur === "rouge"
+                  ? "bg-coral text-background"
+                  : couleur === "orange"
+                    ? "bg-amber-fiscal text-ink"
+                    : iso === aujourdHui
+                      ? "border border-ink/40 text-ink font-semibold"
+                      : "text-ink/50"
+              }`}
+              title={iso === aujourdHui ? "Aujourd'hui" : undefined}
+            >
+              {jour.getDate()}
+            </div>
+          );
+        })}
+      </div>
+
+      {horsMois.length > 0 && (
+        <div className="border-t border-border pt-3 space-y-1.5">
+          <p className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">Plus loin</p>
+          {horsMois.map((e) => (
+            <div key={e.id} className="flex items-center gap-2 text-xs text-ink/70">
+              <span
+                className={`size-1.5 rounded-full shrink-0 ${
+                  e.statut === "a_venir" ? "bg-amber-fiscal" : "bg-coral"
+                }`}
+              />
+              {new Date(e.date_limite!).toLocaleDateString("fr-FR")} — {e.libelle}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
   const [data, setData] = useState<AgendaResponse | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -205,6 +313,7 @@ function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
       {data.parametres_manquants.length > 0 && (
         <FormulaireParametres manquants={data.parametres_manquants} onEnregistre={recharger} />
       )}
+      <CalendrierFiscal echeances={data.echeances} />
       {data.echeances.length === 0 ? (
         <p className="text-sm text-ink/40 text-center py-10">Aucune échéance applicable à votre profil.</p>
       ) : (
