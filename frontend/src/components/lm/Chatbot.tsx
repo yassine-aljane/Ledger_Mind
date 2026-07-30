@@ -69,6 +69,14 @@ export function Chatbot({
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  // Révélation du texte de la question EN SYNC avec la voix (mode vocal uniquement) — null = texte
+  // affiché intégralement (mode texte, ou lecture terminée) ; un nombre = position atteinte par
+  // la synthèse vocale, pour un effet "machine à écrire" calé sur la voix, pas sur une minuterie.
+  const [revealedLength, setRevealedLength] = useState<number | null>(null);
+  // Réponse vocale captée mais pas encore écrite dans le chat — laisse "quelques secondes" avant
+  // de l'envoyer, comme demandé, plutôt que de l'afficher/soumettre instantanément.
+  const [pendingVoiceAnswer, setPendingVoiceAnswer] = useState<string | null>(null);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognitionRef = useRef<RecognitionHandle | null>(null);
   const lastSpokenRef = useRef<string | null>(null);
   // Détecté après montage seulement (jamais pendant le rendu serveur) : évite un décalage
@@ -87,7 +95,14 @@ export function Chatbot({
       onFinal: (text) => {
         setListening(false);
         setInterim("");
-        handleAnswer(text);
+        // « Il attend quelques secondes pour que la réponse soit écrite dans le chat » : on ne
+        // soumet pas tout de suite — on montre d'abord ce qui a été compris, puis on l'envoie.
+        setPendingVoiceAnswer(text);
+        if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+        pendingTimerRef.current = setTimeout(() => {
+          setPendingVoiceAnswer(null);
+          handleAnswer(text);
+        }, 1800);
       },
       onError: (message) => {
         setListening(false);
@@ -109,15 +124,26 @@ export function Chatbot({
   };
 
   /** Lit la question à voix haute (les deux modes lisent) ; en mode vocal, écoute la réponse
-   * juste après — jamais l'inverse, pour ne pas laisser le micro capter la voix de l'assistant. */
+   * juste après — jamais l'inverse, pour ne pas laisser le micro capter la voix de l'assistant.
+   * En mode vocal, le texte de la question se révèle progressivement, calé sur la voix
+   * (`onboundary`) plutôt qu'affiché d'un bloc — en mode texte, rien ne change (texte entier
+   * immédiat, comme avant). */
   const speakQuestion = (text: string) => {
     if (!speechSupported() || lastSpokenRef.current === text) return;
     lastSpokenRef.current = text;
     setSpeaking(true);
-    speak(text, () => {
-      setSpeaking(false);
-      if (modeRef.current === "vocal") startListening();
-    });
+    setRevealedLength(modeRef.current === "vocal" ? 0 : null);
+    speak(
+      text,
+      () => {
+        setSpeaking(false);
+        setRevealedLength(null);
+        if (modeRef.current === "vocal") startListening();
+      },
+      (charIndex) => {
+        if (modeRef.current === "vocal") setRevealedLength(charIndex);
+      },
+    );
   };
 
   useEffect(() => {
@@ -126,10 +152,12 @@ export function Chatbot({
   }, [orchestratorMessage, thinking]);
 
   useEffect(() => {
-    // Nettoyage : ne laisse jamais une lecture ou une écoute tourner après démontage/changement de page.
+    // Nettoyage : ne laisse jamais une lecture, une écoute ou un envoi différé tourner après
+    // démontage/changement de page.
     return () => {
       stopSpeaking();
       recognitionRef.current?.stop();
+      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
     };
   }, []);
 
@@ -400,9 +428,29 @@ export function Chatbot({
 
       {intro && turns.length === 0 && <p className="text-ink/60 text-pretty text-[17px]">{intro}</p>}
 
-      {(speaking || listening || voiceNotice) && (
-        <div className="flex items-center gap-2 text-xs font-mono animate-fade-in">
-          {speaking && (
+      {/* Mode vocal : grand micro animé pendant que l'assistant parle — pas de texte affiché
+          d'un bloc ici, seule la bulle de la question (ci-dessous) se révèle progressivement. */}
+      {mode === "vocal" && speaking && (
+        <div className="flex flex-col items-center gap-2 py-2 animate-fade-in">
+          <button
+            type="button"
+            onClick={stopSpeaking}
+            title="Arrêter la lecture"
+            className="relative size-16 rounded-full bg-teal-dark text-background grid place-items-center text-2xl shadow-lg transition-transform active:scale-95"
+          >
+            <span className="absolute inset-0 rounded-full bg-teal-dark/40 animate-ping" />
+            <span className="absolute inset-[-8px] rounded-full border-2 border-teal-dark/30 animate-pulse" />
+            <span className="relative">🔊</span>
+          </button>
+          <span className="text-[11px] font-mono uppercase tracking-widest text-ink/40">
+            L&apos;assistant parle…
+          </span>
+        </div>
+      )}
+
+      {(mode === "texte" && speaking) || listening || voiceNotice || pendingVoiceAnswer ? (
+        <div className="flex items-center gap-2 text-xs font-mono animate-fade-in flex-wrap">
+          {mode === "texte" && speaking && (
             <button
               type="button"
               onClick={stopSpeaking}
@@ -424,29 +472,45 @@ export function Chatbot({
               🎙️ Je vous écoute{interim ? ` : « ${interim} »` : "…"} <span className="underline">arrêter</span>
             </button>
           )}
+          {pendingVoiceAnswer && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-ink/5 text-ink/60">
+              <span className="size-1.5 rounded-full bg-ink/40 animate-pulse" />
+              « {pendingVoiceAnswer} » — envoi dans un instant…
+            </span>
+          )}
           {voiceNotice && !speaking && !listening && (
             <span className="text-ink/40">{voiceNotice}</span>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Cadre de conversation à hauteur fixe : seuls les messages défilent à l'intérieur — les
           suggestions et la saisie restent TOUJOURS visibles en bas, même en faisant défiler un
           long échange. */}
       <div className="flex flex-col border border-border rounded-2xl bg-white shadow-sm overflow-hidden h-[65vh] min-h-[440px]">
       <div className="chat-scroll flex-1 overflow-y-auto p-5 space-y-6">
-        {turns.map((t) =>
-          t.role === "assistant" ? (
+        {turns.map((t, i) => {
+          // Mode vocal, question en cours de lecture : le texte se révèle EN SYNC avec la voix
+          // (voir speakQuestion/onboundary) plutôt que d'apparaître d'un bloc. En mode texte,
+          // rien ne change (texte entier, immédiat, comme avant).
+          const isRevealing =
+            t.role === "assistant" && i === turns.length - 1 && mode === "vocal" && speaking && revealedLength !== null;
+          const shown = isRevealing ? t.text.slice(0, Math.max(revealedLength!, 1)) : t.text;
+
+          return t.role === "assistant" ? (
             <div key={t.id} className="flex items-end gap-2.5 max-w-[85%] animate-slide-up">
               <span
                 aria-hidden
-                className="shrink-0 size-8 rounded-full bg-teal-dark/10 text-teal-dark grid place-items-center text-sm mb-4"
+                className={`shrink-0 size-8 rounded-full bg-teal-dark/10 text-teal-dark grid place-items-center text-sm mb-4 ${
+                  isRevealing ? "animate-pulse" : ""
+                }`}
               >
                 🤖
               </span>
               <div className="flex flex-col gap-1 min-w-0">
                 <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[17px] leading-relaxed text-ink shadow-sm">
-                  {t.text}
+                  {shown}
+                  {isRevealing && <span className="inline-block w-[2px] h-[1em] bg-ink/40 ml-0.5 align-middle animate-pulse" />}
                 </div>
                 <span className="text-[10px] uppercase opacity-40 font-mono ml-1">
                   {t.time} — Assistant
@@ -473,8 +537,8 @@ export function Chatbot({
                 🙂
               </span>
             </div>
-          ),
-        )}
+          );
+        })}
 
         {thinking && (
           <div className="flex items-center gap-2 text-ink/40 text-sm animate-fade-in ml-[42px]">
@@ -524,6 +588,9 @@ export function Chatbot({
             </div>
           ) : (
             <>
+              {/* Mode vocal : pas d'exemples de suggestion à côté de la question, juste la
+                  question — on parle, on n'a pas besoin de cliquer. Inchangé en mode texte. */}
+              {mode !== "vocal" && (
               <div className="flex flex-wrap gap-2">
                 {orchestratorQuickReplies.map((r) => (
                   <button
@@ -536,6 +603,7 @@ export function Chatbot({
                   </button>
                 ))}
               </div>
+              )}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();

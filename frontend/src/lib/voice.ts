@@ -14,8 +14,19 @@ export function recognitionSupported(): boolean {
 
 let currentUtterance: SpeechSynthesisUtterance | null = null;
 
-/** Lit un texte à voix haute (français). Annule toute lecture en cours avant de démarrer. */
-export function speak(text: string, onEnd?: () => void): void {
+/**
+ * Lit un texte à voix haute (français). Annule toute lecture en cours avant de démarrer.
+ *
+ * `onBoundary` (optionnel) reçoit la position (en caractères) atteinte par la synthèse à chaque
+ * mot/phrase — permet d'afficher le texte progressivement, EN SYNC avec la voix, plutôt que d'un
+ * bloc. Support variable selon navigateur (fiable sur Chrome ; sur les moteurs qui ne l'émettent
+ * pas, `onEnd` révèle simplement le texte en entier — dégradation propre, jamais bloquant).
+ */
+export function speak(
+  text: string,
+  onEnd?: () => void,
+  onBoundary?: (charIndex: number) => void,
+): void {
   if (!speechSupported() || !text.trim()) {
     onEnd?.();
     return;
@@ -24,6 +35,9 @@ export function speak(text: string, onEnd?: () => void): void {
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "fr-FR";
   utterance.rate = 1;
+  utterance.onboundary = (event) => {
+    if (typeof event.charIndex === "number") onBoundary?.(event.charIndex);
+  };
   utterance.onend = () => {
     currentUtterance = null;
     onEnd?.();
