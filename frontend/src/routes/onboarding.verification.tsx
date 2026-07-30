@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
+import { InfoTooltip, type InfoContent } from "@/components/lm/InfoTooltip";
 import {
   ocrExtractSiret,
   startOrchestrator,
@@ -23,6 +24,50 @@ export const Route = createFileRoute("/onboarding/verification")({
 });
 
 type Tab = "manual" | "upload";
+
+// Contenu vérifié à la source (jamais improvisé) — voir les URLs officielles citées.
+const AIDE_JUSTIFICATIF: InfoContent = {
+  titre: "Justificatif accepté",
+  items: [
+    { label: "À quoi ça sert", value: "Extraire automatiquement votre SIREN/SIRET depuis un document que vous avez déjà, sans le ressaisir." },
+    { label: "Documents acceptés", value: "Kbis, extrait RNE, avis de situation SIRENE, ou tout document officiel affichant clairement votre numéro." },
+    { label: "Format", value: "PDF ou photo/scan lisible (image)." },
+    { label: "Si ça échoue", value: "Aucun blocage : basculez sur la saisie manuelle de votre SIREN/SIRET." },
+  ],
+};
+
+const AIDE_KBIS: InfoContent = {
+  titre: "Extrait Kbis",
+  items: [
+    { label: "À quoi ça sert", value: "Preuve officielle de l'immatriculation de votre entreprise au Registre du Commerce et des Sociétés (RCS) — la « carte d'identité » de l'entreprise." },
+    { label: "Qui le délivre", value: "Le greffe du tribunal de commerce (service en ligne : infogreffe.fr)." },
+    { label: "Format", value: "PDF, version électronique ou papier." },
+    { label: "Durée de validité", value: "Généralement exigé daté de moins de 3 mois par les tiers (banques, administrations)." },
+  ],
+  source: { label: "service-public.gouv.fr", url: "https://entreprendre.service-public.gouv.fr/vosdroits/F21000" },
+};
+
+const AIDE_RNE: InfoContent = {
+  titre: "Extrait RNE",
+  items: [
+    { label: "À quoi ça sert", value: "Preuve d'immatriculation au Répertoire National des Entreprises — pour les entrepreneurs individuels et autres activités non inscrites au RCS (artisans, libéraux…)." },
+    { label: "Qui le délivre", value: "L'INPI, gratuitement, via data.inpi.fr (guichet unique des formalités d'entreprise)." },
+    { label: "Format", value: "PDF (attestation d'inscription téléchargeable)." },
+    { label: "Durée de validité", value: "Aucune durée officielle fixée — vérifiez si le destinataire en exige une récente." },
+  ],
+  source: { label: "inpi.fr", url: "https://www.inpi.fr/ressources/formalites-dentreprises/registre-national-entreprises" },
+};
+
+const AIDE_AVIS_SIRENE: InfoContent = {
+  titre: "Avis de situation SIRENE",
+  items: [
+    { label: "À quoi ça sert", value: "Document officiel qui atteste l'existence légale de votre activité et récapitule votre SIREN/SIRET." },
+    { label: "Qui le délivre", value: "L'INSEE, gratuitement et instantanément, sur avis-situation-sirene.insee.fr — méfiez-vous des sites tiers qui font payer ce document gratuit." },
+    { label: "Format", value: "PDF téléchargeable directement depuis le site de l'INSEE, avec votre numéro SIREN." },
+    { label: "Durée de validité", value: "Aucune durée officielle fixée — un document récent reste préférable." },
+  ],
+  source: { label: "insee.fr", url: "https://www.insee.fr/fr/information/6675111" },
+};
 
 function formatSiren(siren: string): string {
   const d = siren.replace(/\D/g, "");
@@ -247,20 +292,27 @@ function VerificationPage() {
           )}
 
           {tab === "upload" && (
-            <label className="block bg-white border-2 border-dashed border-border hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200 rounded-2xl p-16 text-center cursor-pointer">
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="sr-only"
-                disabled={loading}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFile(f);
-                }}
-              />
-              <p className="font-semibold">{loading ? "Extraction…" : "Déposez votre justificatif"}</p>
-              {ocrError && <p className="text-sm text-coral mt-2">{ocrError}</p>}
-            </label>
+            <div className="relative">
+              {/* L'icône d'aide reste HORS du <label> : un clic dessus ne doit jamais déclencher
+                  le sélecteur de fichier associé au champ, qui occupe toute la zone pointillée. */}
+              <div className="absolute top-3 right-3 z-10">
+                <InfoTooltip content={AIDE_JUSTIFICATIF} label="justificatif accepté" />
+              </div>
+              <label className="block bg-white border-2 border-dashed border-border hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200 rounded-2xl p-16 text-center cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="sr-only"
+                  disabled={loading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                  }}
+                />
+                <p className="font-semibold">{loading ? "Extraction…" : "Déposez votre justificatif"}</p>
+                {ocrError && <p className="text-sm text-coral mt-2">{ocrError}</p>}
+              </label>
+            </div>
           )}
         </>
       )}
@@ -324,7 +376,10 @@ function VerificationPage() {
               ) : profile.registry_document_required ? (
                 <>
                   <p className="text-sm text-ink/70 mb-4">
-                    Déposez votre Kbis (greffe / RCS) ou votre extrait RNE (INPI). Nous vérifions
+                    Déposez votre Kbis (greffe / RCS)
+                    <InfoTooltip content={AIDE_KBIS} label="extrait Kbis" />{" "}
+                    ou votre extrait RNE (INPI)
+                    <InfoTooltip content={AIDE_RNE} label="extrait RNE" />. Nous vérifions
                     automatiquement le type de document et le SIREN.
                   </p>
                   <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200">
@@ -357,8 +412,9 @@ function VerificationPage() {
 
           {profile.verification_status === "verified" && !showRegistryDocStep && (
             <section className="bg-white border border-border rounded-2xl p-8">
-              <p className="font-mono text-[11px] uppercase tracking-widest text-teal-dark mb-4">
+              <p className="font-mono text-[11px] uppercase tracking-widest text-teal-dark mb-4 inline-flex items-center gap-1.5">
                 Étape 3 · Avis de situation SIRENE
+                <InfoTooltip content={AIDE_AVIS_SIRENE} label="avis de situation SIRENE" />
               </p>
               {profile.sirene_document_uploaded ? (
                 <div className="text-sm space-y-1">
