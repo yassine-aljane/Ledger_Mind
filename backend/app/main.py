@@ -6,6 +6,7 @@ from app.api import (
     auth,
     capture,
     declaration,
+    expert_comptable,
     facture,
     guidance,
     orchestrator,
@@ -30,10 +31,12 @@ app.include_router(verification.router)
 app.include_router(orchestrator.router)
 # Espace « pas encore immatriculé » : chat conversationnel, mémoire, feuille de route.
 app.include_router(guidance.router)
-# Espace immatriculé (SIREN vérifié) : facture, rapport d'activité, déclaration préparée.
+# Espace immatriculé (SIREN vérifié) : facture, rapport d'activité, déclaration préparée,
+# recherche d'expert-comptable (déclenchée depuis la déclaration).
 app.include_router(facture.router)
 app.include_router(rapport.router)
 app.include_router(declaration.router)
+app.include_router(expert_comptable.router)
 
 
 _scheduler = None
