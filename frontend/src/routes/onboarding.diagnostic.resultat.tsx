@@ -191,7 +191,7 @@ function ResultatPage() {
           <div className="text-coral font-mono text-sm">{error}</div>
           <Link
             to="/onboarding/diagnostic"
-            className="inline-block text-sm font-semibold text-teal-dark hover:underline"
+            className="inline-block text-sm font-semibold text-teal-dark hover:underline transition-colors duration-200"
           >
             ← Recommencer le diagnostic
           </Link>
@@ -309,13 +309,13 @@ function ResultatPage() {
           <div className="mt-12 flex justify-center gap-4">
             <Link
               to="/onboarding/diagnostic"
-              className="px-8 py-4 border border-border rounded-xl font-semibold hover:border-teal-dark transition-colors"
+              className="px-8 py-4 border border-border rounded-xl font-semibold hover:border-teal-dark transition-all duration-200 active:scale-[0.97]"
             >
               Refaire le diagnostic
             </Link>
             <Link
               to="/dashboard"
-              className="px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
+              className="px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
             >
               Accéder à mon dashboard →
             </Link>
@@ -339,7 +339,7 @@ function Card({
 }) {
   return (
     <section
-      className={`bg-white border border-border rounded-2xl p-8 animate-slide-up ${span}`}
+      className={`bg-white border border-border rounded-2xl p-8 animate-slide-up card-hover ${span}`}
     >
       <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ink/40 mb-6">
         {index} · {label}
@@ -353,7 +353,7 @@ function Row({ k, v }: { k: string; v: string }) {
   return (
     <div>
       <dt className="text-xs uppercase tracking-widest text-ink/40">{k}</dt>
-      <dd className="mt-1 font-medium">{v}</dd>
+      <dd className="mt-1 font-medium text-[15px]">{v}</dd>
     </div>
   );
 }

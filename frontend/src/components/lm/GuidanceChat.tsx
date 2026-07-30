@@ -338,7 +338,7 @@ export function GuidanceChat() {
                   <button
                     key={s}
                     onClick={() => void send(s)}
-                    className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-colors text-left"
+                    className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96] text-left"
                   >
                     {s}
                   </button>
@@ -376,7 +376,7 @@ export function GuidanceChat() {
                             onClick={() =>
                               void send(choice.label, { kind: turn.options!.kind, value: choice.value }, index)
                             }
-                            className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors disabled:opacity-40 ${
+                            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100 ${
                               picked
                                 ? "bg-ink text-background"
                                 : "bg-white border border-border hover:border-teal-dark hover:text-teal-dark"
@@ -425,7 +425,7 @@ export function GuidanceChat() {
               <div className="rounded-2xl border border-teal-dark/30 bg-teal-dark/5 p-5 space-y-3 animate-slide-up">
                 <button
                   onClick={openRoadmap}
-                  className="px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
+                  className="px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
                 >
                   Ouvrir la vue détaillée →
                 </button>
@@ -438,7 +438,7 @@ export function GuidanceChat() {
                   </p>
                   <button
                     onClick={() => void navigate({ to: "/onboarding/verification" })}
-                    className="px-5 py-2.5 bg-white border border-teal-dark/40 text-teal-dark rounded-xl text-sm font-semibold hover:bg-teal-dark hover:text-background transition-colors"
+                    className="px-5 py-2.5 bg-white border border-teal-dark/40 text-teal-dark rounded-xl text-sm font-semibold hover:bg-teal-dark hover:text-background transition-all duration-200 active:scale-[0.97]"
                   >
                     J&apos;ai déjà mon SIREN → Vérification
                   </button>
@@ -465,7 +465,7 @@ export function GuidanceChat() {
                 <button
                   key={s}
                   onClick={() => void send(s)}
-                  className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-colors"
+                  className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96]"
                 >
                   {s}
                 </button>
@@ -483,12 +483,12 @@ export function GuidanceChat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Décrivez votre activité, ou posez votre question…"
-              className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors"
+              className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
             />
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+              className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
             >
               Envoyer
             </button>

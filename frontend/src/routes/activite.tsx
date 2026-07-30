@@ -156,7 +156,7 @@ function ActiviteGate() {
           </p>
           <Link
             to="/onboarding/verification"
-            className="inline-flex px-6 py-3 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
+            className="inline-flex px-6 py-3 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
           >
             Lancer la vérification SIREN
           </Link>
@@ -194,7 +194,7 @@ function ActiviteJourney({ profile }: { profile: NonNullable<SessionDetail["prof
             key={e.id}
             type="button"
             onClick={() => setEtape(e.id)}
-            className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-sm font-medium transition-all duration-200 ${
               etape === e.id
                 ? "bg-ink text-background border-ink"
                 : "bg-white border-border text-ink/70 hover:border-ink"
@@ -302,13 +302,13 @@ function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
             {lignes.map((l, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 items-center">
                 <input
-                  className="col-span-5 px-3 py-2 bg-background rounded-lg text-sm"
+                  className="col-span-5 px-3 py-2 bg-background border border-transparent rounded-lg text-sm input-boxed"
                   placeholder="Désignation"
                   value={l.designation}
                   onChange={(e) => updateLigne(i, { designation: e.target.value })}
                 />
                 <input
-                  className="col-span-2 px-3 py-2 bg-background rounded-lg text-sm"
+                  className="col-span-2 px-3 py-2 bg-background border border-transparent rounded-lg text-sm input-boxed"
                   type="number"
                   min={0}
                   step="0.01"
@@ -317,7 +317,7 @@ function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
                   onChange={(e) => updateLigne(i, { quantite: Number(e.target.value) })}
                 />
                 <input
-                  className="col-span-2 px-3 py-2 bg-background rounded-lg text-sm"
+                  className="col-span-2 px-3 py-2 bg-background border border-transparent rounded-lg text-sm input-boxed"
                   type="number"
                   min={0}
                   step="0.01"
@@ -326,7 +326,7 @@ function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
                   onChange={(e) => updateLigne(i, { prix_unitaire_ht: Number(e.target.value) })}
                 />
                 <select
-                  className="col-span-3 px-2 py-2 bg-background rounded-lg text-sm"
+                  className="col-span-3 px-2 py-2 bg-background border border-transparent rounded-lg text-sm input-boxed"
                   value={l.categorie}
                   onChange={(e) => updateLigne(i, { categorie: e.target.value as LigneFacture["categorie"] })}
                 >
@@ -347,7 +347,7 @@ function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
           <button
             type="submit"
             disabled={loading || !clientNom.trim()}
-            className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
           >
             {loading ? "Génération…" : "Générer la facture"}
           </button>
@@ -362,7 +362,7 @@ function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
         {derniere && (
           <section className="bg-white border border-border rounded-2xl p-8 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg">Facture {derniere.numero}</h3>
+              <h3 className="font-semibold text-xl">Facture {derniere.numero}</h3>
               <Provenance>facture_generee</Provenance>
             </div>
             <p className="text-sm text-ink/60">
@@ -381,14 +381,14 @@ function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
               <button
                 type="button"
                 onClick={() => telechargerFacturePdf(derniere.id, derniere.numero)}
-                className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-colors"
+                className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
               >
                 Télécharger le PDF
               </button>
               <button
                 type="button"
                 onClick={onSuivant}
-                className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-colors"
+                className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-all duration-200 active:scale-[0.97]"
               >
                 Étape suivante : rapport →
               </button>
@@ -408,7 +408,7 @@ function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
         ) : (
           <div className="space-y-3">
             {historique.map((f) => (
-              <div key={f.id} className="bg-white border border-border rounded-2xl p-5 flex items-center justify-between">
+              <div key={f.id} className="bg-white border border-border rounded-2xl p-5 flex items-center justify-between card-hover">
                 <div>
                   <p className="font-semibold text-sm font-mono">{f.numero}</p>
                   <p className="text-xs text-ink/50">{f.client.nom} · {f.total_ttc.toFixed(2)} € TTC</p>
@@ -478,7 +478,7 @@ function EtapeRapport({
                 type="date"
                 value={dateDebut}
                 onChange={(e) => setDateDebut(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink"
+                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink transition-colors"
               />
             </div>
             <div>
@@ -487,14 +487,14 @@ function EtapeRapport({
                 type="date"
                 value={dateFin}
                 onChange={(e) => setDateFin(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink"
+                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink transition-colors"
               />
             </div>
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+            className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
           >
             {loading ? "Consolidation…" : "Générer le rapport"}
           </button>
@@ -509,7 +509,7 @@ function EtapeRapport({
         {rapport && (
           <section className="bg-white border border-border rounded-2xl p-8 space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg">
+              <h3 className="font-semibold text-xl">
                 Rapport {rapport.date_debut} → {rapport.date_fin}
               </h3>
               <Provenance>rapport_genere</Provenance>
@@ -533,7 +533,7 @@ function EtapeRapport({
             )}
             <div>
               <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-2">Appréciation</p>
-              <Markdown text={rapport.appreciation} className="text-sm" />
+              <Markdown text={rapport.appreciation} className="text-[15px] leading-relaxed" />
             </div>
             {rapport.sources.length > 0 && (
               <p className="text-[11px] text-ink/40">Sources : {rapport.sources.join(", ")}</p>
@@ -542,14 +542,14 @@ function EtapeRapport({
               <button
                 type="button"
                 onClick={() => telechargerRapportPdf(rapport.id, rapport.date_debut, rapport.date_fin)}
-                className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-colors"
+                className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
               >
                 Télécharger le PDF
               </button>
               <button
                 type="button"
                 onClick={onSuivant}
-                className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-colors"
+                className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-all duration-200 active:scale-[0.97]"
               >
                 Étape suivante : déclaration →
               </button>
@@ -569,7 +569,7 @@ function EtapeRapport({
         ) : (
           <div className="space-y-3">
             {historique.map((r) => (
-              <div key={r.id} className="bg-white border border-border rounded-2xl p-5">
+              <div key={r.id} className="bg-white border border-border rounded-2xl p-5 card-hover">
                 <p className="font-semibold text-sm">{r.date_debut} → {r.date_fin}</p>
                 <p className="text-xs text-ink/50">{r.total_ttc.toFixed(2)} € TTC · {r.nb_factures} facture(s)</p>
               </div>
@@ -641,7 +641,7 @@ function EtapeDeclaration({
                 type="date"
                 value={dateDebut}
                 onChange={(e) => setDateDebut(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink"
+                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink transition-colors"
               />
             </div>
             <div>
@@ -650,7 +650,7 @@ function EtapeDeclaration({
                 type="date"
                 value={dateFin}
                 onChange={(e) => setDateFin(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink"
+                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink transition-colors"
               />
             </div>
           </div>
@@ -662,7 +662,7 @@ function EtapeDeclaration({
           <button
             type="submit"
             disabled={loading}
-            className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+            className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
           >
             {loading ? "Préparation…" : "Préparer la déclaration"}
           </button>
@@ -677,7 +677,7 @@ function EtapeDeclaration({
         {declaration && (
           <section className="bg-white border border-border rounded-2xl p-8 space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg">{declaration.formulaire} — {declaration.regime}</h3>
+              <h3 className="font-semibold text-xl">{declaration.formulaire} — {declaration.regime}</h3>
               <Provenance>declaration_generee</Provenance>
             </div>
             <div className="bg-amber-fiscal/10 border border-amber-fiscal/30 rounded-xl p-4 text-xs">
@@ -705,7 +705,7 @@ function EtapeDeclaration({
               <button
                 type="button"
                 onClick={() => telechargerDeclarationPdf(declaration.id, declaration.date_debut, declaration.date_fin)}
-                className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-colors"
+                className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
               >
                 Télécharger le PDF
               </button>
@@ -713,7 +713,7 @@ function EtapeDeclaration({
                 <button
                   type="button"
                   onClick={handleMarquerRevue}
-                  className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-colors"
+                  className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-all duration-200 active:scale-[0.97]"
                 >
                   J'ai relu chaque montant
                 </button>
@@ -721,7 +721,7 @@ function EtapeDeclaration({
                 <button
                   type="button"
                   onClick={() => onDemanderExpert("")}
-                  className="px-5 py-2.5 border border-teal-dark text-teal-dark rounded-lg text-sm font-medium hover:bg-teal-dark hover:text-background transition-colors"
+                  className="px-5 py-2.5 border border-teal-dark text-teal-dark rounded-lg text-sm font-medium hover:bg-teal-dark hover:text-background transition-all duration-200 active:scale-[0.97]"
                 >
                   Faire vérifier / signer par un expert-comptable →
                 </button>
@@ -742,7 +742,7 @@ function EtapeDeclaration({
         ) : (
           <div className="space-y-3">
             {historique.map((d) => (
-              <div key={d.id} className="bg-white border border-border rounded-2xl p-5">
+              <div key={d.id} className="bg-white border border-border rounded-2xl p-5 card-hover">
                 <p className="font-semibold text-sm">{d.date_debut} → {d.date_fin}</p>
                 <p className="text-xs text-ink/50">
                   {d.total_ca_declare.toFixed(2)} € déclarés · {d.statut}
@@ -805,7 +805,7 @@ function EtapeExpertComptable({
         <button
           type="submit"
           disabled={loading || !ville.trim()}
-          className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+          className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
         >
           {loading ? "Recherche…" : "Chercher"}
         </button>
@@ -837,7 +837,7 @@ function EtapeExpertComptable({
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
               {resultat.cabinets.map((c, i) => (
-                <div key={i} className="bg-white border border-border rounded-2xl p-6 space-y-2">
+                <div key={i} className="bg-white border border-border rounded-2xl p-6 space-y-2 card-hover">
                   <div className="flex items-center justify-between">
                     <p className="font-semibold">{c.nom_cabinet}</p>
                     {c.distance_km != null && (

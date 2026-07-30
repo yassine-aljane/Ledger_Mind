@@ -126,7 +126,7 @@ function ProfilPage() {
       <div className="flex items-center justify-between gap-4">
         <Link
           to="/onboarding/verification"
-          className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink"
+          className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink transition-colors duration-200"
         >
           ← Retour
         </Link>
@@ -154,7 +154,7 @@ function ProfilPage() {
                 </p>
                 <button
                   onClick={handleRestart}
-                  className="text-xs font-semibold text-ink/50 hover:text-coral transition-colors"
+                  className="text-xs font-semibold text-ink/50 hover:text-coral transition-colors duration-200"
                 >
                   ↺ Recommencer
                 </button>
@@ -342,7 +342,7 @@ function ProfilPage() {
 
             <button
               onClick={() => navigate({ to: "/dashboard" })}
-              className="w-full px-8 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors text-center text-base shadow-md"
+              className="w-full px-8 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] text-center text-base shadow-md"
             >
               Confirmer mon profil et continuer vers mon dashboard →
             </button>
@@ -372,13 +372,13 @@ function ProfileListField<K extends keyof UserProfile>({
 }) {
   const val = profile[field];
   return (
-    <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-background/40 transition-colors duration-200">
       <div className="space-y-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-ink/40">{label}</span>
         {editingField === field ? (
           <input
             type="text"
-            className="w-full text-sm p-2 border border-teal-dark rounded-lg focus:outline-none"
+            className="w-full text-sm p-2 border border-teal-dark rounded-lg input-boxed focus:outline-none"
             defaultValue={(val as string[]).join(", ")}
             onBlur={(e) => {
               const items = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
@@ -393,7 +393,7 @@ function ProfileListField<K extends keyof UserProfile>({
       </div>
       <button
         onClick={() => setEditingField(editingField === field ? null : (field as string))}
-        className="text-xs font-semibold text-teal-dark hover:underline self-start sm:self-center"
+        className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 self-start sm:self-center"
       >
         {editingField === field ? "Valider" : "Modifier"}
       </button>
@@ -418,13 +418,13 @@ function ProfileStringField({
 }) {
   const val = profile[field];
   return (
-    <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-background/40 transition-colors duration-200">
       <div className="space-y-1 flex-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-ink/40">{label}</span>
         {editingField === field ? (
           <input
             type="text"
-            className="w-full text-sm p-2 border border-teal-dark rounded-lg focus:outline-none"
+            className="w-full text-sm p-2 border border-teal-dark rounded-lg input-boxed focus:outline-none"
             defaultValue={val ?? ""}
             onBlur={(e) => {
               updateProfileField(field, e.target.value || null);
@@ -440,7 +440,7 @@ function ProfileStringField({
       </div>
       <button
         onClick={() => setEditingField(editingField === field ? null : field)}
-        className="text-xs font-semibold text-teal-dark hover:underline self-start sm:self-center"
+        className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 self-start sm:self-center"
       >
         {editingField === field ? "Valider" : "Modifier"}
       </button>
@@ -462,14 +462,14 @@ function BoolField({
   falseLabel?: string;
 }) {
   return (
-    <div className="p-5 flex items-center justify-between gap-4">
+    <div className="p-5 flex items-center justify-between gap-4 hover:bg-background/40 transition-colors duration-200">
       <div>
         <span className="text-xs font-semibold uppercase tracking-wider text-ink/40 block">{label}</span>
         <span className="text-sm font-medium text-ink">
           {value === null ? "Non précisé" : value ? trueLabel : falseLabel}
         </span>
       </div>
-      <button onClick={onToggle} className="text-xs font-semibold text-teal-dark hover:underline">
+      <button onClick={onToggle} className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200">
         Changer
       </button>
     </div>
@@ -484,7 +484,7 @@ function VariabilityField({
   updateProfileField: <K extends keyof UserProfile>(field: K, value: UserProfile[K]) => void;
 }) {
   return (
-    <div className="p-5 flex items-center justify-between gap-4">
+    <div className="p-5 flex items-center justify-between gap-4 hover:bg-background/40 transition-colors duration-200">
       <div>
         <span className="text-xs font-semibold uppercase tracking-wider text-ink/40 block">
           Stabilité des revenus
@@ -502,7 +502,7 @@ function VariabilityField({
           <button
             key={v}
             onClick={() => updateProfileField("revenue_variability", v)}
-            className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+            className={`px-3 py-1 text-xs rounded-full border transition-all duration-200 active:scale-[0.95] ${
               profile.revenue_variability === v
                 ? "bg-teal-dark text-white border-teal-dark"
                 : "bg-white text-ink/60 border-border hover:border-teal-dark"

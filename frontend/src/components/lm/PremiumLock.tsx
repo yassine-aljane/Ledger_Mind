@@ -62,7 +62,7 @@ export function PremiumLock({ title, eyebrow, pitch, bullets, preview, children 
               {bullets.map((b) => (
                 <li
                   key={b.label}
-                  className="border border-border rounded-2xl p-4 bg-background/50"
+                  className="border border-border rounded-2xl p-4 bg-background/50 card-hover"
                 >
                   <div className="text-2xl mb-2">{b.icon}</div>
                   <p className="font-semibold text-sm mb-1">{b.label}</p>
@@ -74,14 +74,14 @@ export function PremiumLock({ title, eyebrow, pitch, bullets, preview, children 
             <div className="flex flex-wrap items-center gap-4">
               <Link
                 to="/premium"
-                className="group inline-flex items-center gap-2 px-6 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-colors"
+                className="group inline-flex items-center gap-2 px-6 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
               >
                 Débloquer Premium
                 <span className="transition-transform group-hover:translate-x-0.5">→</span>
               </Link>
               <Link
                 to="/education"
-                className="text-sm font-medium text-ink/60 hover:text-ink underline underline-offset-4 decoration-dotted"
+                className="text-sm font-medium text-ink/60 hover:text-ink transition-colors duration-200 underline underline-offset-4 decoration-dotted"
               >
                 Rester en gratuit (Éducation)
               </Link>

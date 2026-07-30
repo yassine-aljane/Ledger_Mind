@@ -136,7 +136,7 @@ export function AuthPage() {
                 setMode("login");
                 setError(null);
               }}
-              className={`relative z-10 py-2.5 rounded-full transition-colors ${
+              className={`relative z-10 py-2.5 rounded-full transition-colors duration-200 ${
                 isLogin ? "text-background" : "text-ink/60"
               }`}
             >
@@ -148,7 +148,7 @@ export function AuthPage() {
                 setMode("signup");
                 setError(null);
               }}
-              className={`relative z-10 py-2.5 rounded-full transition-colors ${
+              className={`relative z-10 py-2.5 rounded-full transition-colors duration-200 ${
                 !isLogin ? "text-background" : "text-ink/60"
               }`}
             >
@@ -195,7 +195,7 @@ export function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full mt-2 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -231,11 +231,11 @@ export function AuthPage() {
 
           <p className="mt-10 text-xs text-ink/50 text-center leading-relaxed">
             En continuant, vous acceptez nos{" "}
-            <a href="#" className="underline underline-offset-2 hover:text-ink">
+            <a href="#" className="underline underline-offset-2 hover:text-ink transition-colors duration-200">
               Conditions
             </a>{" "}
             et notre{" "}
-            <a href="#" className="underline underline-offset-2 hover:text-ink">
+            <a href="#" className="underline underline-offset-2 hover:text-ink transition-colors duration-200">
               Politique de confidentialité
             </a>
             .
@@ -267,7 +267,7 @@ function Field({
       <input
         {...rest}
         name={name}
-        className="w-full bg-transparent border-b border-ink/20 py-3 text-[15px] text-ink placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors"
+        className="w-full bg-transparent border-b border-ink/20 py-3 text-[15px] text-ink placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
       />
     </label>
   );

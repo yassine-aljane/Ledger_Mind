@@ -120,7 +120,7 @@ function ParametresPage() {
       <div className="grid lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-7 grid sm:grid-cols-2 gap-6">
           {fields.map((f) => (
-            <div key={f.l} className="bg-white border border-border rounded-2xl p-6">
+            <div key={f.l} className="bg-white border border-border rounded-2xl p-6 card-hover">
               <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-3">
                 {f.l}
               </p>
@@ -133,7 +133,7 @@ function ParametresPage() {
 
         <div className="lg:col-span-5">
           {hasGuidance ? (
-            <div className="rounded-2xl border border-border bg-white p-8 space-y-6 animate-slide-up">
+            <div className="rounded-2xl border border-border bg-white p-8 space-y-6 animate-slide-up card-hover">
               <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
                 Synthèse guidance
               </p>
@@ -170,7 +170,7 @@ function ParametresPage() {
               </dl>
               <Link
                 to="/onboarding/diagnostic/resultat"
-                className="block w-full text-center px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
+                className="block w-full text-center px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
               >
                 Ouvrir la feuille de route →
               </Link>

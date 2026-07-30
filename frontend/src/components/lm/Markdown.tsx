@@ -153,7 +153,7 @@ export function Markdown({ text, className = "" }: { text?: string | null; class
       {blocks.map((block, i) => {
         if (block.kind === "h") {
           return (
-            <p key={i} className="font-semibold text-ink mt-1">
+            <p key={i} className="font-semibold text-ink text-[1.15em] mt-1">
               {renderInline(block.lines[0], `h${i}`)}
             </p>
           );

@@ -47,7 +47,7 @@ export function ConversationHistory({
     <aside className="bg-white border border-border rounded-2xl p-4 h-fit lg:sticky lg:top-6">
       <button
         onClick={onNew}
-        className="w-full px-4 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
+        className="w-full px-4 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98]"
       >
         + Nouvelle conversation
       </button>
@@ -67,7 +67,7 @@ export function ConversationHistory({
             return (
               <li key={conv.id}>
                 <div
-                  className={`group rounded-xl border px-3 py-2 transition-colors cursor-pointer ${
+                  className={`group rounded-xl border px-3 py-2 transition-all duration-200 cursor-pointer ${
                     active
                       ? "border-teal-dark bg-teal-light/20"
                       : "border-transparent hover:border-border hover:bg-background"
@@ -85,7 +85,7 @@ export function ConversationHistory({
                       }}
                       onBlur={() => commitRename(conv.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-full px-2 py-1 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-teal-dark"
+                      className="w-full px-2 py-1 bg-background border border-border rounded-lg text-sm input-boxed focus:outline-none focus:border-teal-dark"
                     />
                   ) : (
                     <>
@@ -100,7 +100,7 @@ export function ConversationHistory({
                             e.stopPropagation();
                             startRename(conv);
                           }}
-                          className="text-[10px] font-mono uppercase tracking-wider text-ink/40 hover:text-teal-dark"
+                          className="text-[10px] font-mono uppercase tracking-wider text-ink/40 hover:text-teal-dark transition-colors duration-200"
                         >
                           Renommer
                         </button>
@@ -109,7 +109,7 @@ export function ConversationHistory({
                             e.stopPropagation();
                             onDelete(conv.id);
                           }}
-                          className="text-[10px] font-mono uppercase tracking-wider text-ink/40 hover:text-coral"
+                          className="text-[10px] font-mono uppercase tracking-wider text-ink/40 hover:text-coral transition-colors duration-200"
                         >
                           Supprimer
                         </button>

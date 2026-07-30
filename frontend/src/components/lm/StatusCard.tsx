@@ -111,7 +111,7 @@ function EditPopover({
             <button
               key={String(label)}
               onClick={() => onSave(v as boolean)}
-              className="flex-1 px-3 py-2 border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-colors"
+              className="flex-1 px-3 py-2 border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.97]"
             >
               {label as string}
             </button>
@@ -125,11 +125,11 @@ function EditPopover({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && commit()}
-            className="flex-1 min-w-0 px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-teal-dark"
+            className="flex-1 min-w-0 px-3 py-2 bg-background border border-border rounded-lg text-sm input-boxed focus:outline-none focus:border-teal-dark"
           />
           <button
             onClick={commit}
-            className="px-3 py-2 bg-ink text-background rounded-lg text-xs font-semibold hover:bg-teal-dark transition-colors"
+            className="px-3 py-2 bg-ink text-background rounded-lg text-xs font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.95]"
           >
             OK
           </button>
@@ -211,7 +211,7 @@ export function StatusCard({
         {shown.map((spec) => (
           <div
             key={String(spec.key)}
-            className={`relative group rounded-xl border px-3 py-2 animate-slide-up ${
+            className={`relative group rounded-xl border px-3 py-2 animate-slide-up card-hover ${
               spec.warn
                 ? "border-amber-fiscal/50 bg-amber-fiscal/10"
                 : "border-border bg-background"
@@ -264,7 +264,7 @@ export function StatusCard({
           <button
             onClick={onGenerate}
             disabled={generating}
-            className="mt-5 w-full px-4 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors disabled:opacity-50"
+            className="mt-5 w-full px-4 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100"
           >
             {generating ? "Génération…" : "Générer ma feuille de route"}
           </button>

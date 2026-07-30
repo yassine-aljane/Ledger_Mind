@@ -316,7 +316,7 @@ export function Chatbot({
             </div>
             <button
               onClick={handleRetry}
-              className="self-start px-5 py-2 bg-ink text-background rounded-full text-xs font-semibold hover:bg-teal-dark transition-colors"
+              className="self-start px-5 py-2 bg-ink text-background rounded-full text-xs font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
             >
               Réessayer
             </button>
@@ -340,7 +340,7 @@ export function Chatbot({
               <button
                 type="button"
                 onClick={openRoadmap}
-                className="w-full sm:w-auto px-8 py-3.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
+                className="w-full sm:w-auto px-8 py-3.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
               >
                 {orchestratorQuickReplies[0] || "Voir ma feuille de route"} →
               </button>
@@ -352,7 +352,7 @@ export function Chatbot({
                   <button
                     key={r}
                     onClick={() => handleAnswer(r)}
-                    className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-colors"
+                    className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96]"
                   >
                     {r}
                   </button>
@@ -369,11 +369,11 @@ export function Chatbot({
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ou tapez votre réponse librement…"
-                  className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors"
+                  className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
                 />
                 <button
                   type="submit"
-                  className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-colors"
+                  className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
                 >
                   Envoyer
                 </button>

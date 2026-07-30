@@ -187,8 +187,8 @@ function StepCard({
   const [open, setOpen] = useState(false);
   return (
     <div
-      className={`rounded-xl border p-4 transition-colors ${
-        done ? "border-teal-dark/40 bg-teal-light/10" : "border-border bg-white hover:border-teal-dark/40"
+      className={`rounded-xl border p-4 transition-all duration-200 ${
+        done ? "border-teal-dark/40 bg-teal-light/10" : "border-border bg-white hover:border-teal-dark/40 hover:shadow-[0_6px_20px_-10px_rgba(22,36,31,0.15)]"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -454,7 +454,7 @@ export function RoadmapView({
             <button
               onClick={() => void exportPdf()}
               disabled={pdfBusy}
-              className="px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+              className="px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
             >
               {pdfBusy ? "Préparation du PDF…" : "Télécharger la feuille de route (PDF)"}
             </button>
@@ -462,7 +462,7 @@ export function RoadmapView({
           {onReset && done > 0 && (
             <button
               onClick={onReset}
-              className="px-5 py-2.5 bg-white border border-border rounded-xl text-sm font-semibold hover:border-teal-dark hover:text-teal-dark transition-colors"
+              className="px-5 py-2.5 bg-white border border-border rounded-xl text-sm font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.97]"
             >
               Réinitialiser les coches
             </button>

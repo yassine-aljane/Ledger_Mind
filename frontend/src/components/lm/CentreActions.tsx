@@ -35,7 +35,7 @@ function libelleBouton(e: Echeance): string {
 
 function EcheanceCard({ e, onMarquerPaye }: { e: Echeance; onMarquerPaye: (e: Echeance) => void }) {
   return (
-    <div className="bg-white border border-border rounded-2xl p-5 space-y-3">
+    <div className="bg-white border border-border rounded-2xl p-5 space-y-3 card-hover">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className={`mt-1 size-2.5 rounded-full shrink-0 ${COULEUR_STATUT[e.statut]}`} />
@@ -60,14 +60,14 @@ function EcheanceCard({ e, onMarquerPaye }: { e: Echeance; onMarquerPaye: (e: Ec
             href={e.portail_paiement}
             target="_blank"
             rel="noreferrer"
-            className="px-4 py-2 bg-ink text-background rounded-lg text-xs font-medium hover:bg-teal-dark transition-colors"
+            className="px-4 py-2 bg-ink text-background rounded-lg text-xs font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
           >
             {libelleBouton(e)} — {e.portail_label}
           </a>
           <button
             type="button"
             onClick={() => onMarquerPaye(e)}
-            className="px-4 py-2 border border-border rounded-lg text-xs font-medium hover:border-ink transition-colors"
+            className="px-4 py-2 border border-border rounded-lg text-xs font-medium hover:border-ink transition-all duration-200 active:scale-[0.97]"
           >
             Marquer comme payé
           </button>
@@ -106,7 +106,7 @@ function FormulaireParametres({
 
   return (
     <div className="bg-amber-fiscal/10 border border-amber-fiscal/30 rounded-2xl p-5 space-y-4">
-      <p className="text-sm font-semibold">
+      <p className="text-base font-semibold">
         Quelques informations pour affiner votre agenda (demandées une seule fois) :
       </p>
       {manquants.includes("periodicite_urssaf") && (
@@ -117,7 +117,7 @@ function FormulaireParametres({
           <select
             value={periodicite}
             onChange={(e) => setPeriodicite(e.target.value as typeof periodicite)}
-            className="w-full mt-1 px-3 py-2 bg-white border border-border rounded-lg text-sm"
+            className="w-full mt-1 px-3 py-2 bg-white border border-border rounded-lg text-sm input-boxed"
           >
             <option value="mensuelle">Mensuelle</option>
             <option value="trimestrielle">Trimestrielle</option>
@@ -132,7 +132,7 @@ function FormulaireParametres({
           <select
             value={regimeTva}
             onChange={(e) => setRegimeTva(e.target.value as typeof regimeTva)}
-            className="w-full mt-1 px-3 py-2 bg-white border border-border rounded-lg text-sm"
+            className="w-full mt-1 px-3 py-2 bg-white border border-border rounded-lg text-sm input-boxed"
           >
             <option value="franchise">Franchise en base (pas de TVA)</option>
             <option value="reel_simplifie">Réel simplifié</option>
@@ -150,7 +150,7 @@ function FormulaireParametres({
         type="button"
         onClick={enregistrer}
         disabled={loading}
-        className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-colors disabled:opacity-40"
+        className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
       >
         {loading ? "Enregistrement…" : "Enregistrer"}
       </button>
@@ -187,7 +187,7 @@ function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
         <p className="text-sm text-ink/60">{erreur}</p>
         <Link
           to="/onboarding/verification"
-          className="inline-flex px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-colors"
+          className="inline-flex px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
         >
           Vérifier mon SIREN
         </Link>
@@ -242,7 +242,7 @@ function VueHistorique({ onRetour }: { onRetour: () => void }) {
       ) : (
         <div className="space-y-3">
           {items.map((it) => (
-            <div key={`${it.type}-${it.id}`} className="bg-white border border-border rounded-2xl p-4">
+            <div key={`${it.type}-${it.id}`} className="bg-white border border-border rounded-2xl p-4 card-hover">
               <div className="flex items-center justify-between">
                 <p className="font-medium text-sm">{it.libelle}</p>
                 <span className="text-[10px] uppercase tracking-widest text-ink/40">{it.statut}</span>
@@ -278,7 +278,7 @@ export function CentreActionsButton() {
         type="button"
         onClick={() => setOuvert(true)}
         title="Centre d'Actions"
-        className="size-9 rounded-full border border-border flex items-center justify-center hover:border-ink transition-colors shrink-0"
+        className="size-9 rounded-full border border-border flex items-center justify-center hover:border-ink transition-all duration-200 active:scale-[0.95] shrink-0"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
           <rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" strokeWidth="1.6" />
@@ -306,7 +306,7 @@ function PanneauCentreActions({ plan, onFermer }: { plan: string; onFermer: () =
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-lg">Centre d'Actions</h2>
+        <h2 className="font-semibold text-xl">Centre d'Actions</h2>
         <button type="button" onClick={onFermer} className="text-ink/40 hover:text-ink text-xl leading-none">
           ×
         </button>
@@ -319,7 +319,7 @@ function PanneauCentreActions({ plan, onFermer }: { plan: string; onFermer: () =
           </p>
           <Link
             to="/premium"
-            className="inline-flex px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-colors"
+            className="inline-flex px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
           >
             Découvrir Premium
           </Link>
@@ -331,8 +331,8 @@ function PanneauCentreActions({ plan, onFermer }: { plan: string; onFermer: () =
               <button
                 type="button"
                 onClick={() => setVue("agenda")}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  vue === "agenda" ? "bg-ink text-background" : "bg-white border border-border text-ink/70"
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  vue === "agenda" ? "bg-ink text-background" : "bg-white border border-border text-ink/70 hover:border-ink"
                 }`}
               >
                 Agenda fiscal
@@ -340,8 +340,8 @@ function PanneauCentreActions({ plan, onFermer }: { plan: string; onFermer: () =
               <button
                 type="button"
                 onClick={() => setVue("veille")}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  vue === "veille" ? "bg-ink text-background" : "bg-white border border-border text-ink/70"
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  vue === "veille" ? "bg-ink text-background" : "bg-white border border-border text-ink/70 hover:border-ink"
                 }`}
               >
                 Veille réglementaire

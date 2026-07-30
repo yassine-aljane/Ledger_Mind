@@ -99,7 +99,7 @@ function ReferralPage() {
                 value={ville}
                 onChange={(e) => setVille(e.target.value)}
                 placeholder="ex. Lyon, Marseille, Bordeaux…"
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border text-lg focus:outline-none focus:border-ink transition-colors"
+                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border text-lg focus:outline-none focus:border-ink transition-colors duration-200"
               />
             </div>
             <div>
@@ -110,13 +110,13 @@ function ReferralPage() {
                 rows={3}
                 value={demande}
                 onChange={(e) => setDemande(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border text-base focus:outline-none focus:border-ink transition-colors resize-none"
+                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border text-base focus:outline-none focus:border-ink transition-colors duration-200 resize-none"
               />
             </div>
             <button
               type="submit"
               disabled={loading || !ville.trim()}
-              className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               {loading ? "Recherche en cours…" : "Trouver & générer"}
             </button>
@@ -140,7 +140,7 @@ function ReferralPage() {
           {!loading && emails.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">
+                <h2 className="text-xl font-semibold">
                   {cabinetsCount} cabinet{cabinetsCount > 1 ? "s" : ""} trouvé
                   {cabinetsCount > 1 ? "s" : ""}
                 </h2>
@@ -153,7 +153,7 @@ function ReferralPage() {
               {emails.map((em, i) => (
                 <div
                   key={i}
-                  className="bg-white border border-border rounded-2xl overflow-hidden"
+                  className="bg-white border border-border rounded-2xl overflow-hidden card-hover"
                 >
                   <button
                     type="button"
@@ -212,7 +212,7 @@ function ReferralPage() {
                         <button
                           type="button"
                           onClick={() => copyToClipboard(em.corps, i)}
-                          className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-colors"
+                          className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
                         >
                           {copiedIdx === i ? "Copié !" : "Copier le texte"}
                         </button>
@@ -249,7 +249,7 @@ function ReferralPage() {
                 .map((h, i) => (
                   <div
                     key={i}
-                    className="bg-white border border-border rounded-2xl p-5 space-y-2"
+                    className="bg-white border border-border rounded-2xl p-5 space-y-2 card-hover"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-sm">{h.ville}</span>

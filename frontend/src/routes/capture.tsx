@@ -147,7 +147,7 @@ function CapturePage() {
 
       <div className="grid lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-7 space-y-6">
-          <label className="block bg-white border border-dashed border-border hover:border-teal-dark transition-colors rounded-2xl p-16 text-center cursor-pointer">
+          <label className="block bg-white border border-dashed border-border hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200 rounded-2xl p-16 text-center cursor-pointer">
             <input
               ref={fileRef}
               type="file"
@@ -185,7 +185,7 @@ function CapturePage() {
           {result && (
             <section className="bg-white border border-border rounded-2xl p-8 space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Résultat d'analyse</h2>
+                <h2 className="text-xl font-semibold">Résultat d'analyse</h2>
                 <span
                   className={`text-[10px] font-mono uppercase tracking-widest ${
                     result.status === "completed"
@@ -228,7 +228,7 @@ function CapturePage() {
                           key={s}
                           type="button"
                           onClick={() => setHitlAnswer(s)}
-                          className="px-3 py-1.5 text-xs border border-border rounded-lg hover:border-ink transition-colors"
+                          className="px-3 py-1.5 text-xs border border-border rounded-lg hover:border-ink transition-all duration-200 active:scale-[0.97]"
                         >
                           {s}
                         </button>
@@ -240,12 +240,12 @@ function CapturePage() {
                     value={hitlAnswer}
                     onChange={(e) => setHitlAnswer(e.target.value)}
                     placeholder="Votre réponse…"
-                    className="w-full px-4 py-3 border border-border rounded-xl text-sm focus:outline-none focus:border-ink"
+                    className="w-full px-4 py-3 border border-border rounded-xl text-sm input-boxed focus:outline-none focus:border-ink"
                   />
                   <button
                     type="submit"
                     disabled={!hitlAnswer.trim() || loading}
-                    className="px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+                    className="px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
                   >
                     Envoyer
                   </button>
@@ -310,19 +310,19 @@ function CapturePage() {
 
           {(selectedId || result?.document_id) && (
             <section className="bg-white border border-border rounded-2xl p-8 space-y-4">
-              <h3 className="text-lg font-semibold">Question sur ce document</h3>
+              <h3 className="text-xl font-semibold">Question sur ce document</h3>
               <form onSubmit={handleQa} className="space-y-3">
                 <input
                   type="text"
                   value={qaQuestion}
                   onChange={(e) => setQaQuestion(e.target.value)}
                   placeholder="Ex. Cette facture est-elle déductible ?"
-                  className="w-full px-4 py-3 border border-border rounded-xl text-sm focus:outline-none focus:border-ink"
+                  className="w-full px-4 py-3 border border-border rounded-xl text-sm input-boxed focus:outline-none focus:border-ink"
                 />
                 <button
                   type="submit"
                   disabled={qaLoading || !qaQuestion.trim()}
-                  className="px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+                  className="px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
                 >
                   {qaLoading ? "…" : "Poser la question"}
                 </button>
@@ -354,7 +354,7 @@ function CapturePage() {
                     setSelectedId(inv.document_id);
                     setQaAnswer(null);
                   }}
-                  className={`w-full text-left bg-white border rounded-2xl p-5 space-y-1 transition-colors ${
+                  className={`w-full text-left bg-white border rounded-2xl p-5 space-y-1 card-hover transition-all duration-200 ${
                     selectedId === inv.document_id
                       ? "border-teal-dark"
                       : "border-border hover:border-ink/30"

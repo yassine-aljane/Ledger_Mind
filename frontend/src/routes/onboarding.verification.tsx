@@ -168,7 +168,7 @@ function VerificationPage() {
   return (
     <div className="min-h-screen px-6 py-16 max-w-3xl mx-auto animate-slide-up">
       <div className="flex items-center justify-between gap-4">
-        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink">
+        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink transition-colors duration-200">
           ← Retour
         </Link>
         <LogoutBubble />
@@ -191,7 +191,7 @@ function VerificationPage() {
           <div className="flex gap-1 p-1 bg-white border border-border rounded-full w-fit mb-8">
             <button
               onClick={() => setTab("manual")}
-              className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors ${
+              className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
                 tab === "manual" ? "bg-ink text-background" : "text-ink/60 hover:text-ink"
               }`}
             >
@@ -199,7 +199,7 @@ function VerificationPage() {
             </button>
             <button
               onClick={() => setTab("upload")}
-              className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors ${
+              className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
                 tab === "upload" ? "bg-ink text-background" : "text-ink/60 hover:text-ink"
               }`}
             >
@@ -230,7 +230,7 @@ function VerificationPage() {
                   placeholder="832 174 902 00019"
                   maxLength={19}
                   inputMode="numeric"
-                  className="w-full mt-3 px-0 py-3 bg-transparent border-b-2 border-border font-mono text-2xl focus:outline-none focus:border-teal-dark"
+                  className="w-full mt-3 px-0 py-3 bg-transparent border-b-2 border-border font-mono text-2xl focus:outline-none focus:border-teal-dark transition-colors duration-200"
                 />
                 {showError && (
                   <p className="text-xs text-coral mt-2">SIREN (9) ou SIRET (14 chiffres) requis.</p>
@@ -239,7 +239,7 @@ function VerificationPage() {
               <button
                 type="submit"
                 disabled={loading || !isValid}
-                className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+                className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
               >
                 {loading ? "Vérification…" : "Étape 1 — Vérifier mon numéro"}
               </button>
@@ -247,7 +247,7 @@ function VerificationPage() {
           )}
 
           {tab === "upload" && (
-            <label className="block bg-white border-2 border-dashed border-border hover:border-teal-dark rounded-2xl p-16 text-center cursor-pointer">
+            <label className="block bg-white border-2 border-dashed border-border hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200 rounded-2xl p-16 text-center cursor-pointer">
               <input
                 type="file"
                 accept="image/*,application/pdf"
@@ -327,7 +327,7 @@ function VerificationPage() {
                     Déposez votre Kbis (greffe / RCS) ou votre extrait RNE (INPI). Nous vérifions
                     automatiquement le type de document et le SIREN.
                   </p>
-                  <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark">
+                  <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200">
                     <input
                       type="file"
                       accept="application/pdf,image/*"
@@ -381,7 +381,7 @@ function VerificationPage() {
                     </a>{" "}
                     puis déposez-le ici.
                   </p>
-                  <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark">
+                  <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200">
                     <input
                       type="file"
                       accept="application/pdf,image/*"
@@ -407,7 +407,7 @@ function VerificationPage() {
             <button
               onClick={() => advanceVerification()}
               disabled={loading || !showContinueToProfil}
-              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
             >
               {loading ? "Chargement…" : "Continuer vers mon profil →"}
             </button>
@@ -416,7 +416,7 @@ function VerificationPage() {
           {profile.verification_status !== "verified" && (
             <button
               onClick={() => setOrchestratorResult(null)}
-              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold"
+              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98]"
             >
               Réessayer
             </button>

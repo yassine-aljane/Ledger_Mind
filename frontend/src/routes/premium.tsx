@@ -80,10 +80,10 @@ function PremiumPage() {
         {TIERS.map((t) => (
           <div
             key={t.id}
-            className={`relative rounded-3xl border p-8 md:p-10 overflow-hidden ${
+            className={`relative rounded-3xl border p-8 md:p-10 overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
               t.highlight
-                ? "border-ink bg-ink text-background shadow-[0_40px_80px_-40px_rgba(22,36,31,0.5)]"
-                : "border-border bg-white"
+                ? "border-ink bg-ink text-background shadow-[0_40px_80px_-40px_rgba(22,36,31,0.5)] hover:shadow-[0_48px_90px_-36px_rgba(22,36,31,0.6)]"
+                : "border-border bg-white card-hover"
             }`}
           >
             {t.highlight && (
@@ -154,7 +154,7 @@ function PremiumPage() {
                   type="button"
                   onClick={activate}
                   disabled={loading || plan === "premium"}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 bg-background text-ink rounded-full text-sm font-semibold hover:bg-amber-fiscal hover:text-ink transition-colors disabled:opacity-60"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 bg-background text-ink rounded-full text-sm font-semibold hover:bg-amber-fiscal hover:text-ink transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
                 >
                   {plan === "premium"
                     ? "Premium actif ✓"
@@ -187,7 +187,7 @@ function PremiumPage() {
           <button
             type="button"
             onClick={() => setPlan("free")}
-            className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-coral"
+            className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-coral transition-colors duration-200"
           >
             (démo) revenir au plan gratuit
           </button>

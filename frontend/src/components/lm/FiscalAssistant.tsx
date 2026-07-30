@@ -166,7 +166,7 @@ export function FiscalAssistant() {
                 <button
                   key={q}
                   onClick={() => void ask(q)}
-                  className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-colors text-left"
+                  className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96] text-left"
                 >
                   {q}
                 </button>
@@ -232,12 +232,12 @@ export function FiscalAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Posez votre question fiscale…"
-              className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors"
+              className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
             />
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-colors disabled:opacity-40"
+              className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
             >
               Demander
             </button>

@@ -48,7 +48,7 @@ export function Sources({
                   key={`${s.url}-${i}`}
                   onClick={() => setOpen(actif ? null : i)}
                   title="Voir l'extrait utilisé"
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] transition-colors ${
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] transition-colors duration-200 ${
                     autorite
                       ? "bg-teal-light/10 border-teal-dark/30 text-teal-dark"
                       : "bg-background border-border text-ink/60"

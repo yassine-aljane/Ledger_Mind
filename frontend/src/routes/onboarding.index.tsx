@@ -76,7 +76,7 @@ function Gate() {
           <div className="mt-12 grid sm:grid-cols-2 gap-4">
             <Link
               to="/onboarding/verification"
-              className="group p-8 bg-white border border-border rounded-2xl text-left hover:border-teal-dark hover:shadow-lg transition-all"
+              className="group p-8 bg-white border border-border rounded-2xl text-left hover:border-teal-dark hover:shadow-lg transition-all duration-200 active:scale-[0.99]"
             >
               <div className="size-10 rounded-full bg-teal-dark/10 text-teal-dark font-mono text-sm font-semibold grid place-items-center group-hover:bg-teal-dark group-hover:text-background transition-colors">
                 A
@@ -92,7 +92,7 @@ function Gate() {
 
             <Link
               to="/onboarding/diagnostic"
-              className="group p-8 bg-white border border-border rounded-2xl text-left hover:border-teal-dark hover:shadow-lg transition-all"
+              className="group p-8 bg-white border border-border rounded-2xl text-left hover:border-teal-dark hover:shadow-lg transition-all duration-200 active:scale-[0.99]"
             >
               <div className="size-10 rounded-full bg-amber-fiscal/20 text-amber-900 font-mono text-sm font-semibold grid place-items-center group-hover:bg-amber-fiscal group-hover:text-amber-950 transition-colors">
                 B

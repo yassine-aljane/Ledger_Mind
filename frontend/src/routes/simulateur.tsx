@@ -36,9 +36,9 @@ function SimulateurPage() {
         <textarea
           rows={4}
           defaultValue="Si je signe ce contrat de 5000 € avec un client français, combien je garde ?"
-          className="w-full mt-3 px-0 py-3 bg-transparent border-b border-border text-lg focus:outline-none focus:border-ink transition-colors resize-none"
+          className="w-full mt-3 px-0 py-3 bg-transparent border-b border-border text-lg focus:outline-none focus:border-ink transition-colors duration-200 resize-none"
         />
-        <button className="mt-6 px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors">
+        <button className="mt-6 px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]">
           Simuler
         </button>
       </div>
@@ -59,7 +59,7 @@ function SimulateurPage() {
               { s: "+ Contrat 5 000 €", n: "4 025,00", p: "660,00", i: "+ 4 025 €" },
               { s: "+ Contrat 15 000 €", n: "12 075,00", p: "1 980,00", i: "+ 12 075 €" },
             ].map((r) => (
-              <tr key={r.s} className="hover:bg-background/50">
+              <tr key={r.s} className="hover:bg-background/50 transition-colors duration-150">
                 <td className="px-6 py-4 font-sans font-medium">{r.s}</td>
                 <td className="px-6 py-4 text-right">{r.n} €</td>
                 <td className="px-6 py-4 text-right text-amber-fiscal">{r.p} €</td>

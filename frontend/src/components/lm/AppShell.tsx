@@ -36,7 +36,7 @@ export function LogoutBubble() {
     <button
       type="button"
       onClick={handleSignOut}
-      className="px-4 py-1.5 rounded-full border border-border text-[13px] font-medium text-ink/70 hover:border-ink hover:text-ink transition-colors"
+      className="px-4 py-1.5 rounded-full border border-border text-[13px] font-medium text-ink/70 hover:border-ink hover:text-ink transition-all duration-200 active:scale-[0.97]"
     >
       Déconnexion
     </button>
@@ -90,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {plan === "free" ? (
               <Link
                 to="/premium"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-fiscal/10 border border-amber-fiscal/30 text-amber-fiscal text-[12px] font-semibold hover:bg-amber-fiscal hover:text-ink transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-fiscal/10 border border-amber-fiscal/30 text-amber-fiscal text-[12px] font-semibold hover:bg-amber-fiscal hover:text-ink transition-all duration-200 active:scale-[0.97]"
               >
                 <span className="size-1.5 rounded-full bg-amber-fiscal animate-pulse" />
                 Passer Premium
@@ -104,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <LogoutBubble />
             <Link
               to="/parametres"
-              className="px-4 py-1.5 bg-ink text-background rounded-full text-[13px] font-medium hover:bg-teal-dark transition-colors max-w-[10rem] truncate"
+              className="px-4 py-1.5 bg-ink text-background rounded-full text-[13px] font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] max-w-[10rem] truncate"
               title={user ? displayShortName(user) : "Compte"}
             >
               {isAuthed() ? displayShortName(user) : "Compte"}
@@ -133,9 +133,9 @@ export function PageHeader({
           {eyebrow}
         </p>
       )}
-      <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-balance">{title}</h1>
+      <h1 className="text-5xl md:text-6xl font-extrabold tracking-tighter text-balance">{title}</h1>
       {description && (
-        <p className="mt-4 text-lg text-ink/60 max-w-2xl text-pretty">{description}</p>
+        <p className="mt-4 text-lg md:text-xl text-ink/60 max-w-2xl text-pretty leading-relaxed">{description}</p>
       )}
     </header>
   );

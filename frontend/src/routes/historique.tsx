@@ -52,9 +52,9 @@ function HistoriquePage() {
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((row) => (
-              <tr key={row.r} className="hover:bg-background/60 transition-colors cursor-pointer">
+              <tr key={row.r} className="hover:bg-background/60 transition-colors duration-150 cursor-pointer">
                 <td className="px-6 py-4 font-mono text-xs">{row.r}</td>
-                <td className="px-6 py-4 font-medium">{row.c}</td>
+                <td className="px-6 py-4 font-medium text-[15px]">{row.c}</td>
                 <td className="px-6 py-4 text-ink/60">{row.d}</td>
                 <td className="px-6 py-4 text-right font-mono">{row.m} €</td>
                 <td className="px-6 py-4 text-right font-mono font-medium">{row.n} €</td>

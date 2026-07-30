@@ -277,7 +277,7 @@ function DashboardPage() {
           <div className="flex flex-wrap justify-center gap-3">
             <Link
               to="/onboarding"
-              className="inline-block px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
+              className="inline-block px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
             >
               Commencer l&apos;onboarding →
             </Link>
@@ -301,7 +301,7 @@ function DashboardPage() {
           </div>
           <Link
             to="/onboarding/verification"
-            className="shrink-0 px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors text-center"
+            className="shrink-0 px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] text-center"
           >
             Vérifier mon SIREN →
           </Link>
@@ -338,7 +338,7 @@ function DashboardPage() {
 
           {profile && isSirenVerified && profile.compliance_alerts.length > 0 && (
             <section className="bg-white border border-border rounded-2xl p-8">
-              <h2 className="text-lg font-semibold mb-4">Alertes de conformité</h2>
+              <h2 className="text-xl font-semibold mb-4">Alertes de conformité</h2>
               <ul className="space-y-3">
                 {profile.compliance_alerts.map((a, i) => (
                   <li key={i} className="text-sm text-ink/70 flex gap-2">
@@ -362,7 +362,7 @@ function DashboardPage() {
 
           <section className="bg-white border border-border rounded-2xl p-8">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">Pipeline de traitement</h2>
+              <h2 className="text-xl font-semibold">Pipeline de traitement</h2>
               <span className="text-[10px] font-mono uppercase tracking-widest text-teal-dark">
                 {branch === "guidance"
                   ? "Branche B · Guidance"
@@ -388,7 +388,7 @@ function DashboardPage() {
           {profile && profile.recommended_actions.length > 0 && (
             <section className="bg-white border border-border rounded-2xl overflow-hidden">
               <div className="p-6 flex items-center justify-between border-b border-border">
-                <h2 className="text-lg font-semibold">Prochaines actions</h2>
+                <h2 className="text-xl font-semibold">Prochaines actions</h2>
                 {isGuidance && (
                   <Link
                     to="/parametres"
@@ -400,7 +400,7 @@ function DashboardPage() {
               </div>
               <ul className="divide-y divide-border">
                 {profile.recommended_actions.slice(0, 6).map((item) => (
-                  <li key={item.step} className="p-6 flex items-center justify-between gap-4">
+                  <li key={item.step} className="p-6 flex items-center justify-between gap-4 card-hover hover:bg-background/40">
                     <div className="flex items-center gap-5 min-w-0">
                       <span className="font-mono text-xs text-ink/40 shrink-0">
                         {item.step.toString().padStart(2, "0")}
@@ -439,7 +439,7 @@ function DashboardPage() {
               </p>
               <Link
                 to="/onboarding/verification"
-                className="inline-block px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-colors"
+                className="inline-block px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
               >
                 Vérifier mon SIREN →
               </Link>
@@ -466,13 +466,18 @@ function Stat({
   locked?: boolean;
 }) {
   return (
-    <div className={`bg-white border border-border rounded-2xl p-6 ${locked ? "opacity-60" : ""}`}>
+    <div className={`bg-white border border-border rounded-2xl p-6 card-hover ${locked ? "opacity-60" : ""}`}>
       <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-3 flex items-center gap-1.5">
         {label}
         {locked && (
-          <span className="text-ink/30" title="Déverrouillé après vérification SIREN">
-            🔒
-          </span>
+          <svg
+            width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden
+            className="text-ink/30"
+          >
+            <title>Déverrouillé après vérification SIREN</title>
+            <rect x="2" y="5.5" width="8" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M4 5.5V4a2 2 0 1 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" />
+          </svg>
         )}
       </p>
       <p

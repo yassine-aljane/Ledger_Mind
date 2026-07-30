@@ -11,7 +11,7 @@ export function FiscalReceipt({
   return (
     <div className="relative group [perspective:1200px]">
       <div className="absolute inset-0 translate-y-8 scale-90 bg-black/15 blur-3xl opacity-40" aria-hidden />
-      <div className="relative w-80 mx-auto bg-white shadow-[0_20px_60px_-15px_rgba(22,36,31,0.25)] ring-1 ring-black/5 transition-transform duration-500 hover:-translate-y-1">
+      <div className="relative w-80 mx-auto bg-white shadow-[0_20px_60px_-15px_rgba(22,36,31,0.25)] ring-1 ring-black/5 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_28px_70px_-14px_rgba(22,36,31,0.32)]">
         <div className="perforated-top h-4 w-full" aria-hidden />
 
         <div className="px-8 pt-2 pb-8 font-mono text-[11px] text-ink">

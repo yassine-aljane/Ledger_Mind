@@ -94,6 +94,13 @@
     background-color: color-mix(in oklab, var(--color-teal-light) 25%, transparent);
     color: var(--color-ink);
   }
+  :focus-visible {
+    outline: 2px solid var(--color-teal-dark);
+    outline-offset: 2px;
+  }
+  input[type="checkbox"] {
+    accent-color: var(--color-teal-dark);
+  }
 }
 
 /* ============ LedgerMind signature utilities ============ */
@@ -164,6 +171,31 @@
 
 @utility animate-fade-in {
   animation: lm-fade-in 0.6s var(--ease-out-expo) both;
+}
+
+/* Carte "consultable" (ligne d'historique, facture/rapport listé, résultat de recherche...) :
+   élévation douce au survol pour signaler l'interactivité sans casser le style plat des cartes. */
+@utility card-hover {
+  transition:
+    border-color 0.2s var(--ease-out-expo),
+    box-shadow 0.2s var(--ease-out-expo);
+}
+.card-hover:hover {
+  border-color: color-mix(in oklab, var(--color-ink) 30%, var(--color-border));
+  box-shadow: 0 6px 24px -8px color-mix(in oklab, var(--color-ink) 12%, transparent);
+}
+
+/* Input "boxed" (fond plein, coins arrondis) : focus visible cohérent avec le style "underline"
+   qui, lui, définit déjà focus:border-ink ailleurs dans l'app. */
+@utility input-boxed {
+  transition:
+    border-color 0.15s var(--ease-out-expo),
+    box-shadow 0.15s var(--ease-out-expo);
+}
+.input-boxed:focus {
+  outline: none;
+  border-color: var(--color-ink);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-teal-light) 20%, transparent);
 }
 
 /* Panneau de conversation à hauteur fixe (Guidance, Assistant fiscal) : les anciens messages

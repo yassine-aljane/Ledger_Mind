@@ -59,7 +59,7 @@ function DiagnosticChat() {
   return (
     <div className="min-h-screen px-6 py-16 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-4">
-        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink">
+        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink transition-colors duration-200">
           ← Retour
         </Link>
         <LogoutBubble />
@@ -85,7 +85,7 @@ function DiagnosticChat() {
               { n: "3 min", l: "de discussion" },
               { n: "1", l: "feuille de route" },
             ].map((s) => (
-              <div key={s.l} className="bg-white border border-border rounded-2xl p-6">
+              <div key={s.l} className="bg-white border border-border rounded-2xl p-6 card-hover">
                 <p className="font-mono text-2xl font-medium text-teal-dark">{s.n}</p>
                 <p className="text-sm text-ink/60 mt-1">{s.l}</p>
               </div>
@@ -94,7 +94,7 @@ function DiagnosticChat() {
 
           <button
             onClick={() => setStarted(true)}
-            className="mt-12 px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-colors"
+            className="mt-12 px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
           >
             Commencer le diagnostic
           </button>
@@ -112,7 +112,7 @@ function DiagnosticChat() {
                 <button
                   key={e.id}
                   onClick={() => setEspace(e.id)}
-                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-colors ${
+                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
                     actif
                       ? "bg-ink text-background"
                       : "bg-white border border-border text-ink/60 hover:border-teal-dark hover:text-teal-dark"
