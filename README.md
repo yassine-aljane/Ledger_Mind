@@ -93,7 +93,8 @@ ledgermind-assistant/
 │   │   │   ├── facture/      ← generator, mentions (sourced), store, pdf
 │   │   │   ├── rapport/      ← consolidation, signaux, appreciation (LLM+guardrails), pdf
 │   │   │   ├── declaration/  ← pre-fill from report/regime, provenance per line, pdf
-│   │   │   └── expert_comptable/  ← official/open sources only, no scraping
+│   │   │   ├── expert_comptable/  ← official/open sources only, no scraping
+│   │   │   └── echeancier/   ← Rule Engine + Decision Engine + Scheduler (see §7)
 │   │   ├── rag/              ← corpus: embeddings, Mongo vector store, retriever
 │   │   ├── mcp/              ← MCP client (official sources)
 │   │   ├── veille/           ← regulatory watch + threshold checks
@@ -106,13 +107,14 @@ ledgermind-assistant/
 │   └── tests/
 ├── data/                     ← product data, reviewed by hand — not backend code
 │   ├── seuils.yaml           ← thresholds & rates, each sourced and dated
-│   └── sources.yaml          ← corpus seed list, with authority rank
+│   ├── sources.yaml          ← corpus seed list, with authority rank
+│   └── regimes/              ← Rule Engine data (one YAML per tax regime, see §7)
 ├── frontend/
 │   ├── package.json
 │   └── src/
 │       ├── routes/           ← file-based TanStack Router routes
 │       ├── components/       ← AuthPage, Chatbot, AppShell, GuidanceChat, StatusCard, …
-│       └── lib/              ← api.ts, guidance-api.ts, facturation-api.ts, auth.ts
+│       └── lib/              ← api.ts, guidance-api.ts, facturation-api.ts, echeancier-api.ts, auth.ts
 ├── docs/
 │   └── AGENT2-INSIGHTS.md    ← design doc for the post-registration insights agent
 ├── CONTRIBUTING.md           ← branching, conflicts, shared files
@@ -463,6 +465,34 @@ expert-accountant) to review and sign.
 | `PATCH` | `/api/declaration/{id}/revue` | Mark as reviewed line-by-line by the user (`brouillon` → `revue`) |
 | `GET` | `/api/declaration/{id}/pdf` | Declaration PDF (draft banner + disclaimer) |
 | `GET` | `/api/expert-comptable?ville=...` | Nearby accountants from official/open sources only (no scraping, no invented firm) — always includes the official Ordre directory link |
+
+### Centre d'Actions — moteur d'échéances (agenda fiscal)
+
+Premium + SIREN-verified. UI: a global slide-over panel (`CentreActions.tsx`, triggered from
+`AppShell` on every product-shell page — not wired into the two conversational interfaces or
+their navigation). Three-layer, regime-agnostic architecture, see `backend/app/agents/echeancier/`:
+
+- **Rule Engine** (`data/regimes/*.yaml`) — declarative, sourced obligation rules per regime.
+  Adding a regime means adding a YAML file, never touching engine code. Only `micro.yaml` (micro-BNC/
+  micro-BIC/mixte) is populated today; réel/société remain an empty, ready-to-fill registry.
+- **Decision Engine** (`moteur.py`) — pure function: profile → applicable obligations. An
+  obligation whose `applicable_si` doesn't match the profile never appears (no invented TVA/DES
+  for a franchise/domestic-only profile).
+- **Scheduler** (`dates.py`) — resolves each obligation's next occurrence. Stable calendar rules
+  (URSSAF, CFE) are computed in code; rules that are themselves a window, a "jour ouvré", or
+  depend on an unknown département (IR annuelle campaign) stay a `fenetre_indicative` + official
+  link — **never a fabricated exact date**.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/echeancier/agenda` | Applicable obligations + due dates/status + which calendar params are still missing |
+| `PATCH` | `/api/echeancier/parametres` | Save calendar params (périodicité URSSAF, régime TVA, clients UE…), asked once inline in the agenda — never inserted into the onboarding question sequence |
+| `POST` | `/api/echeancier/{obligation_id}/marquer-paye` | Declarative "I've paid" confirmation — the **only** path to the green/`regularisee` status; LedgerMind never infers a payment happened |
+| `GET` | `/api/echeancier/historique` | Combined invoices + prepared declarations, most recent first |
+
+The "Payer"/"Déclarer" button always opens the real official portal (autoentrepreneur.urssaf.fr,
+impots.gouv.fr, PayFiP.gouv.fr, portailpro.gouv.fr, douane.gouv.fr) in a new tab — no payment
+integration, no banking data ever passes through LedgerMind.
 
 ---
 

@@ -99,6 +99,15 @@ class UserProfile(BaseModel):
     compliance_alerts: list[ComplianceAlert] = []
     recommended_actions: list[RecommendedAction] = []
 
+    # Paramètres de calendrier fiscal — demandés une seule fois, à la volée, depuis l'agenda
+    # (`/api/echeancier`) plutôt que dans la séquence d'onboarding : ils ne concernent que le
+    # moteur d'échéances, pas la classification fiscale de base.
+    periodicite_urssaf: Literal["mensuelle", "trimestrielle"] | None = None
+    regime_tva: Literal["franchise", "reel_simplifie", "reel_normal"] | None = None
+    numero_tva_intracommunautaire: str | None = None
+    revenus_intracommunautaires: bool | None = None
+    versement_liberatoire: bool | None = None
+
 
 class OrchestratorState(BaseModel):
     session_id: str

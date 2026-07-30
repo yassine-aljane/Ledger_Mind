@@ -1,0 +1,96 @@
+# Registre des obligations fiscales — régime micro (micro-BNC / micro-BIC / mixte).
+#
+# Chaque obligation est sourcée officiellement (voir `source`). Aucune date n'est inventée :
+# quand la source officielle donne une FENÊTRE (ex. « entre le 15 et le 24 ») plutôt qu'un jour
+# unique, ou quand elle dépend d'un jour ouvré / d'un département non connu du profil, on garde
+# `fenetre_indicative` plutôt qu'un `date_limite` fabriqué.
+#
+# Ajouter un régime = ajouter un fichier YAML ici (voir REGIMES_DIR) — le moteur
+# (backend/app/agents/echeancier/moteur.py) ne connaît aucun régime en dur.
+
+regime: micro
+
+obligations:
+  - id: urssaf_cotisations
+    libelle: "Déclaration et paiement des cotisations URSSAF"
+    applicable_si: {}
+    type_date: urssaf
+    portail_paiement: "https://www.autoentrepreneur.urssaf.fr"
+    portail_label: "Espace auto-entrepreneur URSSAF"
+    source: "https://entreprendre.service-public.gouv.fr/vosdroits/F23264"
+    date_verif: "2026-07-30"
+    regle: >
+      Déclaration mensuelle (par défaut) ou trimestrielle (sur option) du chiffre d'affaires.
+      Mensuelle : déclarer avant la fin du mois suivant. Trimestrielle : déclarer avant le 31/01,
+      30/04, 31/07, 31/10 (pour le trimestre précédent). Première déclaration due dans les 90
+      jours suivant la création de l'entreprise.
+
+  - id: tva_acompte_juillet
+    libelle: "Acompte de TVA de juillet (régime réel simplifié, CA12)"
+    applicable_si: {regime_tva: reel_simplifie}
+    type_date: tva_acompte_juillet
+    portail_paiement: "https://www.impots.gouv.fr/professionnel"
+    portail_label: "Espace professionnel impots.gouv.fr"
+    source: "https://www.impots.gouv.fr/professionnel/les-regimes-dimposition-la-tva"
+    date_verif: "2026-07-30"
+    regle: "Acompte de 55 % de la TVA de référence, à verser entre le 15 et le 24 juillet."
+
+  - id: tva_acompte_decembre
+    libelle: "Acompte de TVA de décembre (régime réel simplifié, CA12)"
+    applicable_si: {regime_tva: reel_simplifie}
+    type_date: tva_acompte_decembre
+    portail_paiement: "https://www.impots.gouv.fr/professionnel"
+    portail_label: "Espace professionnel impots.gouv.fr"
+    source: "https://www.impots.gouv.fr/professionnel/les-regimes-dimposition-la-tva"
+    date_verif: "2026-07-30"
+    regle: "Acompte de 40 % de la TVA de référence, à verser entre le 15 et le 24 décembre."
+
+  - id: tva_ca12_annuelle
+    libelle: "Régularisation annuelle de TVA (CA12)"
+    applicable_si: {regime_tva: reel_simplifie}
+    type_date: tva_ca12_annuelle
+    portail_paiement: "https://www.impots.gouv.fr/professionnel"
+    portail_label: "Espace professionnel impots.gouv.fr"
+    source: "https://www.impots.gouv.fr/professionnel/questions/je-suis-soumis-au-regime-simplifie-dimposition-la-tva-quelle-echeance-dois"
+    date_verif: "2026-07-30"
+    regle: "Télétransmission au plus tard le 2ᵉ jour ouvré suivant le 1er mai de l'année suivante (exercice = année civile)."
+
+  - id: tva_reel_normal
+    libelle: "Déclaration de TVA (régime réel normal, CA3)"
+    applicable_si: {regime_tva: reel_normal}
+    type_date: tva_reel_normal
+    portail_paiement: "https://www.impots.gouv.fr/professionnel"
+    portail_label: "Espace professionnel impots.gouv.fr"
+    source: "https://www.impots.gouv.fr/professionnel/calendrier-fiscal"
+    date_verif: "2026-07-30"
+    regle: "Déclaration mensuelle, échéance exacte variable selon le SIREN — voir le calendrier fiscal personnel."
+
+  - id: ir_annuelle_2042
+    libelle: "Déclaration annuelle de revenus (2042-C-PRO)"
+    applicable_si: {}
+    type_date: ir_annuelle
+    portail_paiement: "https://www.portailpro.gouv.fr"
+    portail_label: "portailpro.gouv.fr"
+    source: "https://www.impots.gouv.fr/les-modalites-de-la-declaration-de-revenus-en-2026"
+    date_verif: "2026-07-30"
+    regle: "Campagne de mai à juin, date exacte variable selon le département — voir le calendrier fiscal."
+
+  - id: cfe
+    libelle: "Cotisation Foncière des Entreprises (CFE)"
+    applicable_si: {}
+    type_date: cfe
+    portail_paiement: "https://www.payfip.gouv.fr"
+    portail_label: "PayFiP.gouv.fr"
+    source: "https://www.impots.gouv.fr/actualite/cfe-etou-ifer-2025-date-limite-de-paiement-des-avis-dimpot-le-15-decembre-2025-inclus"
+    date_verif: "2026-07-30"
+    regle: "Paiement au plus tard le 15 décembre (jour ouvré suivant si weekend). Exonération totale l'année de création."
+
+  - id: des
+    libelle: "Déclaration Européenne de Services (DES)"
+    applicable_si: {revenus_intracommunautaires: {vrai: true}}
+    type_date: des
+    portail_paiement: "https://pro.douane.gouv.fr"
+    portail_label: "douane.gouv.fr — espace DES"
+    source: "https://www.douane.gouv.fr/fiche/la-declaration-europeenne-de-services-des"
+    date_verif: "2026-07-30"
+    regle: "Mensuelle, à déposer au plus tard le 10ᵉ jour ouvrable du mois suivant, même en franchise de TVA."

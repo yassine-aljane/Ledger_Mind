@@ -9,6 +9,7 @@ import {
   type AuthUser,
 } from "@/lib/auth";
 import { usePlan } from "@/lib/plan";
+import { CentreActionsButton } from "@/components/lm/CentreActions";
 
 // Dashboard et Éducation restent accessibles sans premium (guidance/pédagogue + le dashboard,
 // dont le contenu s'adapte lui-même selon la vérification SIREN — voir dashboard.tsx). Tout le
@@ -99,6 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 Premium
               </span>
             )}
+            {isAuthed() && <CentreActionsButton />}
             <LogoutBubble />
             <Link
               to="/parametres"

@@ -17,3 +17,4 @@ DATA_DIR = REPO_ROOT / "data"
 
 SEUILS_YAML = DATA_DIR / "seuils.yaml"
 SOURCES_YAML = DATA_DIR / "sources.yaml"
+REGIMES_DIR = DATA_DIR / "regimes"
