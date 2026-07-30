@@ -1,7 +1,7 @@
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { PremiumLock } from "@/components/lm/PremiumLock";
 
-type Kind = "dashboard" | "referral" | "capture" | "simulateur" | "historique" | "parametres";
+type Kind = "dashboard" | "referral" | "capture" | "simulateur" | "historique" | "parametres" | "activite";
 
 const COPY: Record<
   Kind,
@@ -104,6 +104,24 @@ const COPY: Record<
       { icon: "🧮", label: "Analytics", hint: "CA glissant, ratios, alertes de plafond." },
     ],
     preview: <MockTable />,
+  },
+  activite: {
+    eyebrow: "Activité",
+    title: (
+      <>
+        De la facture <span className="italic font-normal">à la déclaration.</span>
+      </>
+    ),
+    description: "Facturez, consolidez, préparez votre déclaration, faites-la valider.",
+    lockTitle: "Parcours activité complet",
+    pitch:
+      "Émettez vos factures avec les mentions légales sourcées, obtenez un rapport de période avec vos chiffres clés, préparez votre déclaration ligne par ligne, puis faites-la vérifier par un expert-comptable proche.",
+    bullets: [
+      { icon: "🧾", label: "Facture", hint: "Mentions légales vérifiées à la source, numérotation continue." },
+      { icon: "📈", label: "Rapport & déclaration", hint: "Chiffres déterministes, provenance de chaque montant." },
+      { icon: "🤝", label: "Expert-comptable", hint: "Recherche neutre, annuaire officiel de l'Ordre." },
+    ],
+    preview: <MockList rows={["1. Facture", "2. Rapport de période", "3. Déclaration préparée", "4. Expert-comptable"]} />,
   },
   parametres: {
     eyebrow: "Paramètres",

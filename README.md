@@ -82,12 +82,18 @@ ledgermind-assistant/
 │   │   │   ├── auth.py
 │   │   │   ├── orchestrator.py
 │   │   │   ├── guidance.py   ← Branch B: chat, memory, roadmap, PDF, corpus, watch
-│   │   │   └── verification.py
+│   │   │   ├── verification.py
+│   │   │   ├── facture.py, rapport.py, declaration.py, expert_comptable.py
+│   │   │   └──  ↑ registered space (Facture → Rapport → Déclaration → Expert-comptable)
 │   │   ├── agents/
 │   │   │   ├── orchestrator.py
 │   │   │   ├── intake/       ← Branch A
 │   │   │   ├── guidance/     ← Branch B (conversation.py, chat.py, roadmap/)
-│   │   │   └── pedagogue/    ← sourced fiscal Q&A (RAG)
+│   │   │   ├── pedagogue/    ← sourced fiscal Q&A (RAG)
+│   │   │   ├── facture/      ← generator, mentions (sourced), store, pdf
+│   │   │   ├── rapport/      ← consolidation, signaux, appreciation (LLM+guardrails), pdf
+│   │   │   ├── declaration/  ← pre-fill from report/regime, provenance per line, pdf
+│   │   │   └── expert_comptable/  ← official/open sources only, no scraping
 │   │   ├── rag/              ← corpus: embeddings, Mongo vector store, retriever
 │   │   ├── mcp/              ← MCP client (official sources)
 │   │   ├── veille/           ← regulatory watch + threshold checks
@@ -106,7 +112,7 @@ ledgermind-assistant/
 │   └── src/
 │       ├── routes/           ← file-based TanStack Router routes
 │       ├── components/       ← AuthPage, Chatbot, AppShell, GuidanceChat, StatusCard, …
-│       └── lib/              ← api.ts, guidance-api.ts, auth.ts
+│       └── lib/              ← api.ts, guidance-api.ts, facturation-api.ts, auth.ts
 ├── docs/
 │   └── AGENT2-INSIGHTS.md    ← design doc for the post-registration insights agent
 ├── CONTRIBUTING.md           ← branching, conflicts, shared files
@@ -238,6 +244,28 @@ all come from the deterministic backend.
 > **Routing note:** `resultat` is a **child route** of `diagnostic`. The parent must render `<Outlet />` for `/resultat`, or the page stays blank.
 
 Other routes (mostly product shell): `/dashboard`, `/documents`, `/education`, `/historique`, `/parametres`, `/simulateur`.
+
+### Registered space — Facture → Rapport → Déclaration → Expert-comptable
+
+Route: `/activite` (premium + `verification_status === "verified"`; guarded with a link to
+`/onboarding/verification` otherwise — Branch A/B and their navigation are untouched). A single
+page, four steps, one flow (`frontend/src/routes/activite.tsx`,
+`frontend/src/lib/facturation-api.ts`):
+
+1. **Facture** — standard model always available; an uploaded template is a second entry point
+   that falls back cleanly to the standard model on any failure (never blocks issuance). Sourced
+   mandatory mentions, sequential numbering, saved as `facture_generee`.
+2. **Rapport** — pick a period; consolidates that period's invoices into deterministic key
+   figures (CA, ventilation prestations/ventes, position vs. thresholds, cotisations estimées)
+   plus a goal-linked, source-cited, non-accusatory appreciation. Saved as `rapport_genere`.
+3. **Déclaration** — consolidates the report into a pre-filled periodic form, one line per box,
+   each line showing its `provenance`. Stays `brouillon` until the user explicitly marks it
+   reviewed; never auto-transmitted. Saved as `declaration_generee`.
+4. **Expert-comptable** — from the declaration's "faire vérifier/signer", or standalone: searches
+   official/open sources only, always links the official Ordre directory, never invents a firm.
+
+Every card in the flow shows its data provenance (manual entry, generated invoice, report,
+import) so the source of each figure stays visible.
 
 ---
 
@@ -408,6 +436,33 @@ conversation history. UI: `/education` (`FiscalAssistant.tsx`).
 | `POST` | `/api/verification/ocr-siret` | OCR SIRET from uploaded file |
 | `POST` | `/api/verification/registry-document` | Multipart upload tied to `session_id` |
 | `POST` | `/api/verification/sirene-avis` | Multipart SIRENE avis upload |
+
+### Activité (registered space — Facture → Rapport → Déclaration → Expert-comptable)
+
+Premium + SIREN-verified only (`verification_status === "verified"`). UI: `/activite`
+(`facturation-api.ts`). Every produced document is a **preparation aid** — amounts and regime
+come from the deterministic engine (`analyse_juridique`, `comparateur`, `seuils.yaml`) and cited
+law (RAG); the LLM only drafts the report's narrative appreciation. Nothing is transmitted to the
+administration automatically; the declaration is prepared for a human (the user, then their
+expert-accountant) to review and sign.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/facture` | Issue an invoice from profile + service lines (sequential numbering, sourced mandatory mentions) |
+| `POST` | `/api/facture/depuis-template` | Same, from an uploaded template — falls back to the standard model on any analysis failure, never blocks issuance |
+| `GET` | `/api/facture` | List issued invoices (`source="facture_generee"`) |
+| `GET` | `/api/facture/{id}` | Invoice detail |
+| `GET` | `/api/facture/{id}/pdf` | Invoice PDF |
+| `POST` | `/api/rapport` | Consolidate a period (invoices + profile) into key figures + a goal-linked, source-cited appreciation |
+| `GET` | `/api/rapport` | List generated reports (`source="rapport_genere"`) |
+| `GET` | `/api/rapport/{id}` | Report detail |
+| `GET` | `/api/rapport/{id}/pdf` | Report PDF |
+| `POST` | `/api/declaration` | Pre-fill the periodic declaration (box numbers from the deterministic regime + sourced form) from a report/period |
+| `GET` | `/api/declaration` | List prepared declarations (`source="declaration_generee"`) |
+| `GET` | `/api/declaration/{id}` | Declaration detail, each line carries its `provenance` (which invoices/calculation) |
+| `PATCH` | `/api/declaration/{id}/revue` | Mark as reviewed line-by-line by the user (`brouillon` → `revue`) |
+| `GET` | `/api/declaration/{id}/pdf` | Declaration PDF (draft banner + disclaimer) |
+| `GET` | `/api/expert-comptable?ville=...` | Nearby accountants from official/open sources only (no scraping, no invented firm) — always includes the official Ordre directory link |
 
 ---
 

@@ -15,6 +15,7 @@ import { usePlan } from "@/lib/plan";
 // reste (expert-comptable, documents, simulateur, historique) est une fonctionnalité premium.
 const nav = [
   { to: "/dashboard", label: "Dashboard", premium: false },
+  { to: "/activite", label: "Activité", premium: true },
   { to: "/referral", label: "Expert-Comptable", premium: true },
   { to: "/capture", label: "Documents", premium: true },
   { to: "/simulateur", label: "Simulateur", premium: true },

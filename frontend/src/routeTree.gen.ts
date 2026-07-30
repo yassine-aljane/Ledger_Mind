@@ -10,12 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ActiviteRouteImport } from './routes/activite'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CaptureRouteImport } from './routes/capture'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as EducationRouteImport } from './routes/education'
 import { Route as HistoriqueRouteImport } from './routes/historique'
 import { Route as ParametresRouteImport } from './routes/parametres'
+import { Route as PremiumRouteImport } from './routes/premium'
 import { Route as ReferralRouteImport } from './routes/referral'
 import { Route as SimulateurRouteImport } from './routes/simulateur'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding.index'
@@ -27,6 +29,11 @@ import { Route as OnboardingDiagnosticResultatRouteImport } from './routes/onboa
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActiviteRoute = ActiviteRouteImport.update({
+  id: '/activite',
+  path: '/activite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -57,6 +64,11 @@ const HistoriqueRoute = HistoriqueRouteImport.update({
 const ParametresRoute = ParametresRouteImport.update({
   id: '/parametres',
   path: '/parametres',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PremiumRoute = PremiumRouteImport.update({
+  id: '/premium',
+  path: '/premium',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReferralRoute = ReferralRouteImport.update({
@@ -98,12 +110,14 @@ const OnboardingDiagnosticResultatRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activite': typeof ActiviteRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
+  '/premium': typeof PremiumRoute
   '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
@@ -114,12 +128,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activite': typeof ActiviteRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
+  '/premium': typeof PremiumRoute
   '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
@@ -131,12 +147,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/activite': typeof ActiviteRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
+  '/premium': typeof PremiumRoute
   '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
@@ -149,12 +167,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/activite'
     | '/auth'
     | '/capture'
     | '/dashboard'
     | '/education'
     | '/historique'
     | '/parametres'
+    | '/premium'
     | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
@@ -165,12 +185,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/activite'
     | '/auth'
     | '/capture'
     | '/dashboard'
     | '/education'
     | '/historique'
     | '/parametres'
+    | '/premium'
     | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
@@ -181,12 +203,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/activite'
     | '/auth'
     | '/capture'
     | '/dashboard'
     | '/education'
     | '/historique'
     | '/parametres'
+    | '/premium'
     | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
@@ -198,12 +222,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActiviteRoute: typeof ActiviteRoute
   AuthRoute: typeof AuthRoute
   CaptureRoute: typeof CaptureRoute
   DashboardRoute: typeof DashboardRoute
   EducationRoute: typeof EducationRoute
   HistoriqueRoute: typeof HistoriqueRoute
   ParametresRoute: typeof ParametresRoute
+  PremiumRoute: typeof PremiumRoute
   ReferralRoute: typeof ReferralRoute
   SimulateurRoute: typeof SimulateurRoute
   OnboardingDiagnosticRoute: typeof OnboardingDiagnosticRouteWithChildren
@@ -219,6 +245,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/activite': {
+      id: '/activite'
+      path: '/activite'
+      fullPath: '/activite'
+      preLoaderRoute: typeof ActiviteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -261,6 +294,13 @@ declare module '@tanstack/react-router' {
       path: '/parametres'
       fullPath: '/parametres'
       preLoaderRoute: typeof ParametresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/premium': {
+      id: '/premium'
+      path: '/premium'
+      fullPath: '/premium'
+      preLoaderRoute: typeof PremiumRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/referral': {
@@ -328,12 +368,14 @@ const OnboardingDiagnosticRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActiviteRoute: ActiviteRoute,
   AuthRoute: AuthRoute,
   CaptureRoute: CaptureRoute,
   DashboardRoute: DashboardRoute,
   EducationRoute: EducationRoute,
   HistoriqueRoute: HistoriqueRoute,
   ParametresRoute: ParametresRoute,
+  PremiumRoute: PremiumRoute,
   ReferralRoute: ReferralRoute,
   SimulateurRoute: SimulateurRoute,
   OnboardingDiagnosticRoute: OnboardingDiagnosticRouteWithChildren,
