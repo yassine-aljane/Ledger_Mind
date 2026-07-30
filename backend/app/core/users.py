@@ -108,6 +108,34 @@ def _branch_snapshot(state: OrchestratorState) -> BranchAgentContext:
     return snap
 
 
+def sync_guidance_snapshot(
+    user_id: str, *, session_id: str, phase: str, profil: dict,
+    roadmap: dict | None, completeness: float,
+) -> None:
+    """Persiste le snapshot de la branche guidance sur le compte utilisateur.
+
+    La guidance conversationnelle vit dans sa propre mémoire (`conversation_store.py`, jamais
+    dans `OrchestratorState`/`sessions`), donc `sync_agent_context_from_state` (branche intake)
+    ne la voit jamais : sans cet appel, `agent_context.guidance` restait vide pour TOUJOURS pour
+    un utilisateur guidance-only, même après une feuille de route complète — et
+    `hasCompletedOnboarding()` côté frontend renvoyait donc toujours faux, renvoyant
+    l'utilisateur au choix de branche au lieu de sa feuille de route à la reconnexion.
+    """
+    if not user_id:
+        return
+    _ensure_indexes()
+    snap = BranchAgentContext(
+        last_session_id=session_id, phase=phase, updated_at=_now().isoformat(),
+        completeness=completeness, recommended_regime=profil.get("choix_parcours"),
+        profile=profil, roadmap=roadmap,
+    ).model_dump(mode="json")
+    with _lock:
+        users_collection().update_one(
+            {"id": user_id},
+            {"$set": {"agent_context.guidance": snap, "updated_at": _now()}},
+        )
+
+
 def sync_agent_context_from_state(state: OrchestratorState) -> None:
     """Persist intake/guidance snapshots on the user document for next features."""
     if not state.user_id:

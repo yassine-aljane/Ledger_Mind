@@ -104,10 +104,24 @@ class AskRequest(BaseModel):
 async def chat(payload: ChatRequest, uid: str = Depends(_current_uid)):
     """Un tour de conversation : profilage, question suivante OU feuille de route."""
     action = payload.action.model_dump() if payload.action else None
-    return await conversation.respond(
-        payload.session_id, payload.message, payload.mode or "guidance",
-        action=action, uid=uid,
+    mode = payload.mode or "guidance"
+    result = await conversation.respond(
+        payload.session_id, payload.message, mode, action=action, uid=uid,
     )
+    # Compte authentifié (jamais un visiteur anonyme) + branche guidance (pas pédagogue) :
+    # tient à jour agent_context.guidance, sinon jamais peuplé par ce parcours (voir
+    # sync_guidance_snapshot) — postAuthPath() ne saurait sinon jamais renvoyer un utilisateur
+    # guidance-only vers sa feuille de route à la reconnexion.
+    if mode == "guidance" and not uid.startswith("anon-"):
+        from app.core.users import sync_guidance_snapshot
+
+        sync_guidance_snapshot(
+            uid, session_id=result["session_id"],
+            phase="done" if result.get("roadmap") else "diagnostic_questions",
+            profil=result.get("profil") or {}, roadmap=result.get("roadmap"),
+            completeness=1.0 if result.get("profil_complet") else 0.5,
+        )
+    return result
 
 
 @router.post("/ask")
