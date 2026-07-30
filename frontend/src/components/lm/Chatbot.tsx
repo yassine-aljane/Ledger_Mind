@@ -599,10 +599,12 @@ export function Chatbot({
             </div>
           ) : (
             <>
-              {/* Mode vocal : pas d'exemples de suggestion à côté de la question, juste la
-                  question — on parle, on n'a pas besoin de cliquer. Inchangé en mode texte. */}
-              {mode !== "vocal" && (
-              <div className="flex flex-wrap gap-2">
+              {/* Les recommandations restent affichées en mode vocal aussi — elles n'apparaissent
+                  qu'une fois la question entièrement lue (comme demandé : révélation du texte en
+                  parallèle de la voix, PUIS les recommandations, PUIS le temps de répondre). En
+                  mode texte, rien ne change : toujours affichées immédiatement, comme avant. */}
+              {(mode !== "vocal" || !speaking) && (
+              <div className="flex flex-wrap gap-2 animate-fade-in">
                 {orchestratorQuickReplies.map((r) => (
                   <button
                     key={r}
