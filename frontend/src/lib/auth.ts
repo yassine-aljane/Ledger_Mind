@@ -123,6 +123,27 @@ export function hasCompletedOnboarding(user: AuthUser | null | undefined): boole
   return guidanceDone || intakeDone;
 }
 
+/**
+ * True une fois le SIREN (et l'avis de situation) vérifiés — branche A de l'intake.
+ *
+ * Un utilisateur venu de la seule guidance (branche B) a un diagnostic et une feuille de route,
+ * mais rien n'est vérifié administrativement : les fonctionnalités qui en dépendent (reçu
+ * fiscal, expert-comptable, documents, simulateur, historique détaillé) doivent rester
+ * inaccessibles tant que cette étape n'est pas franchie.
+ */
+export function isSirenVerified(user: AuthUser | null | undefined): boolean {
+  if (!user) return false;
+  const profil = user.agent_context?.intake?.profile as
+    | { verification_status?: unknown; tax_category?: unknown }
+    | null
+    | undefined;
+  if (!profil) return false;
+  if (profil.verification_status === "verified") return true;
+  // Repli : le profil n'atteint la classification fiscale qu'après la vérification, dans la
+  // machine à états de la branche A — sa présence signale donc indirectement une vérification.
+  return Boolean(profil.tax_category);
+}
+
 /** Post-login destination from saved agent context. */
 export function postAuthPath(user: AuthUser | null | undefined): "/dashboard" | "/onboarding" {
   return hasCompletedOnboarding(user) ? "/dashboard" : "/onboarding";

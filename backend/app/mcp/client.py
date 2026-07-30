@@ -75,6 +75,18 @@ async def call_tool(server: str, tool: str, arguments: dict) -> dict:
     """Appelle un outil MCP et renvoie le contenu structuré (JSON) ou le texte."""
     async with _session(server) as s:
         result = await s.call_tool(tool, arguments=arguments)
+        # Quand l'outil lève une exception côté serveur, FastMCP ne relaie PAS l'erreur comme
+        # une exception réseau : il renvoie un résultat "réussi" dont le texte EST le message
+        # d'erreur ("Error executing tool fetch_page: ..."). Sans lire `isError` (protocole MCP),
+        # ce message se comporte comme du contenu valide et finit ingéré dans le corpus tel quel —
+        # ce qui est arrivé (403 Forbidden, timeout BOSS, mauvais type d'argument, tous ingérés
+        # comme si c'était de la doctrine). On lève ici pour que l'appelant retombe sur son
+        # try/except existant au lieu de traiter l'échec comme un succès.
+        if getattr(result, "isError", False):
+            textes = [c.text for c in result.content if getattr(c, "type", "") == "text"]
+            raise RuntimeError(
+                f"Outil MCP {server}.{tool} en échec : {' '.join(textes) or 'erreur inconnue'}"
+            )
         # FastMCP renvoie le retour de fonction dans structuredContent quand c'est un dict
         if getattr(result, "structuredContent", None):
             return result.structuredContent

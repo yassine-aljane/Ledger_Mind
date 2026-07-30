@@ -43,6 +43,8 @@ BOFIP_QUERIES = [
     "bénéfices non commerciaux BNC",
     "franchise en base de TVA",
     "revenus des influenceurs création de contenu",
+    "micro-BIC",
+    "micro-BNC",
 ]
 
 # Documents BOFiP curés, récupérés par identifiant : plus fiables que la recherche floue.

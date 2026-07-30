@@ -5,17 +5,23 @@ import {
   displayShortName,
   getStoredUser,
   isAuthed,
+  isSirenVerified,
   logout,
   type AuthUser,
 } from "@/lib/auth";
 
-const nav = [
+// Toujours visibles : ce que la seule guidance (branche B) permet déjà de faire, avant toute
+// vérification SIREN. Le reste dépend de la branche A (vérification administrative) — les
+// masquer plutôt que les afficher désactivés évite de promettre un accès qui échouera.
+const NAV_LIBRE = [
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/education", label: "Éducation" },
+];
+const NAV_APRES_VERIFICATION = [
   { to: "/referral", label: "Expert-Comptable" },
   { to: "/capture", label: "Documents" },
   { to: "/simulateur", label: "Simulateur" },
   { to: "/historique", label: "Historique" },
-  { to: "/education", label: "Éducation" },
 ];
 
 export function LogoutBubble() {
@@ -44,6 +50,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setUser(getStoredUser());
   }, [pathname]);
+
+  const verified = isSirenVerified(user);
+  const nav = verified ? [...NAV_LIBRE, ...NAV_APRES_VERIFICATION] : NAV_LIBRE;
 
   return (
     <div className="min-h-screen">
