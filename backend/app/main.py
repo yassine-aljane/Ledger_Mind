@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import auth, capture, facture, guidance, orchestrator, referral, verification
+from app.api import auth, capture, facture, guidance, orchestrator, rapport, referral, verification
 
 app = FastAPI(title="LedgerMind Backend")
 
@@ -20,8 +20,9 @@ app.include_router(verification.router)
 app.include_router(orchestrator.router)
 # Espace « pas encore immatriculé » : chat conversationnel, mémoire, feuille de route.
 app.include_router(guidance.router)
-# Espace immatriculé (SIREN vérifié) : génération de facture.
+# Espace immatriculé (SIREN vérifié) : génération de facture, rapport d'activité par période.
 app.include_router(facture.router)
+app.include_router(rapport.router)
 
 
 _scheduler = None

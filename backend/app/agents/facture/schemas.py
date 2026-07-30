@@ -7,16 +7,23 @@ l'utilisateur est l'émetteur, la facture est GÉNÉRÉE par la plateforme, jama
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
 class LigneFacture(BaseModel):
-    """Une ligne de désignation — le calcul (HT, TVA, TTC) se fait en code, jamais par le LLM."""
+    """Une ligne de désignation — le calcul (HT, TVA, TTC) se fait en code, jamais par le LLM.
+
+    `categorie` distingue prestation de service et vente de bien : c'est ce qui permet au rapport
+    d'activité (chantier 2) de ventiler le chiffre d'affaires exactement comme le fait déjà le
+    moteur de feuille de route (seuils micro-BNC vs micro-BIC distincts selon la nature réelle).
+    """
 
     designation: str = Field(min_length=1)
     quantite: float = Field(default=1, gt=0)
     prix_unitaire_ht: float = Field(ge=0)
+    categorie: Literal["prestation", "vente"] = "prestation"
     taux_tva: float = Field(default=0.0, ge=0, le=1)  # 0.20, 0.10… ; 0 si franchise ou taux nul
 
 
