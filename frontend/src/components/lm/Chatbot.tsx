@@ -5,6 +5,17 @@ import {
   storeSessionId,
   type UserProfile,
 } from "@/lib/api";
+import {
+  isSpeaking,
+  listenOnce,
+  recognitionSupported,
+  speak,
+  speechSupported,
+  stopSpeaking,
+  type RecognitionHandle,
+} from "@/lib/voice";
+
+type Mode = "texte" | "vocal";
 
 export type ChatTurn = {
   id: string;
@@ -47,6 +58,89 @@ export function Chatbot({
     question: null,
     answer: null,
   });
+
+  // --- Assistant vocal (complément, jamais un prérequis) — API navigateur native uniquement.
+  const [mode, setMode] = useState<Mode>("texte");
+  const modeRef = useRef<Mode>(mode);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+  const [speaking, setSpeaking] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [interim, setInterim] = useState("");
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const recognitionRef = useRef<RecognitionHandle | null>(null);
+  const lastSpokenRef = useRef<string | null>(null);
+  // Détecté après montage seulement (jamais pendant le rendu serveur) : évite un décalage
+  // d'hydratation entre le HTML serveur (pas de `window`) et le premier rendu client.
+  const [canVoiceMode, setCanVoiceMode] = useState(false);
+  useEffect(() => {
+    setCanVoiceMode(recognitionSupported());
+  }, []);
+
+  const startListening = () => {
+    if (modeRef.current !== "vocal" || listening) return;
+    setVoiceNotice(null);
+    setInterim("");
+    const handle = listenOnce({
+      onInterim: setInterim,
+      onFinal: (text) => {
+        setListening(false);
+        setInterim("");
+        handleAnswer(text);
+      },
+      onError: (message) => {
+        setListening(false);
+        setInterim("");
+        setVoiceNotice(message);
+      },
+      onEnd: () => setListening(false),
+    });
+    if (handle) {
+      recognitionRef.current = handle;
+      setListening(true);
+    }
+  };
+
+  const stopListening = () => {
+    recognitionRef.current?.stop();
+    setListening(false);
+    setInterim("");
+  };
+
+  /** Lit la question à voix haute (les deux modes lisent) ; en mode vocal, écoute la réponse
+   * juste après — jamais l'inverse, pour ne pas laisser le micro capter la voix de l'assistant. */
+  const speakQuestion = (text: string) => {
+    if (!speechSupported() || lastSpokenRef.current === text) return;
+    lastSpokenRef.current = text;
+    setSpeaking(true);
+    speak(text, () => {
+      setSpeaking(false);
+      if (modeRef.current === "vocal") startListening();
+    });
+  };
+
+  useEffect(() => {
+    if (orchestratorMessage && !thinking) speakQuestion(orchestratorMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orchestratorMessage, thinking]);
+
+  useEffect(() => {
+    // Nettoyage : ne laisse jamais une lecture ou une écoute tourner après démontage/changement de page.
+    return () => {
+      stopSpeaking();
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    modeRef.current = next; // synchrone : startListening() ci-dessous ne doit pas lire l'ancien mode
+    if (next === "vocal" && orchestratorMessage && !isSpeaking() && !listening) {
+      startListening();
+    }
+    if (next === "texte") stopListening();
+  };
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -257,25 +351,90 @@ export function Chatbot({
   const showComposer = Boolean(orchestratorMessage) && !thinking && !error;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 animate-fade-in">
-      <div className="flex items-center justify-between gap-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark inline-flex items-center gap-1.5">
-          <span aria-hidden>🧭</span> {eyebrow}
-        </p>
-        <div className="flex-1 h-[3px] bg-border rounded-full overflow-hidden max-w-xs">
-          <div
-            className="h-full bg-teal-dark transition-all duration-500 ease-out"
-            style={{ width: `${Math.round(orchestratorCompleteness * 100)}%` }}
-          />
+    <div className="max-w-2xl mx-auto space-y-5 animate-fade-in">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-6 flex-1 min-w-[200px]">
+          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark inline-flex items-center gap-1.5 shrink-0">
+            <span aria-hidden>🧭</span> {eyebrow}
+          </p>
+          <div className="flex-1 h-[3px] bg-border rounded-full overflow-hidden max-w-xs">
+            <div
+              className="h-full bg-teal-dark transition-all duration-500 ease-out"
+              style={{ width: `${Math.round(orchestratorCompleteness * 100)}%` }}
+            />
+          </div>
+          <p className="font-mono text-[11px] text-ink/50 shrink-0">
+            {Math.round(orchestratorCompleteness * 100)}%
+          </p>
         </div>
-        <p className="font-mono text-[11px] text-ink/50">
-          {Math.round(orchestratorCompleteness * 100)}%
-        </p>
+
+        {/* Assistant vocal : complément optionnel, jamais un prérequis — masqué si le navigateur
+            ne supporte pas la reconnaissance vocale (dégradation propre, texte reste la voie
+            principale). La lecture à voix haute des questions (TTS), elle, fonctionne dans les
+            deux modes tant que le navigateur la supporte. */}
+        {canVoiceMode && (
+          <div className="inline-flex p-1 bg-white border border-border rounded-full text-xs font-semibold shrink-0">
+            <button
+              type="button"
+              onClick={() => switchMode("texte")}
+              aria-pressed={mode === "texte"}
+              className={`px-3 py-1.5 rounded-full transition-all duration-200 inline-flex items-center gap-1.5 ${
+                mode === "texte" ? "bg-ink text-background" : "text-ink/60 hover:text-ink"
+              }`}
+            >
+              ⌨️ Texte
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode("vocal")}
+              aria-pressed={mode === "vocal"}
+              className={`px-3 py-1.5 rounded-full transition-all duration-200 inline-flex items-center gap-1.5 ${
+                mode === "vocal" ? "bg-ink text-background" : "text-ink/60 hover:text-ink"
+              }`}
+            >
+              🎙️ Vocal
+            </button>
+          </div>
+        )}
       </div>
 
-      {intro && turns.length === 0 && <p className="text-ink/60 text-pretty">{intro}</p>}
+      {intro && turns.length === 0 && <p className="text-ink/60 text-pretty text-[17px]">{intro}</p>}
 
-      <div className="space-y-6 min-h-[360px]">
+      {(speaking || listening || voiceNotice) && (
+        <div className="flex items-center gap-2 text-xs font-mono animate-fade-in">
+          {speaking && (
+            <button
+              type="button"
+              onClick={stopSpeaking}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-dark/10 text-teal-dark hover:bg-teal-dark/20 transition-colors duration-200"
+            >
+              🔊 Lecture en cours… <span className="underline">arrêter</span>
+            </button>
+          )}
+          {listening && (
+            <button
+              type="button"
+              onClick={stopListening}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-coral/10 text-coral"
+            >
+              <span className="relative flex size-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-coral opacity-60" />
+                <span className="relative inline-flex rounded-full size-2 bg-coral" />
+              </span>
+              🎙️ Je vous écoute{interim ? ` : « ${interim} »` : "…"} <span className="underline">arrêter</span>
+            </button>
+          )}
+          {voiceNotice && !speaking && !listening && (
+            <span className="text-ink/40">{voiceNotice}</span>
+          )}
+        </div>
+      )}
+
+      {/* Cadre de conversation à hauteur fixe : seuls les messages défilent à l'intérieur — les
+          suggestions et la saisie restent TOUJOURS visibles en bas, même en faisant défiler un
+          long échange. */}
+      <div className="flex flex-col border border-border rounded-2xl bg-white shadow-sm overflow-hidden h-[65vh] min-h-[440px]">
+      <div className="chat-scroll flex-1 overflow-y-auto p-5 space-y-6">
         {turns.map((t) =>
           t.role === "assistant" ? (
             <div key={t.id} className="flex items-end gap-2.5 max-w-[85%] animate-slide-up">
@@ -286,7 +445,7 @@ export function Chatbot({
                 🤖
               </span>
               <div className="flex flex-col gap-1 min-w-0">
-                <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[15px] leading-relaxed text-ink shadow-sm">
+                <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[17px] leading-relaxed text-ink shadow-sm">
                   {t.text}
                 </div>
                 <span className="text-[10px] uppercase opacity-40 font-mono ml-1">
@@ -300,7 +459,7 @@ export function Chatbot({
               className="flex items-end justify-end gap-2.5 max-w-[85%] ml-auto animate-slide-up"
             >
               <div className="flex flex-col gap-1 items-end min-w-0">
-                <div className="p-4 bg-teal-dark text-background rounded-2xl rounded-br-none text-[15px] font-medium">
+                <div className="p-4 bg-teal-dark text-background rounded-2xl rounded-br-none text-[17px] font-medium">
                   {t.text}
                 </div>
                 <span className="text-[10px] uppercase opacity-40 font-mono mr-1">
@@ -345,7 +504,7 @@ export function Chatbot({
       </div>
 
       {showComposer && (
-        <div className="space-y-4 pt-2">
+        <div className="shrink-0 border-t border-border bg-white p-4 space-y-4">
           {roadmapReady ? (
             <div className="rounded-2xl border border-teal-dark/30 bg-teal-dark/5 p-6 space-y-4 animate-slide-up">
               <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark inline-flex items-center gap-1.5">
@@ -384,11 +543,26 @@ export function Chatbot({
                 }}
                 className="flex gap-2"
               >
+                {mode === "vocal" && (
+                  <button
+                    type="button"
+                    onClick={() => (listening ? stopListening() : startListening())}
+                    title={listening ? "Arrêter le micro" : "Parler"}
+                    aria-label={listening ? "Arrêter le micro" : "Parler ma réponse"}
+                    className={`shrink-0 size-11 rounded-full grid place-items-center text-lg transition-all duration-200 active:scale-95 ${
+                      listening
+                        ? "bg-coral text-background"
+                        : "bg-white border border-border hover:border-teal-dark"
+                    }`}
+                  >
+                    🎙️
+                  </button>
+                )}
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ou tapez votre réponse librement…"
-                  className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
+                  className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-base placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
                 />
                 <button
                   type="submit"
@@ -401,6 +575,7 @@ export function Chatbot({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
