@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { usePlan } from "@/lib/plan";
+import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 
 export const Route = createFileRoute("/simulateur")({
@@ -14,6 +16,7 @@ export const Route = createFileRoute("/simulateur")({
 });
 
 function SimulateurPage() {
+  if (usePlan() === "free") return <PremiumPagePlaceholder kind="simulateur" />;
   return (
     <AppShell>
       <PageHeader

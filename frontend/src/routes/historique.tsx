@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { usePlan } from "@/lib/plan";
+import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 
 export const Route = createFileRoute("/historique")({
@@ -24,6 +26,7 @@ const rows = [
 ];
 
 function HistoriquePage() {
+  if (usePlan() === "free") return <PremiumPagePlaceholder kind="historique" />;
   return (
     <AppShell>
       <PageHeader

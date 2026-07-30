@@ -5,24 +5,22 @@ import {
   displayShortName,
   getStoredUser,
   isAuthed,
-  isSirenVerified,
   logout,
   type AuthUser,
 } from "@/lib/auth";
+import { usePlan } from "@/lib/plan";
 
-// Toujours visibles : ce que la seule guidance (branche B) permet déjà de faire, avant toute
-// vérification SIREN. Le reste dépend de la branche A (vérification administrative) — les
-// masquer plutôt que les afficher désactivés évite de promettre un accès qui échouera.
-const NAV_LIBRE = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/education", label: "Éducation" },
-];
-const NAV_APRES_VERIFICATION = [
-  { to: "/referral", label: "Expert-Comptable" },
-  { to: "/capture", label: "Documents" },
-  { to: "/simulateur", label: "Simulateur" },
-  { to: "/historique", label: "Historique" },
-];
+// Dashboard et Éducation restent accessibles sans premium (guidance/pédagogue + le dashboard,
+// dont le contenu s'adapte lui-même selon la vérification SIREN — voir dashboard.tsx). Tout le
+// reste (expert-comptable, documents, simulateur, historique) est une fonctionnalité premium.
+const nav = [
+  { to: "/dashboard", label: "Dashboard", premium: false },
+  { to: "/referral", label: "Expert-Comptable", premium: true },
+  { to: "/capture", label: "Documents", premium: true },
+  { to: "/simulateur", label: "Simulateur", premium: true },
+  { to: "/historique", label: "Historique", premium: true },
+  { to: "/education", label: "Éducation", premium: false },
+] as const;
 
 export function LogoutBubble() {
   const navigate = useNavigate();
@@ -46,13 +44,11 @@ export function LogoutBubble() {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [user, setUser] = useState<AuthUser | null>(null);
+  const plan = usePlan();
 
   useEffect(() => {
     setUser(getStoredUser());
   }, [pathname]);
-
-  const verified = isSirenVerified(user);
-  const nav = verified ? [...NAV_LIBRE, ...NAV_APRES_VERIFICATION] : NAV_LIBRE;
 
   return (
     <div className="min-h-screen">
@@ -62,25 +58,46 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="size-6 rounded-full bg-teal-dark" />
             <span className="font-semibold tracking-tight uppercase text-sm">LedgerMind</span>
           </Link>
-          <div className="hidden md:flex items-center gap-8 text-[13px] font-medium">
+          <div className="hidden md:flex items-center gap-7 text-[13px] font-medium">
             {nav.map((item) => {
               const active = pathname.startsWith(item.to);
+              const locked = item.premium && plan === "free";
               return (
                 <Link
                   key={item.to}
                   to={item.to}
+                  title={locked ? "Fonctionnalité Premium" : item.label}
                   className={
                     active
-                      ? "text-teal-dark relative after:absolute after:inset-x-0 after:-bottom-[22px] after:h-px after:bg-teal-dark"
-                      : "text-ink/60 hover:text-ink transition-colors"
+                      ? "text-teal-dark relative after:absolute after:inset-x-0 after:-bottom-[22px] after:h-px after:bg-teal-dark inline-flex items-center gap-1.5"
+                      : "text-ink/60 hover:text-ink transition-colors inline-flex items-center gap-1.5"
                   }
                 >
                   {item.label}
+                  {locked && (
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden className="text-amber-fiscal">
+                      <rect x="2" y="5.5" width="8" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+                      <path d="M4 5.5V4a2 2 0 1 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" />
+                    </svg>
+                  )}
                 </Link>
               );
             })}
           </div>
           <div className="flex items-center gap-3 shrink-0">
+            {plan === "free" ? (
+              <Link
+                to="/premium"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-fiscal/10 border border-amber-fiscal/30 text-amber-fiscal text-[12px] font-semibold hover:bg-amber-fiscal hover:text-ink transition-colors"
+              >
+                <span className="size-1.5 rounded-full bg-amber-fiscal animate-pulse" />
+                Passer Premium
+              </Link>
+            ) : (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-dark/10 border border-teal-dark/30 text-teal-dark text-[12px] font-semibold font-mono uppercase tracking-widest">
+                Premium
+              </span>
+            )}
             <LogoutBubble />
             <Link
               to="/parametres"
