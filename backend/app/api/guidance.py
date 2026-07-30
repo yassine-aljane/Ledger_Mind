@@ -53,7 +53,12 @@ async def _current_uid(
 # --------------------------------------------------------------------------------- Schémas
 class ChatOption(BaseModel):
     kind: str
-    value: str
+    # `value` : réponse rapide classique (kind="choix_parcours"...).
+    # `champ`/`valeurs` : clic sur une chip de suggestion de profilage (kind="reponse_champ"),
+    # appliquée directement au profil sans extraction LLM — voir conversation.respond().
+    value: str | None = None
+    champ: str | None = None
+    valeurs: dict[str, Any] | None = None
 
 
 class ChatRequest(BaseModel):
