@@ -86,8 +86,11 @@ export function Chatbot({
     setCanVoiceMode(recognitionSupported());
   }, []);
 
-  const startListening = () => {
-    if (modeRef.current !== "vocal" || listening) return;
+  /** `force` : passe outre le mode courant — le bouton micro doit rester utilisable à la main sur
+   * CHAQUE question, même en mode texte (le déclenchement AUTOMATIQUE après lecture, lui, reste
+   * réservé au mode vocal, plus bas). */
+  const startListening = (force = false) => {
+    if ((!force && modeRef.current !== "vocal") || listening) return;
     setVoiceNotice(null);
     setInterim("");
     const handle = listenOnce({
@@ -127,9 +130,17 @@ export function Chatbot({
    * juste après — jamais l'inverse, pour ne pas laisser le micro capter la voix de l'assistant.
    * En mode vocal, le texte de la question se révèle progressivement, calé sur la voix
    * (`onboundary`) plutôt qu'affiché d'un bloc — en mode texte, rien ne change (texte entier
-   * immédiat, comme avant). */
+   * immédiat, comme avant).
+   *
+   * Si l'orchestrateur reformule EXACTEMENT la même question (réponse précédente non comprise),
+   * on ne la relit pas une seconde fois à l'identique — mais on relance quand même l'écoute en
+   * mode vocal : sans ce cas, le micro restait inactif après une réponse mal comprise, donnant
+   * l'impression que l'assistant "ignore" l'utilisateur au lieu de laisser reparler. */
   const speakQuestion = (text: string) => {
-    if (!speechSupported() || lastSpokenRef.current === text) return;
+    if (lastSpokenRef.current === text || !speechSupported()) {
+      if (modeRef.current === "vocal") startListening();
+      return;
+    }
     lastSpokenRef.current = text;
     setSpeaking(true);
     setRevealedLength(modeRef.current === "vocal" ? 0 : null);
@@ -611,11 +622,14 @@ export function Chatbot({
                 }}
                 className="flex gap-2"
               >
-                {mode === "vocal" && (
+                {/* Le micro reste disponible sur CHAQUE question, quel que soit le mode — le
+                    mode "Vocal" ne fait qu'automatiser lecture + écoute ; ici, on permet de
+                    répondre à la voix ponctuellement même en mode texte. */}
+                {canVoiceMode && (
                   <button
                     type="button"
-                    onClick={() => (listening ? stopListening() : startListening())}
-                    title={listening ? "Arrêter le micro" : "Parler"}
+                    onClick={() => (listening ? stopListening() : startListening(true))}
+                    title={listening ? "Arrêter le micro" : "Parler ma réponse"}
                     aria-label={listening ? "Arrêter le micro" : "Parler ma réponse"}
                     className={`shrink-0 size-11 rounded-full grid place-items-center text-lg transition-all duration-200 active:scale-95 ${
                       listening
