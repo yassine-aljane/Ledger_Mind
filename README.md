@@ -362,12 +362,16 @@ Base URL: `http://localhost:8000`
 
 ### Guidance (Branch B — conversational, no SIREN yet)
 
-Auth optional: without a token the space runs on the `demo` identity.
+Auth optional: without a token, identity comes from the `X-Anon-Id` header (a UUID generated and
+kept in the browser's `localStorage`, see `frontend/src/lib/anon.ts`) — never a shared identity.
+Each anonymous visitor gets their own isolated profile, purged after 30 days of inactivity;
+authenticated accounts persist indefinitely.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/guidance/chat` | One conversation turn — `{session_id?, message, mode?, action?}` |
-| `GET` | `/api/guidance/suggestions` | Opening suggestions, then contextual quick replies |
+| `GET` | `/api/guidance/suggestions` | Opening suggestions, then contextual quick replies + chip structure |
+| `POST` | `/api/guidance/suggestions/affiner` | LLM-refined chip suggestions for one open field (progressive enhancement) |
 | `GET` | `/api/guidance/conversations` | Conversation history (filtered by space) |
 | `GET` | `/api/guidance/chat/{id}` | Full conversation + profile + roadmap + checked steps |
 | `PATCH` | `/api/guidance/chat/{id}/rename` | Rename a conversation |
@@ -378,9 +382,25 @@ Auth optional: without a token the space runs on the `demo` identity.
 | `GET`/`PUT` | `/api/guidance/roadmap/state/{id}` | Checkbox state, persisted server-side |
 | `POST` | `/api/guidance/roadmap/pdf` | Roadmap as a downloadable PDF (`fpdf2`, WeasyPrint if available) |
 
-`POST /chat` returns `{session_id, reponse, profil, roadmap, options, suggestions, profil_complet}`.
-`options` is a generic clickable structure decided by the backend (e.g. micro vs société in the
-switching zone) — the frontend renders it without knowing the case.
+`POST /chat` returns `{session_id, reponse, profil, roadmap, options, suggestions,
+suggestions_champ, profil_complet}`. `options` is a generic clickable structure decided by the
+backend (e.g. micro vs société in the switching zone) — the frontend renders it without knowing
+the case.
+
+**Fast profiling (chips + "Autre")** — `suggestions_champ` (`{champ, question, ouvert,
+suggestions: [{label, valeurs}]}`) is the structure the frontend renders as clickable chips
+instead of an open-ended question, so answering never requires typing:
+- **Closed fields** (`vend_produits`, `devise`) — suggestions come straight from the deterministic
+  table in `conversation.py` (`reponses_rapides_pour`), no LLM call, `ouvert: false`.
+- **`ventilation`** is a pure arithmetic split of the already-known `ca_estime` (not a fiscal rule,
+  just a 50/50 or all-one-way split) — deterministic too.
+- **Open fields** (`ca_estime`) start with the same deterministic defaults (`ouvert: true`), then
+  `POST /suggestions/affiner` can replace them with LLM-refined, context-aware labels in the
+  background — the chips are never blocked waiting for it (progressive enhancement).
+- Clicking a chip sends `action: {kind: "reponse_champ", champ, valeurs}` — applied **directly**
+  to the profile (`store.patch_profil`), bypassing the semantic extraction pipeline entirely
+  (unlike free text, which always goes through `extraire_profil`). Free text via the "Autre" chip
+  (which simply focuses the existing input) is always available and unchanged.
 
 ### Assistant fiscal (RAG, sourced answers)
 

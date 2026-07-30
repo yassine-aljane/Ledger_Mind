@@ -16,6 +16,7 @@ import { ConversationHistory } from "@/components/lm/ConversationHistory";
 import { Markdown } from "@/components/lm/Markdown";
 import { RoadmapView, type Roadmap } from "@/components/lm/RoadmapView";
 import { StatusCard } from "@/components/lm/StatusCard";
+import { SuggestionChips } from "@/components/lm/SuggestionChips";
 import {
   cacheDiagnosticResult,
   storeSessionId,
@@ -23,6 +24,7 @@ import {
   type UserProfile,
 } from "@/lib/api";
 import {
+  affinerSuggestions,
   deleteConversation,
   downloadRoadmapPdf,
   fetchConversation,
@@ -37,6 +39,7 @@ import {
   type ChatOptions,
   type ConversationSummary,
   type GuidanceProfile,
+  type SuggestionsChamp,
 } from "@/lib/guidance-api";
 
 const SESSION_KEY = "ledgermind_guidance_session";
@@ -110,6 +113,10 @@ export function GuidanceChat() {
   const [profil, setProfil] = useState<GuidanceProfile>({});
   const [manquantes, setManquantes] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionsChamp, setSuggestionsChamp] = useState<SuggestionsChamp | null>(null);
+  const [pickedLabel, setPickedLabel] = useState<string | null>(null);
+  const [autreOuvert, setAutreOuvert] = useState(false);
+  const [refiningChamp, setRefiningChamp] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -118,6 +125,7 @@ export function GuidanceChat() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const refreshConversations = useCallback(() => {
     fetchConversations("guidance")
@@ -140,7 +148,16 @@ export function GuidanceChat() {
       setRoadmap(detail.roadmap as Roadmap | null);
       setChecked(detail.checked ?? {});
       setManquantes([]);
-      if (detail.roadmap) setSuggestions([]);
+      setPickedLabel(null);
+      setAutreOuvert(false);
+      if (detail.roadmap) {
+        setSuggestions([]);
+        setSuggestionsChamp(null);
+      } else {
+        fetchSuggestions()
+          .then((d) => setSuggestionsChamp(d.suggestions_champ))
+          .catch(() => {});
+      }
       const p = await fetchGuidanceProfile();
       setManquantes(p.manquantes);
     } catch (e) {
@@ -155,6 +172,7 @@ export function GuidanceChat() {
     fetchSuggestions()
       .then((d) => {
         setSuggestions(d.suggestions);
+        setSuggestionsChamp(d.suggestions_champ);
         setProfil(d.profil);
       })
       .catch(() => {
@@ -179,17 +197,22 @@ export function GuidanceChat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns, busy, roadmap]);
 
-  async function send(text: string, action?: { kind: string; value: string }, turnIndex?: number) {
+  async function send(
+    text: string,
+    action?: { kind: string; value?: string; champ?: string; valeurs?: Record<string, unknown> },
+    turnIndex?: number,
+  ) {
     const message = text.trim();
     if (!message || busy) return;
     setError(null);
     if (!action) setInput("");
     setTurns((prev) => [...prev, { id: nowId("u", prev.length), role: "user", text: message }]);
-    if (action && turnIndex != null) {
+    if (action && turnIndex != null && action.value) {
       setTurns((prev) =>
         prev.map((t, i) => (i === turnIndex ? { ...t, optionPicked: action.value } : t)),
       );
     }
+    setAutreOuvert(false);
     setBusy(true);
     try {
       const data = await sendGuidanceMessage({
@@ -202,6 +225,8 @@ export function GuidanceChat() {
       setSessionId(data.session_id);
       setProfil(data.profil);
       setSuggestions(data.suggestions ?? []);
+      setSuggestionsChamp(data.suggestions_champ);
+      setPickedLabel(null);
       setManquantes(data.profil_complet ? [] : manquantes);
       if (data.roadmap) setRoadmap(data.roadmap as Roadmap);
       setTurns((prev) => [
@@ -248,11 +273,56 @@ export function GuidanceChat() {
     setTurns([]);
     setRoadmap(null);
     setChecked({});
+    setPickedLabel(null);
+    setAutreOuvert(false);
     localStorage.removeItem(SESSION_KEY);
     fetchSuggestions()
-      .then((d) => setSuggestions(d.suggestions))
+      .then((d) => {
+        setSuggestions(d.suggestions);
+        setSuggestionsChamp(d.suggestions_champ);
+      })
       .catch(() => {});
   };
+
+  /** Clic sur une chip : réponse instantanée, aucune frappe — les valeurs sont déjà connues
+   * (voir `reponse_champ` côté backend), donc aucune extraction sémantique n'est déclenchée. */
+  const pickChip = (label: string, valeurs: Record<string, unknown>) => {
+    if (!suggestionsChamp) return;
+    setPickedLabel(label);
+    void send(label, { kind: "reponse_champ", champ: suggestionsChamp.champ, valeurs });
+  };
+
+  /** « Autre » : la saisie libre reste toujours disponible — on ouvre/focus simplement le champ
+   * déjà présent en bas de l'écran plutôt que de dupliquer un input. */
+  const openAutre = () => {
+    setPickedLabel("__autre__");
+    setAutreOuvert(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  // Affinage progressif (chantier 1.2) : les chips déterministes s'affichent déjà ; pour un champ
+  // OUVERT (ex. ca_estime), on tente en tâche de fond des suggestions plus contextualisées — sans
+  // jamais bloquer ni remplacer l'affichage tant que la réponse n'est pas là.
+  useEffect(() => {
+    if (!suggestionsChamp?.ouvert) return;
+    let annule = false;
+    setRefiningChamp(true);
+    affinerSuggestions(suggestionsChamp.champ)
+      .then((d) => {
+        if (annule || !d.suggestions) return;
+        setSuggestionsChamp((prev) =>
+          prev && prev.champ === suggestionsChamp.champ ? { ...prev, suggestions: d.suggestions! } : prev,
+        );
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!annule) setRefiningChamp(false);
+      });
+    return () => {
+      annule = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestionsChamp?.champ]);
 
   const patchField = async (field: string, value: string | number | boolean) => {
     try {
@@ -330,19 +400,32 @@ export function GuidanceChat() {
           {empty && (
             <div className="bg-white border border-border rounded-2xl p-6 animate-fade-in">
               <p className="text-sm text-ink/60 leading-relaxed">
-                Décrivez votre activité avec vos mots — je construis votre situation au fil de la
-                discussion, puis votre feuille de route. Aucun formulaire.
+                Un clic suffit pour répondre — ou décrivez votre activité avec vos mots, la saisie
+                libre reste toujours possible via « Autre ».
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {suggestions.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => void send(s)}
-                    className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96] text-left"
-                  >
-                    {s}
-                  </button>
-                ))}
+              <div className="mt-4">
+                {suggestionsChamp ? (
+                  <SuggestionChips
+                    structure={suggestionsChamp}
+                    onPick={pickChip}
+                    onAutre={openAutre}
+                    picked={pickedLabel}
+                    disabled={busy}
+                    refining={refiningChamp}
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => void send(s)}
+                        className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96] text-left"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -459,40 +542,40 @@ export function GuidanceChat() {
             suggestions n'ont plus de sens et ne doivent pas réapparaître (y compris en rouvrant
             une conversation dont le profil était déjà complet). */}
         <div className="shrink-0 mt-4 pt-4 border-t border-border space-y-3">
-          {!empty && !roadmap && suggestions.length > 0 && !busy && (
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => void send(s)}
-                  className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96]"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void send(input);
-            }}
-            className="flex gap-2"
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Décrivez votre activité, ou posez votre question…"
-              className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
+          {!empty && !roadmap && suggestionsChamp && !busy && (
+            <SuggestionChips
+              structure={suggestionsChamp}
+              onPick={pickChip}
+              onAutre={openAutre}
+              picked={pickedLabel}
+              disabled={busy}
+              refining={refiningChamp}
             />
-            <button
-              type="submit"
-              disabled={busy || !input.trim()}
-              className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
+          )}
+          {(autreOuvert || !suggestionsChamp || roadmap) && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void send(input);
+              }}
+              className="flex gap-2 animate-slide-up"
             >
-              Envoyer
-            </button>
-          </form>
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Décrivez votre activité, ou posez votre question…"
+                className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
+              />
+              <button
+                type="submit"
+                disabled={busy || !input.trim()}
+                className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
+              >
+                Envoyer
+              </button>
+            </form>
+          )}
         </div>
       </div>
 

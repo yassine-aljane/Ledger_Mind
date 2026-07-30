@@ -280,6 +280,11 @@ def questions_manquantes(profil: dict) -> list[dict]:
 # voit alors sa propre réponse ignorée et la question reposée à l'identique.
 # « Je ne sais pas encore » ne renseigne rien volontairement : c'est `_resoudre_question` qui
 # applique alors une hypothèse prudente.
+#
+# Champs FERMÉS (oui/non, choix fini) : ces suggestions suffisent, jamais affinées par LLM.
+# Champs OUVERTS (voir `_CHAMPS_OUVERTS`) : celles-ci sont les valeurs par défaut, affichées
+# immédiatement ; le front peut ensuite les affiner via `affiner_suggestions()` (LLM,
+# progressive enhancement, jamais bloquant).
 _REPONSES_RAPIDES: dict[str, list[tuple[str, dict]]] = {
     "activite": [
         ("Création de contenu", {"activite": "création de contenu"}),
@@ -295,7 +300,93 @@ _REPONSES_RAPIDES: dict[str, list[tuple[str, dict]]] = {
         ("Oui, je vends aussi des produits", {"vend_produits": True}),
         ("Non, uniquement des prestations", {"vend_produits": False}),
     ],
+    "devise": [
+        ("Mes montants sont déjà en euros", {"devise": "EUR"}),
+        ("Je ne connais pas le taux exact", {}),
+    ],
 }
+
+# Champs dont les 3 suggestions PEUVENT être affinées par LLM à partir du contexte déjà connu
+# (jamais les champs fermés : vend_produits reste un simple oui/non déterministe).
+_CHAMPS_OUVERTS = {"ca_estime"}
+
+
+def _reponses_ventilation(profil: dict) -> list[tuple[str, dict]]:
+    """Répartition prestations/vente — pur calcul déterministe sur le CA déjà connu (pas de LLM :
+    ce n'est pas une règle fiscale, juste une répartition arithmétique du montant déclaré)."""
+    ca = float(profil.get("ca_estime") or 0)
+    return [
+        ("Uniquement des prestations", {"ca_prestations": ca, "ca_vente": 0.0}),
+        ("Uniquement de la vente", {"ca_prestations": 0.0, "ca_vente": ca}),
+        ("Un mélange des deux (50/50)", {"ca_prestations": round(ca / 2, 2), "ca_vente": round(ca / 2, 2)}),
+    ]
+
+
+def reponses_rapides_pour(champ: str, profil: dict) -> list[tuple[str, dict]]:
+    """Renvoie les (label, valeurs) déterministes pour un champ — certaines dépendent du profil
+    (ventilation), la plupart viennent de la table statique `_REPONSES_RAPIDES`."""
+    if champ == "ventilation":
+        return _reponses_ventilation(profil)
+    return list(_REPONSES_RAPIDES.get(champ, []))
+
+
+def suggestions_champ_pour(profil: dict) -> dict | None:
+    """Structure complète pour la question courante : champ, question, 3 chips déterministes
+    (label + valeurs à appliquer directement, sans LLM) et si le champ est ouvert (donc
+    éligible à un affinage LLM ultérieur, en progressive enhancement)."""
+    manquantes = questions_manquantes(profil)
+    if not manquantes:
+        return None
+    item = manquantes[0]
+    champ = item["champ"]
+    return {
+        "champ": champ,
+        "question": item["question"],
+        "ouvert": champ in _CHAMPS_OUVERTS,
+        "suggestions": [
+            {"label": libelle, "valeurs": valeurs}
+            for libelle, valeurs in reponses_rapides_pour(champ, profil)
+        ],
+    }
+
+
+_AFFINAGE_SYS = """Tu proposes 3 suggestions de chiffre d'affaires COURTES et PLAUSIBLES pour un
+créateur de contenu / freelance français, à partir de son activité déjà connue. Ce ne sont que des
+raccourcis de saisie pour l'utilisateur — jamais une estimation fiscale, jamais un chiffre imposé.
+
+Réponds en JSON STRICT : {"suggestions": [{"label": "...", "ca_annuel": <nombre>}, ...]} — exactement
+3 entrées, montants annuels en euros, labels courts (« Environ 1 200 €/mois », etc.). N'invente
+aucune règle fiscale, ne mentionne aucun seuil, aucun régime : uniquement des montants plausibles."""
+
+
+async def affiner_suggestions(champ: str, profil: dict) -> list[dict] | None:
+    """Affine les suggestions d'un champ OUVERT via LLM, à partir du contexte déjà connu.
+
+    Ne bloque jamais l'affichage (le front montre déjà les valeurs par défaut déterministes) :
+    renvoie None sur tout échec/absence de contexte plutôt que de lever — le repli déterministe
+    reste affiché tel quel.
+    """
+    if champ not in _CHAMPS_OUVERTS:
+        return None
+    activite = (profil.get("activite") or "").strip()
+    if not activite:
+        return None  # rien à affiner sans contexte : les valeurs par défaut suffisent
+    try:
+        data = await chat_json_with_system(
+            _AFFINAGE_SYS, f"Activité : {activite}", temperature=0.3, max_tokens=200,
+        )
+        propositions = data.get("suggestions")
+        if not isinstance(propositions, list) or len(propositions) != 3:
+            return None
+        out = []
+        for p in propositions:
+            label, montant = p.get("label"), p.get("ca_annuel")
+            if isinstance(label, str) and label.strip() and isinstance(montant, (int, float)):
+                out.append({"label": label.strip(), "valeurs": {"ca_estime": float(montant)}})
+        return out if len(out) == 3 else None
+    except Exception as exc:  # noqa: BLE001
+        logger.info("Affinage de suggestions indisponible pour %s : %s", champ, exc)
+        return None
 
 
 def suggestions_pour(profil: dict) -> list[str]:
@@ -303,13 +394,16 @@ def suggestions_pour(profil: dict) -> list[str]:
     manquantes = questions_manquantes(profil)
     if not manquantes:
         return []
-    return [libelle for libelle, _ in _REPONSES_RAPIDES.get(manquantes[0]["champ"], [])]
+    return [libelle for libelle, _ in reponses_rapides_pour(manquantes[0]["champ"], profil)]
 
 
-def _reponse_rapide(message: str) -> dict:
+def _reponse_rapide(message: str, profil: dict | None = None) -> dict:
     """Traduit le texte EXACT d'une réponse rapide en valeurs de profil, sans appel LLM."""
     cle = message.strip().lower().rstrip(".!")
-    for choix in _REPONSES_RAPIDES.values():
+    tables = list(_REPONSES_RAPIDES.values())
+    if profil is not None:
+        tables.append(_reponses_ventilation(profil))
+    for choix in tables:
         for libelle, valeurs in choix:
             if cle == libelle.lower():
                 return dict(valeurs)
@@ -466,6 +560,7 @@ async def respond(session_id: str | None, message: str, mode: str = "guidance",
             "roadmap": roadmap,
             "options": options,
             "suggestions": suggestions if suggestions is not None else suggestions_pour(profil_courant),
+            "suggestions_champ": suggestions_champ_pour(profil_courant),
             "profil_complet": not questions_manquantes(profil_courant),
             "debug": debug,
         }
@@ -478,63 +573,80 @@ async def respond(session_id: str | None, message: str, mode: str = "guidance",
         return _paquet(result["reponse"], result["sources"], result["roadmap"], None,
                        {"intention": "guidance", "action": action})
 
+    async def _continuer(message: str, profil: dict, profil_avant: dict) -> dict:
+        """Suite commune aux deux chemins (chip directe / saisie libre extraite) : anti-boucle,
+        prochaine question ou feuille de route — partagée pour ne pas dupliquer la logique
+        déterministe entre les deux points d'entrée."""
+
+        # --- Espace « assistant fiscal » : Q&A sourcée sur le corpus, jamais de feuille de route ---
+        if stype == "pedagogue":
+            from app.agents import pedagogue
+
+            reformulee = await reformuler(message, historique, profil)
+            verdict = verdict_courant(profil) if profil.get("ca_estime") is not None else None
+            resultat = await pedagogue.answer(
+                reformulee, concerne=None, profil=profil,
+                historique=historique[-12:], regime_verdict=verdict,
+            )
+            return _paquet(
+                resultat["reponse"], resultat["sources"], None, None,
+                {"intention": "pedagogue", "question_reformulee": reformulee,
+                 "avertissement_fraicheur": resultat.get("avertissement_fraicheur", False),
+                 "bofip_live_utilise": resultat.get("bofip_live_utilise", False)},
+                suggestions=[],
+            )
+
+        manquantes = questions_manquantes(profil)
+        note: str | None = None
+        if manquantes:
+            # Anti-boucle : la même question qu'au tour précédent reste sans réponse exploitable ?
+            # On interprète alors la réponse et on applique une hypothèse prudente plutôt que de
+            # re-poser la question à l'identique.
+            pending_avant = questions_manquantes(profil_avant)
+            if (pending_avant and pending_avant[0]["champ"] == manquantes[0]["champ"]
+                    and _a_repondu_assistant(historique)):
+                debloque, note = await _resoudre_question(uid, manquantes[0], message, profil)
+                if debloque:
+                    profil = store.get_profil(uid)
+                    manquantes = questions_manquantes(profil)
+
+        if manquantes:
+            reste = len(manquantes)
+            jauge = ("Il me reste une information à connaître" if reste == 1
+                     else f"Il me reste {reste} informations à connaître") + \
+                    " pour te proposer une feuille de route. "
+            texte = f"{note} {jauge}".strip() if note else jauge
+            return _paquet(texte + manquantes[0]["question"], [], None, None,
+                           {"intention": "guidance", "champ_attendu": manquantes[0]["champ"]})
+
+        # Anti-boucle durabilité : la question « CA de l'an dernier ? » était pendante et reste
+        # non résolue -> interprète, sinon hypothèse prudente.
+        if (_durabilite_indeterminee(profil) and _durabilite_indeterminee(profil_avant)
+                and _a_repondu_assistant(historique)):
+            if await _resoudre_durabilite(uid, message):
+                profil = store.get_profil(uid)
+
+        result = await guidance_chat(message, _profil_roadmap(profil))
+        options = _options_bascule(profil, result["roadmap"])
+        reponse = f"{note} {result['reponse']}".strip() if note else result["reponse"]
+        return _paquet(reponse, result["sources"], result["roadmap"], options,
+                       {"intention": "guidance"}, suggestions=[])
+
+    # --- Chip de suggestion cliquée (champ fermé/ouvert) : applique DIRECTEMENT, sans LLM ---
+    # C'est le cœur de la refonte « profilage rapide » : une chip porte déjà les valeurs de
+    # profil qu'elle renseigne (voir `reponses_rapides_pour`), donc aucune extraction sémantique
+    # n'est nécessaire — contrairement à la saisie libre, qui passe toujours par `extraire_profil`.
+    if action and action.get("kind") == "reponse_champ":
+        profil_avant_chip = store.get_profil(uid)
+        valeurs = action.get("valeurs") or {}
+        profil = store.patch_profil(uid, valeurs) if valeurs else profil_avant_chip
+        store.add_message(sid, "user", message)
+        return await _continuer(message, profil, profil_avant_chip)
+
     profil_avant = store.get_profil(uid)
     profil = store.patch_profil(uid, await extraire_profil(message, profil_avant))
     store.add_message(sid, "user", message)
-
-    # --- Espace « assistant fiscal » : Q&A sourcée sur le corpus, jamais de feuille de route ---
-    if stype == "pedagogue":
-        from app.agents import pedagogue
-
-        reformulee = await reformuler(message, historique, profil)
-        verdict = verdict_courant(profil) if profil.get("ca_estime") is not None else None
-        resultat = await pedagogue.answer(
-            reformulee, concerne=None, profil=profil,
-            historique=historique[-12:], regime_verdict=verdict,
-        )
-        return _paquet(
-            resultat["reponse"], resultat["sources"], None, None,
-            {"intention": "pedagogue", "question_reformulee": reformulee,
-             "avertissement_fraicheur": resultat.get("avertissement_fraicheur", False),
-             "bofip_live_utilise": resultat.get("bofip_live_utilise", False)},
-            suggestions=[],
-        )
-
-    manquantes = questions_manquantes(profil)
-    note: str | None = None
-    if manquantes:
-        # Anti-boucle : la même question qu'au tour précédent reste sans réponse exploitable ?
-        # On interprète alors la réponse et on applique une hypothèse prudente plutôt que de
-        # re-poser la question à l'identique.
-        pending_avant = questions_manquantes(profil_avant)
-        if (pending_avant and pending_avant[0]["champ"] == manquantes[0]["champ"]
-                and _a_repondu_assistant(historique)):
-            debloque, note = await _resoudre_question(uid, manquantes[0], message, profil)
-            if debloque:
-                profil = store.get_profil(uid)
-                manquantes = questions_manquantes(profil)
-
-    if manquantes:
-        reste = len(manquantes)
-        jauge = ("Il me reste une information à connaître" if reste == 1
-                 else f"Il me reste {reste} informations à connaître") + \
-                " pour te proposer une feuille de route. "
-        texte = f"{note} {jauge}".strip() if note else jauge
-        return _paquet(texte + manquantes[0]["question"], [], None, None,
-                       {"intention": "guidance", "champ_attendu": manquantes[0]["champ"]})
-
-    # Anti-boucle durabilité : la question « CA de l'an dernier ? » était pendante et reste
-    # non résolue -> interprète, sinon hypothèse prudente.
-    if (_durabilite_indeterminee(profil) and _durabilite_indeterminee(profil_avant)
-            and _a_repondu_assistant(historique)):
-        if await _resoudre_durabilite(uid, message):
-            profil = store.get_profil(uid)
-
-    result = await guidance_chat(message, _profil_roadmap(profil))
-    options = _options_bascule(profil, result["roadmap"])
-    reponse = f"{note} {result['reponse']}".strip() if note else result["reponse"]
-    return _paquet(reponse, result["sources"], result["roadmap"], options,
-                   {"intention": "guidance"}, suggestions=[])
+    return await _continuer(message, profil, profil_avant)
 
 
 def verdict_courant(profil: dict) -> dict | None:

@@ -41,6 +41,13 @@
   --color-coral: var(--coral);
   --color-purple-flow: var(--purple-flow);
 
+  /* Palette stricte du profilage (chips + panneau profil) : marine/butter/prune/crème. Jamais de
+     texte clair sur butter — butter n'est utilisé qu'avec du texte marine dessus. */
+  --color-marine: var(--marine);
+  --color-butter: var(--butter);
+  --color-prune: var(--prune);
+  --color-creme: var(--creme);
+
   --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
@@ -59,6 +66,10 @@
   --amber-fiscal: #ba7517;
   --coral: #e07a5f;
   --purple-flow: #8b5cf6;
+  --marine: #1b3a5f;
+  --butter: #f2d98d;
+  --prune: #7a4a63;
+  --creme: #fdfbf6;
 
   --card: #ffffff;
   --card-foreground: #16241f;
@@ -183,6 +194,67 @@
 .card-hover:hover {
   border-color: color-mix(in oklab, var(--color-ink) 30%, var(--color-border));
   box-shadow: 0 6px 24px -8px color-mix(in oklab, var(--color-ink) 12%, transparent);
+}
+
+/* Chip de suggestion de profilage (chantier "profilage rapide") — palette stricte marine/butter/
+   prune/crème. Rempli progressivement au survol en butter, texte TOUJOURS marine sur butter
+   (jamais de texte clair dessus). Sélectionné = plein marine, texte crème. Focus clavier = même
+   rendu que le survol (accessibilité). */
+@keyframes lm-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@utility chip-stagger {
+  animation: lm-stagger-in 0.35s var(--ease-out-expo) both;
+}
+
+@utility suggestion-chip {
+  position: relative;
+  color: var(--color-marine);
+  background: var(--color-creme);
+  border: 1px solid color-mix(in oklab, var(--color-marine) 25%, transparent);
+  transition:
+    background-color 0.2s var(--ease-out-expo),
+    border-color 0.2s var(--ease-out-expo),
+    transform 0.15s var(--ease-out-expo);
+}
+.suggestion-chip:hover,
+.suggestion-chip:focus-visible {
+  background: var(--color-butter);
+  border-color: var(--color-butter);
+  color: var(--color-marine);
+  outline: none;
+  transform: translateY(-1px);
+}
+.suggestion-chip:active {
+  transform: translateY(0) scale(0.97);
+}
+.suggestion-chip[data-selected="true"] {
+  background: var(--color-marine);
+  border-color: var(--color-marine);
+  color: var(--color-creme);
+}
+.suggestion-chip[data-variant="autre"] {
+  color: var(--color-prune);
+  border-color: color-mix(in oklab, var(--color-prune) 35%, transparent);
+  border-style: dashed;
+}
+.suggestion-chip[data-variant="autre"]:hover,
+.suggestion-chip[data-variant="autre"]:focus-visible {
+  background: color-mix(in oklab, var(--color-prune) 12%, var(--color-creme));
+  border-color: var(--color-prune);
+  color: var(--color-prune);
+}
+.suggestion-chip:disabled {
+  opacity: 0.5;
+  transform: none;
+  cursor: default;
 }
 
 /* Input "boxed" (fond plein, coins arrondis) : focus visible cohérent avec le style "underline"

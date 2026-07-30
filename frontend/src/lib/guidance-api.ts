@@ -62,6 +62,19 @@ export type ChatOptions = {
   choices: { label: string; value: string }[];
 };
 
+/** Une chip de suggestion pour le champ en cours — `valeurs` s'applique DIRECTEMENT au profil,
+ * sans passer par l'extraction sémantique (voir `reponse_champ` côté backend). */
+export type ChampSuggestion = { label: string; valeurs: Record<string, unknown> };
+
+/** Structure complète pour la question courante du profilage — présente dès qu'il manque une
+ * information, y compris au tout premier tour (aucune attente réseau nécessaire pour l'afficher). */
+export type SuggestionsChamp = {
+  champ: string;
+  question: string;
+  ouvert: boolean; // éligible à un affinage LLM (progressive enhancement) — jamais bloquant
+  suggestions: ChampSuggestion[];
+};
+
 export type GuidanceChatResponse = {
   session_id: string;
   reponse: string;
@@ -70,6 +83,7 @@ export type GuidanceChatResponse = {
   roadmap: Record<string, any> | null;
   options: ChatOptions | null;
   suggestions: string[];
+  suggestions_champ: SuggestionsChamp | null;
   profil_complet: boolean;
   debug?: Record<string, unknown>;
 };
@@ -99,7 +113,7 @@ export function sendGuidanceMessage(payload: {
   session_id?: string | null;
   message: string;
   mode?: "guidance" | "pedagogue";
-  action?: { kind: string; value: string } | null;
+  action?: { kind: string; champ?: string; value?: string; valeurs?: Record<string, unknown> } | null;
 }): Promise<GuidanceChatResponse> {
   return request<GuidanceChatResponse>("/chat", {
     method: "POST",
@@ -114,10 +128,17 @@ export function sendGuidanceMessage(payload: {
 
 export function fetchSuggestions(): Promise<{
   suggestions: string[];
+  suggestions_champ: SuggestionsChamp | null;
   profil: GuidanceProfile;
   profil_complet: boolean;
 }> {
   return request("/suggestions");
+}
+
+/** Affine par LLM les 3 suggestions d'un champ OUVERT (ex. ca_estime), en tâche de fond — les
+ * valeurs déterministes par défaut restent affichées tant que ceci n'a pas répondu. */
+export function affinerSuggestions(champ: string): Promise<{ suggestions: ChampSuggestion[] | null }> {
+  return request("/suggestions/affiner", { method: "POST", body: JSON.stringify({ champ }) });
 }
 
 export function fetchConversations(type = "guidance"): Promise<{

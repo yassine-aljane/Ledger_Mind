@@ -182,8 +182,26 @@ async def suggestions(uid: str = Depends(_current_uid)):
     vierge = not any(v is not None for v in (profil or {}).values())
     contextuelles = conversation.suggestions_pour(profil)
     return {"suggestions": ouverture if vierge else (contextuelles or ouverture),
+            # Toujours peuplé dès qu'une information manque (y compris au tout premier tour,
+            # "activite") — c'est la structure que le front doit préférer pour les chips ; les
+            # "amorces" de récit ci-dessus restent l'alternative narrative, jamais bloquante.
+            "suggestions_champ": conversation.suggestions_champ_pour(profil),
             "profil": profil,
             "profil_complet": not conversation.questions_manquantes(profil)}
+
+
+class AffinerSuggestionsRequest(BaseModel):
+    champ: str = Field(min_length=1)
+
+
+@router.post("/suggestions/affiner")
+async def affiner_suggestions(payload: AffinerSuggestionsRequest, uid: str = Depends(_current_uid)):
+    """Affine par LLM les 3 suggestions d'un champ OUVERT (ex. ca_estime), à partir du contexte
+    déjà connu — appelé en tâche de fond par le front pendant que les valeurs déterministes par
+    défaut sont déjà affichées (progressive enhancement, jamais bloquant)."""
+    profil = await asyncio.to_thread(store.get_profil, uid)
+    suggestions = await conversation.affiner_suggestions(payload.champ, profil)
+    return {"suggestions": suggestions}
 
 
 # -------------------------------------------------------------------- Historique des échanges
