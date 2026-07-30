@@ -19,6 +19,7 @@ obligations:
     portail_label: "Espace auto-entrepreneur URSSAF"
     source: "https://entreprendre.service-public.gouv.fr/vosdroits/F23264"
     date_verif: "2026-07-30"
+    verif_motif: "tous les 3 mois"
     regle: >
       Déclaration mensuelle (par défaut) ou trimestrielle (sur option) du chiffre d'affaires.
       Mensuelle : déclarer avant la fin du mois suivant. Trimestrielle : déclarer avant le 31/01,
@@ -53,6 +54,7 @@ obligations:
     portail_label: "Espace professionnel impots.gouv.fr"
     source: "https://www.impots.gouv.fr/professionnel/questions/je-suis-soumis-au-regime-simplifie-dimposition-la-tva-quelle-echeance-dois"
     date_verif: "2026-07-30"
+    verif_motif: "1er mai"
     regle: "Télétransmission au plus tard le 2ᵉ jour ouvré suivant le 1er mai de l'année suivante (exercice = année civile)."
 
   - id: tva_reel_normal
@@ -83,6 +85,7 @@ obligations:
     portail_label: "PayFiP.gouv.fr"
     source: "https://www.impots.gouv.fr/actualite/cfe-etou-ifer-2025-date-limite-de-paiement-des-avis-dimpot-le-15-decembre-2025-inclus"
     date_verif: "2026-07-30"
+    verif_motif: "15 décembre"
     regle: "Paiement au plus tard le 15 décembre (jour ouvré suivant si weekend). Exonération totale l'année de création."
 
   - id: des
@@ -93,4 +96,5 @@ obligations:
     portail_label: "douane.gouv.fr — espace DES"
     source: "https://www.douane.gouv.fr/fiche/la-declaration-europeenne-de-services-des"
     date_verif: "2026-07-30"
+    verif_motif: "jour ouvrable"
     regle: "Mensuelle, à déposer au plus tard le 10ᵉ jour ouvrable du mois suivant, même en franchise de TVA."

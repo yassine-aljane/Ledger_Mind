@@ -494,6 +494,18 @@ The "Payer"/"Déclarer" button always opens the real official portal (autoentrep
 impots.gouv.fr, PayFiP.gouv.fr, portailpro.gouv.fr, douane.gouv.fr) in a new tab — no payment
 integration, no banking data ever passes through LedgerMind.
 
+**RAG corpus stays dynamic, via MCP, not a one-off script.** The 6 échéancier sources (URSSAF,
+TVA régime simplifié, IR annuelle, CFE, DES) are seeded once in `data/sources.yaml` like any
+other corpus source, then kept fresh by `app/veille/scheduler.py`:
+- `_collecter()` re-fetches every échéancier `source` URL (from `data/regimes/*.yaml`, no
+  duplicated URL list) via the `docs-officiels` MCP tool on each veille cycle, and re-ingests it
+  — so the pédagogue's answers about these obligations don't go stale between manual reviews.
+- `verifier_echeancier()` (mirrors the pre-existing `verifier_seuils()` for `seuils.yaml`)
+  re-confirms the exact fact each rule depends on (`verif_motif`, e.g. "15 décembre" for CFE)
+  against the live official page. A mismatch is only ever **signalled** (`echeancier_ecarts` in
+  `GET /api/guidance/veille/last`) — `data/regimes/*.yaml` is never auto-overwritten; correcting
+  a rule stays a reviewed, human decision, exactly like a threshold change in `seuils.yaml`.
+
 ---
 
 ## 8. Sessions & data model

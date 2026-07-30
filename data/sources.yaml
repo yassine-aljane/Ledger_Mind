@@ -59,6 +59,52 @@ sources:
     autorite: 2
     concerne: ["influenceur"]
 
+  # --- Échéancier fiscal (chantier 6) — mêmes URLs que data/regimes/micro.yaml (`source` de
+  # chaque obligation). Amorcées ici une fois par seed_corpus.py ; ensuite tenues à jour par la
+  # veille réglementaire (app/veille/scheduler.py verifie_echeancier + ré-ingestion via MCP
+  # docs-officiels), pas par un nouvel appel réseau direct à chaque affichage de l'agenda.
+  - titre: "Déclaration et paiement des cotisations URSSAF (auto-entrepreneur)"
+    url: "https://entreprendre.service-public.gouv.fr/vosdroits/F23264"
+    source: "Service-Public"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "Régimes d'imposition à la TVA (réel simplifié, réel normal)"
+    url: "https://www.impots.gouv.fr/professionnel/les-regimes-dimposition-la-tva"
+    source: "DGFiP"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "TVA réel simplifié — échéance de la déclaration annuelle CA12"
+    url: "https://www.impots.gouv.fr/professionnel/questions/je-suis-soumis-au-regime-simplifie-dimposition-la-tva-quelle-echeance-dois"
+    source: "DGFiP"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "Modalités de la déclaration de revenus (2042-C-PRO)"
+    url: "https://www.impots.gouv.fr/les-modalites-de-la-declaration-de-revenus-en-2026"
+    source: "DGFiP"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "CFE/IFER — date limite de paiement"
+    url: "https://www.impots.gouv.fr/actualite/cfe-etou-ifer-2025-date-limite-de-paiement-des-avis-dimpot-le-15-decembre-2025-inclus"
+    source: "DGFiP"
+    type_doc: "actualite"
+    autorite: 2
+    concerne: ["tous"]
+
+  - titre: "Déclaration Européenne de Services (DES)"
+    url: "https://www.douane.gouv.fr/fiche/la-declaration-europeenne-de-services-des"
+    source: "Douane"
+    type_doc: "guide"
+    autorite: 2
+    concerne: ["tous"]
+
 # Sources accessibles dynamiquement via les serveurs MCP (pas besoin de les figer ici) :
 #   - BOFiP (doctrine opposable) -> serveur mcp "bofip" (API Opendatasoft, dataset bofip-vigueur)
 #       ex : POST /mcp/ingest-bofip?requete=avantages en nature influenceur

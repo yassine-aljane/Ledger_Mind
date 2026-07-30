@@ -27,13 +27,27 @@ logger = logging.getLogger(__name__)
 MOTS_CLES = ("influence commerciale influenceur micro-entreprise franchise TVA "
              "benefices non commerciaux")
 
-_dernier_rapport: dict = {"nouveautes": [], "date": None, "seuils": []}
+_dernier_rapport: dict = {
+    "nouveautes": [], "date": None, "seuils": [], "seuils_ecarts": 0,
+    "echeancier": [], "echeancier_ecarts": 0,
+}
 
 
 def _valeur_presente(valeur: int, texte: str) -> bool:
     """Vrai si le nombre apparaît dans le texte (tolère espaces, insécables, points de milliers)."""
     compact = re.sub(r"[\s .]", "", texte or "")
     return re.search(rf"(?<!\d){int(valeur)}(?!\d)", compact) is not None
+
+
+def _motif_present(motif: str, texte: str) -> bool:
+    """Vrai si le motif (ex. "15 décembre") apparaît dans le texte.
+
+    Les espaces sont entièrement retirés avant comparaison (pas seulement normalisés) : certaines
+    extractions HTML/PDF insèrent une espace parasite dans les ordinaux ("1 er mai" au lieu de
+    "1er mai"), ce qui ferait sinon remonter un faux "écart" sur un texte pourtant inchangé.
+    """
+    norm = lambda s: re.sub(r"\s+", "", (s or "").lower())
+    return norm(motif) in norm(texte)
 
 
 def _cibles_seuils() -> list[dict]:
@@ -74,6 +88,45 @@ async def verifier_seuils() -> list[dict]:
             logger.warning("Veille seuils — %s (%s) : %s %s",
                            cible["label"], cible["valeur"], statut, detail)
         resultats.append({**cible, "statut": statut, "detail": detail})
+    return resultats
+
+
+def _cibles_echeancier() -> list[dict]:
+    """Obligations du Rule Engine (data/regimes/*.yaml) qui portent un `verif_motif` — le fait
+    précis à reconfirmer à la source (ex. "15 décembre" pour la CFE). Une obligation sans motif
+    n'est pas vérifiée ici (mais reste ré-ingérée dans le corpus, voir `_collecter`)."""
+    from app.agents.echeancier import regles
+
+    cibles = []
+    for regime in ("micro",):  # seuls régimes renseignés aujourd'hui (voir data/regimes/)
+        for obligation in regles.obligations_pour_regime(regime):
+            if obligation.get("verif_motif"):
+                cibles.append(obligation)
+    return cibles
+
+
+async def verifier_echeancier() -> list[dict]:
+    """Confronte le fait clé de chaque règle d'échéance à sa source officielle. N'écrase JAMAIS
+    `data/regimes/*.yaml` automatiquement — un écart est seulement signalé, la correction reste
+    une décision humaine (même principe que verifier_seuils pour seuils.yaml)."""
+    from app.mcp import client as mcp
+
+    resultats = []
+    for cible in _cibles_echeancier():
+        statut, detail = "inaccessible", ""
+        try:
+            page = await mcp.call_tool("docs-officiels", "fetch_page",
+                                       {"cle_ou_url": cible["source"]})
+            texte = page.get("texte", "") if isinstance(page, dict) else ""
+            if texte:
+                statut = "confirme" if _motif_present(cible["verif_motif"], texte) else "ecart_possible"
+        except Exception as exc:  # noqa: BLE001
+            detail = str(exc)
+        if statut != "confirme":
+            logger.warning("Veille échéancier — %s (%s) : %s %s",
+                           cible["libelle"], cible["verif_motif"], statut, detail)
+        resultats.append({"label": cible["libelle"], "valeur": cible["verif_motif"],
+                          "source": cible["source"], "statut": statut, "detail": detail})
     return resultats
 
 
@@ -141,6 +194,28 @@ async def _collecter() -> list[dict]:
         except Exception as exc:  # noqa: BLE001
             logger.warning("MCP docs-officiels (%s) indisponible : %s", cle, exc)
 
+    # Échéancier fiscal (chantier 6) — mêmes sources que data/regimes/*.yaml. Ré-ingérées à
+    # chaque cycle : le corpus RAG du pédagogue reste dynamique sans appel réseau direct depuis
+    # l'agenda (qui, lui, ne lit jamais que le résultat déjà en cache/le Rule Engine).
+    try:
+        from app.agents.echeancier import regles as echeancier_regles
+
+        vues: set[str] = set()
+        for obligation in echeancier_regles.obligations_pour_regime("micro"):
+            url = obligation["source"]
+            if url in vues:
+                continue
+            vues.add(url)
+            try:
+                page = await mcp.call_tool("docs-officiels", "fetch_page", {"cle_ou_url": url})
+                if page.get("texte"):
+                    items.append({"titre": obligation["libelle"], "url": url, "source": "DGFiP/Service-Public",
+                                  "texte": page["texte"], "autorite": 2, "concerne": ["tous"]})
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("MCP docs-officiels (échéancier %s) indisponible : %s", obligation["id"], exc)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Rule Engine échéancier indisponible pour la veille : %s", exc)
+
     return items
 
 
@@ -164,11 +239,17 @@ async def run_veille() -> dict:
     seuils_verif = await verifier_seuils()
     ecarts = [s for s in seuils_verif if s["statut"] == "ecart_possible"]
 
+    echeancier_verif = await verifier_echeancier()
+    echeancier_ecarts = [s for s in echeancier_verif if s["statut"] == "ecart_possible"]
+
     global _dernier_rapport
     _dernier_rapport = {"nouveautes": rapport, "seuils": seuils_verif,
-                        "seuils_ecarts": len(ecarts), "date": datetime.now().isoformat()}
-    logger.info("Veille terminée : %d nouveauté(s), %d écart(s) de seuil signalé(s)",
-                len(rapport), len(ecarts))
+                        "seuils_ecarts": len(ecarts),
+                        "echeancier": echeancier_verif,
+                        "echeancier_ecarts": len(echeancier_ecarts),
+                        "date": datetime.now().isoformat()}
+    logger.info("Veille terminée : %d nouveauté(s), %d écart(s) de seuil, %d écart(s) d'échéancier",
+                len(rapport), len(ecarts), len(echeancier_ecarts))
     return _dernier_rapport
 
 
