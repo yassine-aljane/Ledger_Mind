@@ -2,6 +2,7 @@
 // Complète `api.ts` (orchestrateur de la branche SIREN) — même base d'URL, même auth.
 
 import { authHeaders, clearAuth } from "@/lib/auth";
+import { getAnonId } from "@/lib/anon";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 const BASE = `${API_BASE}/api/guidance`;
@@ -18,6 +19,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...authHeaders(),
+      "X-Anon-Id": getAnonId(),
       ...(init.headers ?? {}),
     },
   });

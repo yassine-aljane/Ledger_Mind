@@ -4,17 +4,23 @@ Complète l'orchestrateur (`/api/orchestrator`, machine à états de la branche 
 parcours CONVERSATIONNEL de la branche sans SIREN : profilage au fil de la discussion, fiche de
 statut qui se remplit toute seule, historique des conversations, feuille de route déterministe.
 
-Le profil est partagé par utilisateur (`uid` = identifiant du compte authentifié) ; sans
-authentification, l'espace fonctionne sur l'identité de démonstration `demo`.
+Le profil est partagé par utilisateur (`uid` = identifiant du compte authentifié). Sans
+authentification, `uid` vient de l'en-tête `X-Anon-Id` (un identifiant généré et conservé côté
+navigateur, voir `frontend/src/lib/anon.ts`) — PAS d'un identifiant `demo` partagé par tout le
+monde : un `uid` unique partagé entre visiteurs anonymes mélangeait leurs profils respectifs
+(CA, activité...) dans le même document Mongo, ce qui dégradait progressivement les réponses de
+l'agent pour tout le monde. Chaque visiteur anonyme a désormais sa propre mémoire, isolée.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
+import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -28,11 +34,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/guidance", tags=["guidance"])
 
-_DEMO_UID = "demo"
+_ANON_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 
 
-def _uid(user: UserPublic | None) -> str:
-    return user.id if user else _DEMO_UID
+async def _current_uid(
+    user: UserPublic | None = Depends(get_current_user_optional),
+    x_anon_id: str | None = Header(default=None, alias="X-Anon-Id"),
+) -> str:
+    if user:
+        return user.id
+    if x_anon_id and _ANON_ID_RE.match(x_anon_id):
+        return f"anon-{x_anon_id}"
+    # Pas d'en-tête (client ancien/sans JS) : identité isolée pour cette requête plutôt qu'un
+    # identifiant partagé — dégrade la continuité mais jamais la mémoire d'un autre visiteur.
+    return f"anon-{uuid.uuid4()}"
 
 
 # --------------------------------------------------------------------------------- Schémas
@@ -86,17 +101,17 @@ class AskRequest(BaseModel):
 
 # ------------------------------------------------------------------------------------ Chat
 @router.post("/chat")
-async def chat(payload: ChatRequest, user: UserPublic | None = Depends(get_current_user_optional)):
+async def chat(payload: ChatRequest, uid: str = Depends(_current_uid)):
     """Un tour de conversation : profilage, question suivante OU feuille de route."""
     action = payload.action.model_dump() if payload.action else None
     return await conversation.respond(
         payload.session_id, payload.message, payload.mode or "guidance",
-        action=action, uid=_uid(user),
+        action=action, uid=uid,
     )
 
 
 @router.post("/ask")
-async def ask(payload: AskRequest, user: UserPublic | None = Depends(get_current_user_optional)):
+async def ask(payload: AskRequest, uid: str = Depends(_current_uid)):
     """Question fiscale ponctuelle, sans conversation : réponse ancrée sur le corpus et sourcée.
 
     L'agent refuse d'inventer un chiffre absent des extraits et s'aligne sur le verdict
@@ -104,7 +119,7 @@ async def ask(payload: AskRequest, user: UserPublic | None = Depends(get_current
     """
     from app.agents import pedagogue
 
-    profil = await store.async_get_profil(_uid(user))
+    profil = await store.async_get_profil(uid)
     verdict = conversation.verdict_courant(profil) if profil.get("ca_estime") is not None else None
     return await pedagogue.answer(payload.question, concerne=payload.concerne,
                                   profil=profil, regime_verdict=verdict)
@@ -135,13 +150,13 @@ async def veille_last():
 
 
 @router.get("/suggestions")
-async def suggestions(user: UserPublic | None = Depends(get_current_user_optional)):
+async def suggestions(uid: str = Depends(_current_uid)):
     """Suggestions d'ouverture, affichées avant le premier message.
 
     Elles s'adaptent : tant que rien n'est connu, ce sont des amorces de description d'activité ;
     dès que le profil se remplit, ce sont les réponses rapides à la question courante.
     """
-    profil = await asyncio.to_thread(store.get_profil, _uid(user))
+    profil = await asyncio.to_thread(store.get_profil, uid)
     ouverture = [
         "Je débute sur Instagram et je gagne de l'argent, par où commencer ?",
         "Je fais des vidéos YouTube, environ 3000 € par mois",
@@ -160,19 +175,19 @@ async def suggestions(user: UserPublic | None = Depends(get_current_user_optiona
 # -------------------------------------------------------------------- Historique des échanges
 @router.get("/conversations")
 async def list_conversations(type: str | None = "guidance",
-                             user: UserPublic | None = Depends(get_current_user_optional)):
+                             uid: str = Depends(_current_uid)):
     """Conversations de l'utilisateur, filtrées par interface, la plus récente en premier."""
-    rows = await store.async_list_sessions(_uid(user), type)
+    rows = await store.async_list_sessions(uid, type)
     return {"conversations": rows}
 
 
 @router.get("/chat/{session_id}")
-async def chat_history(session_id: str, user: UserPublic | None = Depends(get_current_user_optional)):
+async def chat_history(session_id: str, uid: str = Depends(_current_uid)):
     """Conversation complète + profil + feuille de route + cases cochées."""
     meta = await asyncio.to_thread(store.session_meta, session_id)
     if not meta:
         raise HTTPException(status_code=404, detail="Conversation introuvable ou expirée.")
-    if meta.get("uid") and meta["uid"] != _uid(user):
+    if meta.get("uid") and meta["uid"] != uid:
         raise HTTPException(status_code=403, detail="Cette conversation ne vous appartient pas.")
     etat = await asyncio.to_thread(store.get_roadmap, session_id) or {}
     profil = await asyncio.to_thread(store.get_profil_by_session, session_id)
@@ -190,11 +205,11 @@ async def chat_history(session_id: str, user: UserPublic | None = Depends(get_cu
 
 @router.patch("/chat/{session_id}/rename")
 async def rename_conversation(session_id: str, payload: RenameRequest,
-                              user: UserPublic | None = Depends(get_current_user_optional)):
+                              uid: str = Depends(_current_uid)):
     meta = await asyncio.to_thread(store.session_meta, session_id)
     if not meta:
         raise HTTPException(status_code=404, detail="Conversation introuvable ou expirée.")
-    if meta.get("uid") and meta["uid"] != _uid(user):
+    if meta.get("uid") and meta["uid"] != uid:
         raise HTTPException(status_code=403, detail="Cette conversation ne vous appartient pas.")
     await asyncio.to_thread(store.rename_session, session_id, payload.title)
     return {"session_id": session_id, "title": payload.title.strip()[:120]}
@@ -202,11 +217,11 @@ async def rename_conversation(session_id: str, payload: RenameRequest,
 
 @router.delete("/chat/{session_id}")
 async def delete_conversation(session_id: str,
-                              user: UserPublic | None = Depends(get_current_user_optional)):
+                              uid: str = Depends(_current_uid)):
     meta = await asyncio.to_thread(store.session_meta, session_id)
     if not meta:
         raise HTTPException(status_code=404, detail="Conversation introuvable ou expirée.")
-    if meta.get("uid") and meta["uid"] != _uid(user):
+    if meta.get("uid") and meta["uid"] != uid:
         raise HTTPException(status_code=403, detail="Cette conversation ne vous appartient pas.")
     await asyncio.to_thread(store.delete_session, session_id)
     return {"session_id": session_id, "supprimee": True}
@@ -214,28 +229,28 @@ async def delete_conversation(session_id: str,
 
 # ----------------------------------------------------- Profil partagé (fiche de statut adaptative)
 @router.get("/profil")
-async def get_profil(user: UserPublic | None = Depends(get_current_user_optional)):
-    profil = await store.async_get_profil(_uid(user))
+async def get_profil(uid: str = Depends(_current_uid)):
+    profil = await store.async_get_profil(uid)
     return {"profil": profil, "verdict": conversation.verdict_courant(profil) if profil else None,
             "manquantes": [q["champ"] for q in conversation.questions_manquantes(profil)]}
 
 
 @router.patch("/profil")
 async def patch_profil(payload: ProfilPatchRequest,
-                       user: UserPublic | None = Depends(get_current_user_optional)):
+                       uid: str = Depends(_current_uid)):
     """Correction manuelle depuis la fiche de statut (chaque carte est éditable)."""
-    profil = await store.async_patch_profil(_uid(user), payload.model_dump())
+    profil = await store.async_patch_profil(uid, payload.model_dump())
     return {"profil": profil,
             "manquantes": [q["champ"] for q in conversation.questions_manquantes(profil)]}
 
 
 @router.delete("/profil/{field}")
 async def clear_profil_field(field: str,
-                             user: UserPublic | None = Depends(get_current_user_optional)):
+                             uid: str = Depends(_current_uid)):
     """Efface une information du profil (croix sur une carte de la fiche de statut)."""
     if field not in store.PROFILE_FIELDS:
         raise HTTPException(status_code=400, detail=f"Champ inconnu : {field}")
-    profil = await asyncio.to_thread(store.clear_profil_field, _uid(user), field)
+    profil = await asyncio.to_thread(store.clear_profil_field, uid, field)
     return {"profil": profil,
             "manquantes": [q["champ"] for q in conversation.questions_manquantes(profil)]}
 
@@ -257,7 +272,7 @@ async def save_roadmap_state(session_id: str, payload: RoadmapStateRequest):
 
 @router.post("/roadmap/pdf")
 async def roadmap_pdf(payload: RoadmapPdfRequest,
-                      user: UserPublic | None = Depends(get_current_user_optional)):
+                      uid: str = Depends(_current_uid)):
     """Feuille de route en PDF téléchargeable.
 
     Priorité à la feuille de route PERSISTÉE de la conversation : le PDF est ainsi strictement
@@ -268,7 +283,7 @@ async def roadmap_pdf(payload: RoadmapPdfRequest,
         etat = await asyncio.to_thread(store.get_roadmap, payload.session_id) or {}
         roadmap = etat.get("roadmap")
     if roadmap is None:
-        profil = payload.profil or await store.async_get_profil(_uid(user))
+        profil = payload.profil or await store.async_get_profil(uid)
         if not profil:
             raise HTTPException(status_code=404, detail="Aucune feuille de route à exporter.")
         roadmap = build_roadmap({**profil, "ca_estime_annuel": profil.get("ca_estime", 0)})

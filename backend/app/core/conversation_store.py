@@ -112,15 +112,20 @@ def _doc_to_profil(doc: dict | None) -> dict:
 
 # --------------------------------------------------------------------------- Conversations
 def purge_expirees() -> int:
-    """Supprime les conversations inactives depuis plus de `_TTL_DAYS`, et leurs dépendances."""
+    """Supprime les conversations inactives depuis plus de `_TTL_DAYS`, et leurs dépendances.
+
+    Purge aussi les profils anonymes (`uid` préfixé `anon-`, voir `app/api/guidance.py`) inactifs
+    depuis le même délai : chacun est isolé par visiteur, donc rien à perdre à les nettoyer — au
+    contraire d'un profil de compte authentifié, qui doit persister indéfiniment.
+    """
     _ensure_schema()
     limite = _now() - timedelta(days=_TTL_DAYS)
     ids = [row["id"] for row in _conversations().find({"updated_at": {"$lt": limite}}, {"id": 1})]
-    if not ids:
-        return 0
-    _messages().delete_many({"conversation_id": {"$in": ids}})
-    _roadmaps().delete_many({"conversation_id": {"$in": ids}})
-    _conversations().delete_many({"id": {"$in": ids}})
+    if ids:
+        _messages().delete_many({"conversation_id": {"$in": ids}})
+        _roadmaps().delete_many({"conversation_id": {"$in": ids}})
+        _conversations().delete_many({"id": {"$in": ids}})
+    _profiles().delete_many({"uid": {"$regex": "^anon-"}, "updated_at": {"$lt": limite}})
     return len(ids)
 
 
