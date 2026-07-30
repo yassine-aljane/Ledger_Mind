@@ -94,6 +94,12 @@
   * {
     border-color: var(--color-border);
   }
+  html {
+    /* Hausse de la taille de police de base (16px navigateur -> 23px) : comme les utilitaires
+       Tailwind (text-sm, text-lg, ...) sont en rem, tout le site grandit proportionnellement
+       depuis ce seul endroit, sans retoucher chaque composant. */
+    font-size: 23px;
+  }
   html,
   body {
     background-color: var(--color-background);

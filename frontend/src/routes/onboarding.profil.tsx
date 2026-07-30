@@ -146,7 +146,7 @@ function ProfilPage() {
             />
           )
         ) : (
-          <div className="max-w-2xl mx-auto animate-slide-up space-y-8">
+          <div className="max-w-3xl mx-auto animate-slide-up space-y-8">
             <div>
               <div className="flex items-center justify-between">
                 <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-teal-dark mb-2">
@@ -159,7 +159,8 @@ function ProfilPage() {
                   ↺ Recommencer
                 </button>
               </div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-balance">
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-balance inline-flex items-center gap-3">
+                <span aria-hidden>✨</span>
                 Vérifiez et ajustez <span className="italic font-normal">votre profil</span>.
               </h1>
               <p className="mt-3 text-ink/60 text-pretty">
@@ -170,8 +171,8 @@ function ProfilPage() {
 
             {(profile.denomination || profile.siret) && (
               <div className="bg-teal-dark/5 border border-teal-dark/20 rounded-2xl p-5">
-                <p className="text-xs uppercase tracking-widest text-teal-dark font-semibold mb-2">
-                  Vérification SIRET
+                <p className="text-xs uppercase tracking-widest text-teal-dark font-semibold mb-2 inline-flex items-center gap-1.5">
+                  <span aria-hidden>✅</span> Vérification SIRET
                 </p>
                 <p className="font-semibold">{profile.denomination ?? "—"}</p>
                 <p className="font-mono text-sm text-ink/60 mt-1">{profile.siret}</p>
@@ -202,14 +203,16 @@ function ProfilPage() {
               </div>
             )}
 
-            <div className="bg-white border border-border rounded-2xl divide-y divide-border shadow-sm">
+            <Section icon="🎯" title="Votre activité">
               <ProfileListField
+                icon="🧩"
                 label="Types d'activité"
                 field="activity_types"
                 profile={profile}
                 editingField={editingField}
                 setEditingField={setEditingField}
                 updateProfileField={updateProfileField}
+                full
                 render={(val) =>
                   (val as string[]).length > 0 ? (
                     (val as string[]).map((act, i) => (
@@ -223,12 +226,14 @@ function ProfilPage() {
                 }
               />
               <ProfileListField
+                icon="📡"
                 label="Sources de revenus / Plateformes"
                 field="revenue_sources"
                 profile={profile}
                 editingField={editingField}
                 setEditingField={setEditingField}
                 updateProfileField={updateProfileField}
+                full
                 render={(val) =>
                   (val as string[]).length > 0 ? (
                     (val as string[]).map((src, i) => (
@@ -241,7 +246,20 @@ function ProfilPage() {
                   )
                 }
               />
+            </Section>
+
+            <Section icon="💶" title="Revenus & devises">
+              <ProfileStringField
+                icon="📅"
+                label="Revenu mensuel estimé"
+                field="estimated_monthly_revenue"
+                profile={profile}
+                editingField={editingField}
+                setEditingField={setEditingField}
+                updateProfileField={updateProfileField}
+              />
               <ProfileListField
+                icon="💱"
                 label="Devises de paiement"
                 field="currencies"
                 profile={profile}
@@ -261,6 +279,7 @@ function ProfilPage() {
                 }
               />
               <BoolField
+                icon="🌍"
                 label="Clients internationaux"
                 value={profile.international_clients}
                 onToggle={() =>
@@ -269,16 +288,12 @@ function ProfilPage() {
                 trueLabel="Oui (factures hors France / UE)"
                 falseLabel="Non (France uniquement)"
               />
-              <ProfileStringField
-                label="Revenu mensuel estimé"
-                field="estimated_monthly_revenue"
-                profile={profile}
-                editingField={editingField}
-                setEditingField={setEditingField}
-                updateProfileField={updateProfileField}
-              />
               <VariabilityField profile={profile} updateProfileField={updateProfileField} />
+            </Section>
+
+            <Section icon="📄" title="Facturation & contrats">
               <BoolField
+                icon="🧾"
                 label="Factures déjà émises"
                 value={profile.invoices_already_issued}
                 onToggle={() =>
@@ -286,6 +301,7 @@ function ProfilPage() {
                 }
               />
               <BoolField
+                icon="🔄"
                 label="Contrats récurrents"
                 value={profile.has_recurring_contracts}
                 onToggle={() =>
@@ -295,6 +311,7 @@ function ProfilPage() {
                 falseLabel="Non (one-shot / par mission)"
               />
               <BoolField
+                icon="🎁"
                 label="Cadeaux & dotations en nature"
                 value={profile.in_kind_gifts}
                 onToggle={() =>
@@ -303,6 +320,7 @@ function ProfilPage() {
                 trueLabel="Oui (produits, voyages, dotations)"
               />
               <ProfileStringField
+                icon="🚀"
                 label="Début des premiers revenus"
                 field="first_income_date"
                 profile={profile}
@@ -310,7 +328,7 @@ function ProfilPage() {
                 setEditingField={setEditingField}
                 updateProfileField={updateProfileField}
               />
-            </div>
+            </Section>
 
             {doneTranscript && doneTranscript.length > 0 && (
               <div className="border border-border rounded-2xl bg-slate-50 p-4">
@@ -342,8 +360,9 @@ function ProfilPage() {
 
             <button
               onClick={() => navigate({ to: "/dashboard" })}
-              className="w-full px-8 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] text-center text-base shadow-md"
+              className="w-full px-8 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] text-center text-base shadow-md inline-flex items-center justify-center gap-2"
             >
+              <span aria-hidden>🚀</span>
               Confirmer mon profil et continuer vers mon dashboard →
             </button>
           </div>
@@ -353,7 +372,48 @@ function ProfilPage() {
   );
 }
 
+/** Petite tuile qui encadre chaque champ de la fiche — icône + libellé + valeur + action,
+ * plus vivante qu'une simple ligne de liste tout en gardant la même logique d'édition. */
+function FieldTile({
+  icon,
+  label,
+  action,
+  children,
+}: {
+  icon: string;
+  label: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl bg-background border border-border p-4 hover:border-teal-dark/40 hover:shadow-[0_4px_16px_-8px_rgba(22,36,31,0.15)] transition-all duration-200">
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-sm font-semibold uppercase tracking-wider text-ink/45 inline-flex items-center gap-1.5">
+          <span aria-hidden className="text-base leading-none">{icon}</span>
+          {label}
+        </span>
+        {action}
+      </div>
+      <div className="mt-2">{children}</div>
+    </div>
+  );
+}
+
+/** En-tête de section — regroupe des champs apparentés sous un même thème visuel. */
+function Section({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <section className="bg-white border border-border rounded-2xl p-6 shadow-sm">
+      <p className="font-semibold text-lg mb-4 inline-flex items-center gap-2">
+        <span aria-hidden className="text-xl leading-none">{icon}</span>
+        {title}
+      </p>
+      <div className="grid sm:grid-cols-2 gap-3">{children}</div>
+    </section>
+  );
+}
+
 function ProfileListField<K extends keyof UserProfile>({
+  icon,
   label,
   field,
   profile,
@@ -361,7 +421,9 @@ function ProfileListField<K extends keyof UserProfile>({
   setEditingField,
   updateProfileField,
   render,
+  full = false,
 }: {
+  icon: string;
   label: string;
   field: K;
   profile: UserProfile;
@@ -369,12 +431,23 @@ function ProfileListField<K extends keyof UserProfile>({
   setEditingField: (f: string | null) => void;
   updateProfileField: <Key extends keyof UserProfile>(field: Key, value: UserProfile[Key]) => void;
   render: (val: UserProfile[K]) => React.ReactNode;
+  full?: boolean;
 }) {
   const val = profile[field];
   return (
-    <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-background/40 transition-colors duration-200">
-      <div className="space-y-1">
-        <span className="text-xs font-semibold uppercase tracking-wider text-ink/40">{label}</span>
+    <div className={full ? "sm:col-span-2" : ""}>
+      <FieldTile
+        icon={icon}
+        label={label}
+        action={
+          <button
+            onClick={() => setEditingField(editingField === field ? null : (field as string))}
+            className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 shrink-0"
+          >
+            {editingField === field ? "Valider" : "Modifier"}
+          </button>
+        }
+      >
         {editingField === field ? (
           <input
             type="text"
@@ -388,20 +461,15 @@ function ProfileListField<K extends keyof UserProfile>({
             autoFocus
           />
         ) : (
-          <div className="flex flex-wrap gap-1.5 pt-1">{render(val)}</div>
+          <div className="flex flex-wrap gap-1.5">{render(val)}</div>
         )}
-      </div>
-      <button
-        onClick={() => setEditingField(editingField === field ? null : (field as string))}
-        className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 self-start sm:self-center"
-      >
-        {editingField === field ? "Valider" : "Modifier"}
-      </button>
+      </FieldTile>
     </div>
   );
 }
 
 function ProfileStringField({
+  icon,
   label,
   field,
   profile,
@@ -409,6 +477,7 @@ function ProfileStringField({
   setEditingField,
   updateProfileField,
 }: {
+  icon: string;
   label: string;
   field: "estimated_monthly_revenue" | "first_income_date";
   profile: UserProfile;
@@ -418,43 +487,47 @@ function ProfileStringField({
 }) {
   const val = profile[field];
   return (
-    <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-background/40 transition-colors duration-200">
-      <div className="space-y-1 flex-1">
-        <span className="text-xs font-semibold uppercase tracking-wider text-ink/40">{label}</span>
-        {editingField === field ? (
-          <input
-            type="text"
-            className="w-full text-sm p-2 border border-teal-dark rounded-lg input-boxed focus:outline-none"
-            defaultValue={val ?? ""}
-            onBlur={(e) => {
-              updateProfileField(field, e.target.value || null);
-              setEditingField(null);
-            }}
-            autoFocus
-          />
-        ) : (
-          <p className="text-sm font-semibold text-ink">
-            {val || <span className="italic text-ink/40 font-normal">Non renseigné</span>}
-          </p>
-        )}
-      </div>
-      <button
-        onClick={() => setEditingField(editingField === field ? null : field)}
-        className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 self-start sm:self-center"
-      >
-        {editingField === field ? "Valider" : "Modifier"}
-      </button>
-    </div>
+    <FieldTile
+      icon={icon}
+      label={label}
+      action={
+        <button
+          onClick={() => setEditingField(editingField === field ? null : field)}
+          className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 shrink-0"
+        >
+          {editingField === field ? "Valider" : "Modifier"}
+        </button>
+      }
+    >
+      {editingField === field ? (
+        <input
+          type="text"
+          className="w-full text-sm p-2 border border-teal-dark rounded-lg input-boxed focus:outline-none"
+          defaultValue={val ?? ""}
+          onBlur={(e) => {
+            updateProfileField(field, e.target.value || null);
+            setEditingField(null);
+          }}
+          autoFocus
+        />
+      ) : (
+        <p className="text-base font-semibold text-ink">
+          {val || <span className="italic text-ink/40 font-normal">Non renseigné</span>}
+        </p>
+      )}
+    </FieldTile>
   );
 }
 
 function BoolField({
+  icon,
   label,
   value,
   onToggle,
   trueLabel = "Oui",
   falseLabel = "Non",
 }: {
+  icon: string;
   label: string;
   value: boolean | null;
   onToggle: () => void;
@@ -462,17 +535,22 @@ function BoolField({
   falseLabel?: string;
 }) {
   return (
-    <div className="p-5 flex items-center justify-between gap-4 hover:bg-background/40 transition-colors duration-200">
-      <div>
-        <span className="text-xs font-semibold uppercase tracking-wider text-ink/40 block">{label}</span>
-        <span className="text-sm font-medium text-ink">
-          {value === null ? "Non précisé" : value ? trueLabel : falseLabel}
-        </span>
-      </div>
-      <button onClick={onToggle} className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200">
-        Changer
-      </button>
-    </div>
+    <FieldTile
+      icon={icon}
+      label={label}
+      action={
+        <button
+          onClick={onToggle}
+          className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 shrink-0"
+        >
+          Changer
+        </button>
+      }
+    >
+      <span className="text-base font-medium text-ink">
+        {value === null ? "Non précisé" : value ? trueLabel : falseLabel}
+      </span>
+    </FieldTile>
   );
 }
 
@@ -484,34 +562,31 @@ function VariabilityField({
   updateProfileField: <K extends keyof UserProfile>(field: K, value: UserProfile[K]) => void;
 }) {
   return (
-    <div className="p-5 flex items-center justify-between gap-4 hover:bg-background/40 transition-colors duration-200">
-      <div>
-        <span className="text-xs font-semibold uppercase tracking-wider text-ink/40 block">
-          Stabilité des revenus
-        </span>
-        <span className="text-sm font-medium text-ink">
+    <FieldTile icon="📈" label="Stabilité des revenus">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="text-base font-medium text-ink">
           {profile.revenue_variability === "stable"
             ? "Revenus stables"
             : profile.revenue_variability === "spiky"
             ? "Revenus irréguliers (pics de saisonnalité)"
             : "Non précisé"}
         </span>
+        <div className="flex gap-2">
+          {(["stable", "spiky"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => updateProfileField("revenue_variability", v)}
+              className={`px-3 py-1 text-xs rounded-full border transition-all duration-200 active:scale-[0.95] ${
+                profile.revenue_variability === v
+                  ? "bg-teal-dark text-white border-teal-dark"
+                  : "bg-white text-ink/60 border-border hover:border-teal-dark"
+              }`}
+            >
+              {v === "stable" ? "Stables" : "Irréguliers"}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="flex gap-2">
-        {(["stable", "spiky"] as const).map((v) => (
-          <button
-            key={v}
-            onClick={() => updateProfileField("revenue_variability", v)}
-            className={`px-3 py-1 text-xs rounded-full border transition-all duration-200 active:scale-[0.95] ${
-              profile.revenue_variability === v
-                ? "bg-teal-dark text-white border-teal-dark"
-                : "bg-white text-ink/60 border-border hover:border-teal-dark"
-            }`}
-          >
-            {v === "stable" ? "Stables" : "Irréguliers"}
-          </button>
-        ))}
-      </div>
-    </div>
+    </FieldTile>
   );
 }

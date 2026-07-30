@@ -259,8 +259,8 @@ export function Chatbot({
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-fade-in">
       <div className="flex items-center justify-between gap-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-          {eyebrow}
+        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark inline-flex items-center gap-1.5">
+          <span aria-hidden>🧭</span> {eyebrow}
         </p>
         <div className="flex-1 h-[3px] bg-border rounded-full overflow-hidden max-w-xs">
           <div
@@ -278,32 +278,50 @@ export function Chatbot({
       <div className="space-y-6 min-h-[360px]">
         {turns.map((t) =>
           t.role === "assistant" ? (
-            <div key={t.id} className="flex flex-col gap-1 max-w-[85%] animate-slide-up">
-              <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[15px] leading-relaxed text-ink shadow-sm">
-                {t.text}
-              </div>
-              <span className="text-[10px] uppercase opacity-40 font-mono ml-1">
-                {t.time} — Assistant
+            <div key={t.id} className="flex items-end gap-2.5 max-w-[85%] animate-slide-up">
+              <span
+                aria-hidden
+                className="shrink-0 size-8 rounded-full bg-teal-dark/10 text-teal-dark grid place-items-center text-sm mb-4"
+              >
+                🤖
               </span>
+              <div className="flex flex-col gap-1 min-w-0">
+                <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[15px] leading-relaxed text-ink shadow-sm">
+                  {t.text}
+                </div>
+                <span className="text-[10px] uppercase opacity-40 font-mono ml-1">
+                  {t.time} — Assistant
+                </span>
+              </div>
             </div>
           ) : (
             <div
               key={t.id}
-              className="flex flex-col gap-1 max-w-[85%] ml-auto items-end animate-slide-up"
+              className="flex items-end justify-end gap-2.5 max-w-[85%] ml-auto animate-slide-up"
             >
-              <div className="p-4 bg-teal-dark text-background rounded-2xl rounded-br-none text-[15px] font-medium">
-                {t.text}
+              <div className="flex flex-col gap-1 items-end min-w-0">
+                <div className="p-4 bg-teal-dark text-background rounded-2xl rounded-br-none text-[15px] font-medium">
+                  {t.text}
+                </div>
+                <span className="text-[10px] uppercase opacity-40 font-mono mr-1">
+                  {t.time} — Vous
+                </span>
               </div>
-              <span className="text-[10px] uppercase opacity-40 font-mono mr-1">
-                {t.time} — Vous
+              <span
+                aria-hidden
+                className="shrink-0 size-8 rounded-full bg-ink text-background grid place-items-center text-sm mb-4"
+              >
+                🙂
               </span>
             </div>
           ),
         )}
 
         {thinking && (
-          <div className="flex items-center gap-2 text-ink/40 text-sm animate-fade-in">
+          <div className="flex items-center gap-2 text-ink/40 text-sm animate-fade-in ml-[42px]">
             <span className="size-1.5 rounded-full bg-teal-dark animate-pulse" />
+            <span className="size-1.5 rounded-full bg-teal-dark animate-pulse [animation-delay:150ms]" />
+            <span className="size-1.5 rounded-full bg-teal-dark animate-pulse [animation-delay:300ms]" />
             <span className="font-mono text-xs">L&apos;assistant réfléchit…</span>
           </div>
         )}
@@ -330,8 +348,8 @@ export function Chatbot({
         <div className="space-y-4 pt-2">
           {roadmapReady ? (
             <div className="rounded-2xl border border-teal-dark/30 bg-teal-dark/5 p-6 space-y-4 animate-slide-up">
-              <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-                Feuille de route prête
+              <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark inline-flex items-center gap-1.5">
+                <span aria-hidden>🎉</span> Feuille de route prête
               </p>
               <p className="text-sm text-ink/70 leading-relaxed">
                 Votre diagnostic est terminé. Ouvrez le résultat pour voir le régime recommandé
@@ -352,8 +370,9 @@ export function Chatbot({
                   <button
                     key={r}
                     onClick={() => handleAnswer(r)}
-                    className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96]"
+                    className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96] inline-flex items-center gap-1.5"
                   >
+                    <span aria-hidden className="opacity-50">💬</span>
                     {r}
                   </button>
                 ))}
