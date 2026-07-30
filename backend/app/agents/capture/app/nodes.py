@@ -15,6 +15,7 @@ from langgraph.types import interrupt  # HITL
 from pydantic import ValidationError
 
 from . import prompts
+from . import fx
 from .config import (
     EXPENSE_CATEGORIES,
     MANDATORY_FIELDS,
@@ -349,12 +350,22 @@ def write_analysis_node(state: Dict[str, Any], deps: Deps) -> Dict[str, Any]:
     inv = _safe_invoice(state.get("invoice") or {})
     incoherences = compute_incoherences(inv)
     payment = compute_payment(inv)
+    # Unification devise (déterministe, jamais bloquant) : montant TTC converti en EUR.
+    inv.amount_eur, inv.exchange_rate = fx.enrich_amount_eur(
+        deps.db, inv.total_ttc, inv.currency, inv.issue_date
+    )
+    inv.rate_date = inv.issue_date if inv.amount_eur is not None else None
     system, user = prompts.write_analysis(
         state["ocr_text"], state["invoice"],
         payment_note=payment.get("note"), incoherences=incoherences,
     )
     analysis = deps.mistral.chat_text(MODEL_LARGE, system, user)
-    return {"analysis": analysis, "incoherences": incoherences, "payment": payment}
+    return {
+        "invoice": inv.model_dump(),
+        "analysis": analysis,
+        "incoherences": incoherences,
+        "payment": payment,
+    }
 
 
 def classify_expense_node(state: Dict[str, Any], deps: Deps) -> Dict[str, Any]:
@@ -487,11 +498,16 @@ def ask_missing_virement_field_node(state: Dict[str, Any], deps: Deps) -> Dict[s
 def analyze_virement_node(state: Dict[str, Any], deps: Deps) -> Dict[str, Any]:
     vir = _safe_virement(state.get("virement") or {})
     incoherences = compute_virement_incoherences(vir)  # déterministe (IBAN, montant)
+    # Unification devise (déterministe, jamais bloquant) : montant converti en EUR.
+    vir.amount_eur, vir.exchange_rate = fx.enrich_amount_eur(
+        deps.db, vir.amount, vir.currency, vir.execution_date
+    )
+    vir.rate_date = vir.execution_date if vir.amount_eur is not None else None
     system, user = prompts.write_virement_analysis(
         state["ocr_text"], state["virement"], incoherences
     )
     analysis = deps.mistral.chat_text(MODEL_LARGE, system, user)
-    return {"analysis": analysis, "incoherences": incoherences}
+    return {"virement": vir.model_dump(), "analysis": analysis, "incoherences": incoherences}
 
 
 def check_duplicate_virement_node(state: Dict[str, Any], deps: Deps) -> Dict[str, Any]:

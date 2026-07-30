@@ -244,6 +244,64 @@ def test_iban_validation_flags_bad_key():
     assert compute_virement_incoherences(BankTransfer(amount=100, currency="EUR", beneficiary_iban=good)) == []
 
 
+def test_invoice_eur_amount_is_passthrough_without_network_call():
+    """Facture déjà en EUR -> amount_eur = total_ttc, taux 1.0, aucun appel réseau."""
+    db = make_db()
+    mistral = FakeMistral(invoice=copy.deepcopy(COMPLETE_INVOICE))
+    graph, _ = make_graph(mistral, db)
+
+    cfg = run(graph, initial_state("ufx1"), "t-fx-eur")
+    values, ints = inspect(graph, cfg)
+    assert not ints
+    inv = values["invoice"]
+    assert inv["amount_eur"] == 120.0
+    assert inv["exchange_rate"] == 1.0
+    assert inv["rate_date"] == "2026-02-12"
+
+
+def test_virement_non_eur_amount_is_converted_via_fx(monkeypatch):
+    """Virement en devise étrangère -> converti en EUR via le taux (mocké, sans réseau)."""
+    import app.fx as fx
+
+    monkeypatch.setattr(fx, "get_eur_rate", lambda db, currency, on_date: 0.9)
+
+    db = make_db()
+    vir = {
+        "transfer_reference": "VIR-USD-1",
+        "execution_date": "2026-03-01",
+        "amount": 1000.0, "currency": "USD", "direction": "recu",
+        "beneficiary_iban": "FR1420041010050500013M02606",
+    }
+    mistral = FakeMistral(invoice={}, document_type="virement", virement=vir)
+    graph, _ = make_graph(mistral, db)
+
+    cfg = run(graph, initial_state("ufx2"), "t-fx-usd")
+    values, ints = inspect(graph, cfg)
+    assert not ints
+    saved = db.list_virements("ufx2")[0]
+    assert saved["transfer"]["amount_eur"] == 900.0
+    assert saved["transfer"]["exchange_rate"] == 0.9
+    assert saved["transfer"]["rate_date"] == "2026-03-01"
+
+
+def test_fx_rate_lookup_failure_never_blocks_pipeline(monkeypatch):
+    """Devise inconnue / API injoignable -> amount_eur reste None, pas d'erreur levée."""
+    import app.fx as fx
+
+    monkeypatch.setattr(fx, "get_eur_rate", lambda db, currency, on_date: None)
+
+    db = make_db()
+    mistral = FakeMistral(invoice=copy.deepcopy(COMPLETE_INVOICE))
+    graph, _ = make_graph(mistral, db)
+
+    cfg = run(graph, initial_state("ufx3"), "t-fx-fail")
+    values, ints = inspect(graph, cfg)
+    assert not ints
+    assert values["status"] == "completed"
+    assert values["invoice"]["amount_eur"] is None
+    assert values["invoice"]["rate_date"] is None
+
+
 def test_no_rag_anywhere_in_codebase():
     """Garde-fou DoD : aucun vector store / embedding / RAG dans app/."""
     app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"

@@ -35,6 +35,7 @@ class Database:
         self.invoices = self._db["invoices"]
         self.virements = self._db["virements"]      # justificatifs de virement
         self.chat_sessions = self._db["chat_sessions"]
+        self.fx_rates = self._db["fx_rates"]        # cache de taux de change (devise, date)
 
     @classmethod
     def connect(cls, uri: str, db_name: str) -> "Database":
@@ -80,6 +81,12 @@ class Database:
             self.chat_sessions,
             [("user_id", ASCENDING), ("document_id", ASCENDING)],
             name="uniq_chat_session",
+        )
+        # Cache de taux de change par (devise, date) : évite de rappeler l'API à chaque affichage.
+        self._ensure_unique_index(
+            self.fx_rates,
+            [("currency", ASCENDING), ("date", ASCENDING)],
+            name="uniq_fx_rate",
         )
 
     @staticmethod
@@ -178,6 +185,18 @@ class Database:
         if d:
             d.pop("_id", None)
         return d
+
+    # -- Cache des taux de change --------------------------------------------
+    def get_cached_fx_rate(self, currency: str, date: str) -> Optional[float]:
+        doc = self.fx_rates.find_one({"currency": currency, "date": date})
+        return doc.get("rate") if doc else None
+
+    def cache_fx_rate(self, currency: str, date: str, rate: float) -> None:
+        self.fx_rates.update_one(
+            {"currency": currency, "date": date},
+            {"$set": {"rate": rate}},
+            upsert=True,
+        )
 
     # -- Mémoire de conversation ---------------------------------------------
     def get_history(self, user_id: str, document_id: str) -> List[Dict[str, str]]:

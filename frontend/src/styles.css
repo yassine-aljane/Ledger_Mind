@@ -182,6 +182,21 @@
   }
 }
 
+@keyframes lm-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@utility animate-slide-in-right {
+  animation: lm-slide-in-right 0.35s var(--ease-out-expo) both;
+}
+
 @utility animate-slide-up {
   animation: lm-slide-up 0.7s var(--ease-out-expo) both;
 }

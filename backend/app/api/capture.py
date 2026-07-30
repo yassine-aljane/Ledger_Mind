@@ -41,6 +41,11 @@ class CaptureQABody(BaseModel):
     question: str = Field(min_length=1)
 
 
+class DocumentMessage(BaseModel):
+    role: str
+    content: str
+
+
 def _interrupts(graph, config) -> tuple[Any, list[Any]]:
     snap = graph.get_state(config)
     ints = [i for t in snap.tasks for i in (getattr(t, "interrupts", None) or [])]
@@ -253,6 +258,15 @@ async def list_invoices(user: UserPublic = Depends(get_current_user)):
             )
         )
     return out
+
+
+@router.get("/documents/{document_id}/messages", response_model=list[DocumentMessage])
+async def document_messages(document_id: str, user: UserPublic = Depends(get_current_user)):
+    """Historique de conversation (chat par document), filtré par utilisateur."""
+    runtime = get_runtime()
+    deps = runtime["deps"]
+    history = await asyncio.to_thread(deps.db.get_history, user.id, document_id)
+    return [DocumentMessage(role=m.get("role", ""), content=m.get("content", "")) for m in history]
 
 
 @router.get("/virements", response_model=list[VirementListItem])

@@ -38,6 +38,10 @@ class Invoice(BaseModel):
     vat_amount: Optional[float] = None
     total_ttc: Optional[float] = None
     currency: Optional[str] = None
+    # Unification devise (FR : montant TTC converti en EUR, taux BCE à la date d'émission).
+    amount_eur: Optional[float] = None
+    exchange_rate: Optional[float] = None        # taux `currency` -> EUR appliqué
+    rate_date: Optional[str] = None              # date du taux utilisé (ISO 'YYYY-MM-DD')
     # Suivi de paiement (FR-18 : factures à régler).
     paid: Optional[bool] = None                  # True si la facture est indiquée réglée
     due_date: Optional[str] = None               # échéance explicite (ISO 'YYYY-MM-DD') si présente
@@ -80,6 +84,10 @@ class BankTransfer(BaseModel):
     value_date: Optional[str] = None             # date de valeur (ISO) si présente
     amount: Optional[float] = None
     currency: Optional[str] = None               # ex. EUR
+    # Unification devise (FR : montant converti en EUR, taux BCE à la date d'exécution).
+    amount_eur: Optional[float] = None
+    exchange_rate: Optional[float] = None        # taux `currency` -> EUR appliqué
+    rate_date: Optional[str] = None              # date du taux utilisé (ISO 'YYYY-MM-DD')
     direction: Optional[str] = None              # 'emis' | 'recu' (sens du virement)
     sender_name: Optional[str] = None            # donneur d'ordre / émetteur
     sender_iban: Optional[str] = None

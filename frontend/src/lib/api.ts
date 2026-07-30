@@ -388,17 +388,50 @@ export async function fetchReferralHistory(): Promise<ReferralHistoryEntry[]> {
 
 // -------- Capture agent (document analysis) --------
 
+export type CaptureLineItem = {
+  description: string | null;
+  quantity: number | null;
+  unit_price: number | null;
+  total: number | null;
+};
+
 export type CaptureInvoice = {
   invoice_number: string | null;
   issuer_name: string | null;
   issuer_tax_id: string | null;
   client_name: string | null;
   issue_date: string | null;
+  line_items?: CaptureLineItem[] | null;
   subtotal_ht: number | null;
   vat_amount: number | null;
   total_ttc: number | null;
   currency: string | null;
+  amount_eur?: number | null;
+  exchange_rate?: number | null;
+  rate_date?: string | null;
   paid: boolean | null;
+  due_date?: string | null;
+  payment_terms_days?: number | null;
+};
+
+export type CaptureVirement = {
+  transfer_reference: string | null;
+  execution_date: string | null;
+  value_date?: string | null;
+  amount: number | null;
+  currency: string | null;
+  amount_eur?: number | null;
+  exchange_rate?: number | null;
+  rate_date?: string | null;
+  direction?: string | null;
+  sender_name?: string | null;
+  sender_iban?: string | null;
+  beneficiary_name?: string | null;
+  beneficiary_iban?: string | null;
+  beneficiary_bic?: string | null;
+  bank_name?: string | null;
+  motif?: string | null;
+  transfer_type?: string | null;
 };
 
 export type CapturePending = {
@@ -414,6 +447,7 @@ export type CaptureAnalyzeResult = {
   document_id: string | null;
   document_type?: string | null;
   invoice?: CaptureInvoice | null;
+  transfer?: CaptureVirement | null;
   analysis?: string | null;
   expense_category?: string | null;
   incoherences?: string[] | null;
@@ -436,6 +470,19 @@ export type CaptureInvoiceItem = {
   payment_date?: string | null;
   payment_days_until?: number | null;
   created_at?: string | null;
+};
+
+export type CaptureVirementItem = {
+  document_id: string;
+  transfer: CaptureVirement;
+  analysis?: string | null;
+  incoherences?: string[] | null;
+  created_at?: string | null;
+};
+
+export type CaptureDocumentMessage = {
+  role: string;
+  content: string;
 };
 
 export async function analyzeCapture(file: File, activite?: string): Promise<CaptureAnalyzeResult> {
@@ -486,6 +533,25 @@ export async function fetchCaptureInvoices(): Promise<CaptureInvoiceItem[]> {
   const response = await fetch(`${API_BASE}/api/capture/invoices`, {
     headers: authHeaders(),
   });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export async function fetchCaptureVirements(): Promise<CaptureVirementItem[]> {
+  const response = await fetch(`${API_BASE}/api/capture/virements`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export async function fetchCaptureDocumentMessages(
+  documentId: string,
+): Promise<CaptureDocumentMessage[]> {
+  const response = await fetch(
+    `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}/messages`,
+    { headers: authHeaders() },
+  );
   if (!response.ok) throw new Error(await parseError(response));
   return response.json();
 }
