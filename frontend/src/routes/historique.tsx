@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { usePlan } from "@/lib/plan";
-import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
+import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/historique")({
   head: () => ({
@@ -15,8 +15,16 @@ export const Route = createFileRoute("/historique")({
       },
     ],
   }),
-  component: HistoriquePage,
+  component: HistoriqueRoute,
 });
+
+function HistoriqueRoute() {
+  return (
+    <PremiumGate kind="historique">
+      <HistoriquePage />
+    </PremiumGate>
+  );
+}
 
 const rows = [
   { r: "LM-2026-0082", c: "Studio Aurore SAS", d: "14 nov.", m: "2 500,00", n: "2 725,00", s: "Qualifié" },
@@ -26,7 +34,6 @@ const rows = [
 ];
 
 function HistoriquePage() {
-  if (usePlan() === "free") return <PremiumPagePlaceholder kind="historique" />;
   return (
     <AppShell>
       <PageHeader
@@ -38,39 +45,42 @@ function HistoriquePage() {
         }
       />
 
-      <div className="bg-white border border-border rounded-2xl overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-background">
-            <tr className="text-[11px] uppercase tracking-widest text-ink/50">
-              <th className="text-left px-6 py-4 font-semibold">Référence</th>
-              <th className="text-left px-6 py-4 font-semibold">Client</th>
-              <th className="text-left px-6 py-4 font-semibold">Date</th>
-              <th className="text-right px-6 py-4 font-semibold">HT</th>
-              <th className="text-right px-6 py-4 font-semibold">Net</th>
-              <th className="text-right px-6 py-4 font-semibold">Statut</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.map((row) => (
-              <tr key={row.r} className="hover:bg-background/60 transition-colors duration-150 cursor-pointer">
-                <td className="px-6 py-4 font-mono text-xs">{row.r}</td>
-                <td className="px-6 py-4 font-medium text-[15px]">{row.c}</td>
-                <td className="px-6 py-4 text-ink/60">{row.d}</td>
-                <td className="px-6 py-4 text-right font-mono">{row.m} €</td>
-                <td className="px-6 py-4 text-right font-mono font-medium">{row.n} €</td>
-                <td className="px-6 py-4 text-right">
-                  <span
-                    className={`text-[10px] uppercase tracking-widest font-semibold ${
-                      row.s === "Qualifié" ? "text-teal-dark" : "text-amber-fiscal"
-                    }`}
-                  >
-                    {row.s}
-                  </span>
-                </td>
+      <div className="animate-rise overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border bg-secondary/50">
+              <tr>
+                {["Référence", "Client", "Date"].map((h) => (
+                  <th key={h} className="rule-label px-5 py-3.5 text-left text-muted-foreground">
+                    {h}
+                  </th>
+                ))}
+                {["HT", "Net", "Statut"].map((h) => (
+                  <th key={h} className="rule-label px-5 py-3.5 text-right text-muted-foreground">
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {rows.map((row) => (
+                <tr
+                  key={row.r}
+                  className="cursor-pointer transition-colors duration-150 hover:bg-secondary/40"
+                >
+                  <td className="num px-5 py-3.5 text-xs text-muted-foreground">{row.r}</td>
+                  <td className="px-5 py-3.5 font-medium">{row.c}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground">{row.d}</td>
+                  <td className="num px-5 py-3.5 text-right">{row.m} €</td>
+                  <td className="num px-5 py-3.5 text-right font-medium">{row.n} €</td>
+                  <td className="px-5 py-3.5 text-right">
+                    <Badge variant={row.s === "Qualifié" ? "success" : "warning"}>{row.s}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </AppShell>
   );

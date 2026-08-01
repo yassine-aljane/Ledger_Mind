@@ -7,7 +7,9 @@
  * pour que l'utilisateur puisse contrôler ce que l'agent a lu.
  */
 
+import { ExternalLink, TriangleAlert } from "lucide-react";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import type { ChatSource } from "@/lib/guidance-api";
 
 /** Sources faisant autorité : texte de loi et doctrine administrative opposable. */
@@ -27,9 +29,9 @@ export function Sources({
   if (list.length === 0 && !fraicheur && !bofipLive) return null;
 
   return (
-    <div className="mt-4 pt-3 border-t border-border/70">
+    <div className="mt-4 border-t border-border/70 pt-3">
       {bofipLive && (
-        <p className="mb-3 rounded-lg bg-teal-light/10 border border-teal-dark/25 px-3 py-2 text-[11px] text-teal-dark leading-snug">
+        <p className="mb-3 rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs leading-snug text-info-ink">
           Repli BOFiP en direct : le corpus local était insuffisant, la réponse est ancrée sur la
           doctrine à jour.
         </p>
@@ -37,7 +39,7 @@ export function Sources({
 
       {list.length > 0 && (
         <>
-          <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-2">Sources</p>
+          <p className="rule-label mb-2 text-muted-foreground">Sources</p>
           <div className="flex flex-wrap gap-2">
             {list.map((s, i) => {
               const autorite = AUTORITE.test(s.source ?? "");
@@ -48,22 +50,25 @@ export function Sources({
                   key={`${s.url}-${i}`}
                   onClick={() => setOpen(actif ? null : i)}
                   title="Voir l'extrait utilisé"
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] transition-colors duration-200 ${
+                  aria-expanded={actif}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors duration-200",
                     autorite
-                      ? "bg-teal-light/10 border-teal-dark/30 text-teal-dark"
-                      : "bg-background border-border text-ink/60"
-                  } ${actif ? "ring-1 ring-teal-dark/40" : "hover:border-teal-dark/50"}`}
+                      ? "border-success/30 bg-success/10 text-success-ink"
+                      : "border-border bg-secondary/60 text-muted-foreground",
+                    actif ? "ring-1 ring-ring/50" : "hover:border-ink/40",
+                  )}
                 >
-                  <span className="font-semibold">{s.source}</span>
+                  <span className="font-medium">{s.source}</span>
                   {score != null && (
                     <>
-                      <span className="w-8 h-1 rounded-full bg-border overflow-hidden">
+                      <span className="h-1 w-8 overflow-hidden rounded-full bg-border">
                         <span
-                          className="block h-full bg-teal-dark"
+                          className="block h-full bg-current"
                           style={{ width: `${Math.round(score * 100)}%` }}
                         />
                       </span>
-                      <span className="font-mono tabular-nums opacity-60">{score.toFixed(2)}</span>
+                      <span className="num opacity-60">{score.toFixed(2)}</span>
                     </>
                   )}
                   {s.url && (
@@ -72,10 +77,10 @@ export function Sources({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="opacity-70 hover:opacity-100"
+                      className="opacity-70 transition-opacity hover:opacity-100"
                       aria-label={`Ouvrir ${s.source}`}
                     >
-                      ↗
+                      <ExternalLink className="size-3" />
                     </a>
                   )}
                 </button>
@@ -84,11 +89,9 @@ export function Sources({
           </div>
 
           {open != null && list[open] && (
-            <div className="mt-2.5 rounded-lg bg-background border border-border p-3 animate-fade-in">
-              <p className="text-[11px] font-semibold text-ink/70">
-                {list[open].titre || list[open].source}
-              </p>
-              <p className="mt-1.5 text-[11px] text-ink/55 leading-relaxed whitespace-pre-wrap">
+            <div className="animate-fade-in mt-2.5 rounded-lg border border-border bg-secondary/50 p-3">
+              <p className="text-xs font-medium">{list[open].titre || list[open].source}</p>
+              <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
                 {list[open].texte || list[open].extrait || "Extrait non disponible."}
               </p>
             </div>
@@ -97,7 +100,8 @@ export function Sources({
       )}
 
       {fraicheur && (
-        <p className="mt-2.5 text-[11px] text-amber-fiscal leading-snug">
+        <p className="mt-2.5 flex items-start gap-1.5 text-xs leading-snug text-amber-fiscal">
+          <TriangleAlert className="mt-0.5 size-3 shrink-0" />
           Au moins une source n&apos;a pas été revérifiée récemment : confirmez les montants sur
           impots.gouv.fr avant toute décision.
         </p>

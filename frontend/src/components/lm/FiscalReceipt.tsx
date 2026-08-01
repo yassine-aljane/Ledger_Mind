@@ -11,7 +11,7 @@ export function FiscalReceipt({
   return (
     <div className="relative group [perspective:1200px]">
       <div className="absolute inset-0 translate-y-8 scale-90 bg-black/15 blur-3xl opacity-40" aria-hidden />
-      <div className="relative w-80 mx-auto bg-white shadow-[0_20px_60px_-15px_rgba(22,36,31,0.25)] ring-1 ring-black/5 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_28px_70px_-14px_rgba(22,36,31,0.32)]">
+      <div className="relative w-80 mx-auto bg-card shadow-[0_20px_60px_-15px_rgba(22,36,31,0.25)] ring-1 ring-black/5 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_28px_70px_-14px_rgba(22,36,31,0.32)]">
         <div className="perforated-top h-4 w-full" aria-hidden />
 
         <div className="px-8 pt-2 pb-8 font-mono text-[11px] text-ink">
@@ -61,7 +61,7 @@ export function FiscalReceipt({
             <span className="font-bold text-lg">{formatMoney(calcul.net_a_percevoir)} €</span>
           </div>
 
-          <div className="rounded-lg bg-teal-dark p-4 text-background">
+          <div className="rounded-lg bg-teal-dark p-4 text-ink-foreground">
             <div className="flex justify-between items-end">
               <div>
                 <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">

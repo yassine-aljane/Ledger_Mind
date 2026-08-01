@@ -1,4 +1,20 @@
+import {
+  ArrowRight,
+  Bot,
+  Check,
+  Compass,
+  Keyboard,
+  Mic,
+  MicOff,
+  PartyPopper,
+  RotateCcw,
+  Send,
+  User,
+  Volume2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   cacheDiagnosticResult,
   orchestratorTurn,
@@ -390,19 +406,19 @@ export function Chatbot({
   const showComposer = Boolean(orchestratorMessage) && !thinking && !error;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-6 flex-1 min-w-[200px]">
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark inline-flex items-center gap-1.5 shrink-0">
-            <span aria-hidden>🧭</span> {eyebrow}
+    <div className="animate-fade-in mx-auto max-w-2xl space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-[200px] flex-1 items-center gap-5">
+          <p className="rule-label inline-flex shrink-0 items-center gap-1.5 text-accent-ink">
+            <Compass className="size-3" aria-hidden /> {eyebrow}
           </p>
-          <div className="flex-1 h-[3px] bg-border rounded-full overflow-hidden max-w-xs">
+          <div className="h-[3px] max-w-xs flex-1 overflow-hidden rounded-full bg-border">
             <div
-              className="h-full bg-teal-dark transition-all duration-500 ease-out"
+              className="h-full bg-primary transition-all duration-500 ease-out"
               style={{ width: `${Math.round(orchestratorCompleteness * 100)}%` }}
             />
           </div>
-          <p className="font-mono text-[11px] text-ink/50 shrink-0">
+          <p className="num shrink-0 text-xs text-muted-foreground">
             {Math.round(orchestratorCompleteness * 100)}%
           </p>
         </div>
@@ -412,85 +428,98 @@ export function Chatbot({
             principale). La lecture à voix haute des questions (TTS), elle, fonctionne dans les
             deux modes tant que le navigateur la supporte. */}
         {canVoiceMode && (
-          <div className="inline-flex p-1 bg-white border border-border rounded-full text-xs font-semibold shrink-0">
-            <button
-              type="button"
-              onClick={() => switchMode("texte")}
-              aria-pressed={mode === "texte"}
-              className={`px-3 py-1.5 rounded-full transition-all duration-200 inline-flex items-center gap-1.5 ${
-                mode === "texte" ? "bg-ink text-background" : "text-ink/60 hover:text-ink"
-              }`}
-            >
-              ⌨️ Texte
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode("vocal")}
-              aria-pressed={mode === "vocal"}
-              className={`px-3 py-1.5 rounded-full transition-all duration-200 inline-flex items-center gap-1.5 ${
-                mode === "vocal" ? "bg-ink text-background" : "text-ink/60 hover:text-ink"
-              }`}
-            >
-              🎙️ Vocal
-            </button>
+          <div className="inline-flex shrink-0 rounded-full border border-border bg-card p-1 text-xs font-medium">
+            {(
+              [
+                { value: "texte" as const, label: "Texte", icon: Keyboard },
+                { value: "vocal" as const, label: "Vocal", icon: Mic },
+              ]
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => switchMode(option.value)}
+                aria-pressed={mode === option.value}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-all duration-200",
+                  mode === option.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <option.icon className="size-3" aria-hidden />
+                {option.label}
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      {intro && turns.length === 0 && <p className="text-ink/60 text-pretty text-[17px]">{intro}</p>}
+      {intro && turns.length === 0 && (
+        <p className="text-pretty text-base text-muted-foreground">{intro}</p>
+      )}
 
-      {/* Mode vocal : grand micro animé pendant que l'assistant parle — pas de texte affiché
-          d'un bloc ici, seule la bulle de la question (ci-dessous) se révèle progressivement. */}
+      {/* Mode vocal, état « l'assistant parle » : grand micro animé, avec sa commande d'arrêt.
+          Aucun texte d'un bloc ici — seule la bulle de la question (ci-dessous) se révèle au
+          rythme de la voix. */}
       {mode === "vocal" && speaking && (
-        <div className="flex flex-col items-center gap-2 py-2 animate-fade-in">
+        <div className="animate-fade-in flex flex-col items-center gap-2 py-2">
           <button
             type="button"
             onClick={stopSpeaking}
             title="Arrêter la lecture"
-            className="relative size-16 rounded-full bg-teal-dark text-background grid place-items-center text-2xl shadow-lg transition-transform active:scale-95"
+            aria-label="Arrêter la lecture à voix haute"
+            className="relative grid size-16 place-items-center rounded-full bg-primary text-primary-foreground shadow-lift transition-transform active:scale-95"
           >
-            <span className="absolute inset-0 rounded-full bg-teal-dark/40 animate-ping" />
-            <span className="absolute inset-[-8px] rounded-full border-2 border-teal-dark/30 animate-pulse" />
-            <span className="relative">🔊</span>
+            <span className="absolute inset-0 animate-ping rounded-full bg-primary/40" />
+            <span className="absolute -inset-2 animate-pulse rounded-full border-2 border-primary/30" />
+            <Volume2 className="relative size-6" />
           </button>
-          <span className="text-[11px] font-mono uppercase tracking-widest text-ink/40">
-            L&apos;assistant parle…
-          </span>
+          <span className="rule-label text-muted-foreground">L&apos;assistant parle…</span>
         </div>
       )}
 
+      {/* États vocaux compacts : lecture en cours (mode texte), écoute avec transcription en
+          direct, et réponse captée en attente d'envoi. Chacun reste distinct — jamais fondu
+          dans un état « chargement » générique. */}
       {(mode === "texte" && speaking) || listening || voiceNotice || pendingVoiceAnswer ? (
-        <div className="flex items-center gap-2 text-xs font-mono animate-fade-in flex-wrap">
+        <div className="animate-fade-in flex flex-wrap items-center gap-2 text-xs">
           {mode === "texte" && speaking && (
             <button
               type="button"
               onClick={stopSpeaking}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-dark/10 text-teal-dark hover:bg-teal-dark/20 transition-colors duration-200"
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-primary transition-colors duration-200 hover:bg-primary/20"
             >
-              🔊 Lecture en cours… <span className="underline">arrêter</span>
+              <Volume2 className="size-3" /> Lecture en cours…
+              <span className="underline">arrêter</span>
             </button>
           )}
           {listening && (
             <button
               type="button"
               onClick={stopListening}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-coral/10 text-coral"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1.5 text-destructive"
             >
-              <span className="relative flex size-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-coral opacity-60" />
-                <span className="relative inline-flex rounded-full size-2 bg-coral" />
+              <span className="relative flex size-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-60" />
+                <span className="relative inline-flex size-2 rounded-full bg-destructive" />
               </span>
-              🎙️ Je vous écoute{interim ? ` : « ${interim} »` : "…"} <span className="underline">arrêter</span>
+              <Mic className="size-3 shrink-0" />
+              <span className="truncate">
+                Je vous écoute{interim ? ` : « ${interim} »` : "…"}
+              </span>
+              <span className="shrink-0 underline">arrêter</span>
             </button>
           )}
           {pendingVoiceAnswer && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-ink/5 text-ink/60">
-              <span className="size-1.5 rounded-full bg-ink/40 animate-pulse" />
-              « {pendingVoiceAnswer} » — envoi dans un instant…
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-muted-foreground">
+              <Check className="size-3 shrink-0 text-success-ink" />
+              <span className="truncate">« {pendingVoiceAnswer} »</span>
+              <span className="shrink-0">— envoi dans un instant…</span>
             </span>
           )}
           {voiceNotice && !speaking && !listening && (
-            <span className="text-ink/40">{voiceNotice}</span>
+            <span className="text-muted-foreground">{voiceNotice}</span>
           )}
         </div>
       ) : null}
@@ -498,8 +527,8 @@ export function Chatbot({
       {/* Cadre de conversation à hauteur fixe : seuls les messages défilent à l'intérieur — les
           suggestions et la saisie restent TOUJOURS visibles en bas, même en faisant défiler un
           long échange. */}
-      <div className="flex flex-col border border-border rounded-2xl bg-white shadow-sm overflow-hidden h-[65vh] min-h-[440px]">
-      <div className="chat-scroll flex-1 overflow-y-auto p-5 space-y-6">
+      <div className="flex h-[65vh] min-h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+      <div className="chat-scroll flex-1 space-y-6 overflow-y-auto p-5">
         {turns.map((t, i) => {
           // Mode vocal, question en cours de lecture : le texte se révèle EN SYNC avec la voix
           // (voir speakQuestion/onboundary) plutôt que d'apparaître d'un bloc. En mode texte,
@@ -509,21 +538,24 @@ export function Chatbot({
           const shown = isRevealing ? t.text.slice(0, Math.max(revealedLength!, 1)) : t.text;
 
           return t.role === "assistant" ? (
-            <div key={t.id} className="flex items-end gap-2.5 max-w-[85%] animate-slide-up">
+            <div key={t.id} className="animate-rise flex max-w-[85%] items-end gap-2.5">
               <span
                 aria-hidden
-                className={`shrink-0 size-8 rounded-full bg-teal-dark/10 text-teal-dark grid place-items-center text-sm mb-4 ${
-                  isRevealing ? "animate-pulse" : ""
-                }`}
+                className={cn(
+                  "mb-4 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary",
+                  isRevealing && "animate-pulse",
+                )}
               >
-                🤖
+                <Bot className="size-3.5" />
               </span>
-              <div className="flex flex-col gap-1 min-w-0">
-                <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[17px] leading-relaxed text-ink shadow-sm">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <div className="rounded-2xl rounded-bl-none border border-border bg-card p-4 text-base leading-relaxed shadow-soft">
                   {shown}
-                  {isRevealing && <span className="inline-block w-[2px] h-[1em] bg-ink/40 ml-0.5 align-middle animate-pulse" />}
+                  {isRevealing && (
+                    <span className="ml-0.5 inline-block h-[1em] w-0.5 animate-pulse bg-foreground/40 align-middle" />
+                  )}
                 </div>
-                <span className="text-[10px] uppercase opacity-40 font-mono ml-1">
+                <span className="rule-label ml-1 text-muted-foreground">
                   {t.time} — Assistant
                 </span>
               </div>
@@ -531,47 +563,45 @@ export function Chatbot({
           ) : (
             <div
               key={t.id}
-              className="flex items-end justify-end gap-2.5 max-w-[85%] ml-auto animate-slide-up"
+              className="animate-rise ml-auto flex max-w-[85%] items-end justify-end gap-2.5"
             >
-              <div className="flex flex-col gap-1 items-end min-w-0">
-                <div className="p-4 bg-teal-dark text-background rounded-2xl rounded-br-none text-[17px] font-medium">
+              <div className="flex min-w-0 flex-col items-end gap-1.5">
+                <div className="rounded-2xl rounded-br-none bg-primary p-4 text-base font-medium text-primary-foreground">
                   {t.text}
                 </div>
-                <span className="text-[10px] uppercase opacity-40 font-mono mr-1">
-                  {t.time} — Vous
-                </span>
+                <span className="rule-label mr-1 text-muted-foreground">{t.time} — Vous</span>
               </div>
               <span
                 aria-hidden
-                className="shrink-0 size-8 rounded-full bg-ink text-background grid place-items-center text-sm mb-4"
+                className="mb-4 grid size-7 shrink-0 place-items-center rounded-full bg-ink text-ink-foreground"
               >
-                🙂
+                <User className="size-3.5" />
               </span>
             </div>
           );
         })}
 
         {thinking && (
-          <div className="flex items-center gap-2 text-ink/40 text-sm animate-fade-in ml-[42px]">
-            <span className="size-1.5 rounded-full bg-teal-dark animate-pulse" />
-            <span className="size-1.5 rounded-full bg-teal-dark animate-pulse [animation-delay:150ms]" />
-            <span className="size-1.5 rounded-full bg-teal-dark animate-pulse [animation-delay:300ms]" />
-            <span className="font-mono text-xs">L&apos;assistant réfléchit…</span>
+          <div className="animate-fade-in ml-10 flex items-center gap-2 text-muted-foreground">
+            <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+            <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:150ms]" />
+            <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:300ms]" />
+            <span className="rule-label">L&apos;assistant réfléchit…</span>
           </div>
         )}
 
         {error && !thinking && (
-          <div className="flex flex-col gap-3 animate-fade-in">
-            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-sm text-red-700">
-              <span className="font-semibold">Erreur : </span>
+          <div className="animate-fade-in flex flex-col gap-3">
+            <div
+              role="alert"
+              className="rounded-2xl border border-destructive/30 bg-destructive/8 p-4 text-sm text-destructive"
+            >
+              <span className="font-medium">Erreur : </span>
               {error}
             </div>
-            <button
-              onClick={handleRetry}
-              className="self-start px-5 py-2 bg-ink text-background rounded-full text-xs font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-            >
-              Réessayer
-            </button>
+            <Button size="sm" onClick={handleRetry} className="self-start rounded-full">
+              <RotateCcw /> Réessayer
+            </Button>
           </div>
         )}
 
@@ -579,23 +609,25 @@ export function Chatbot({
       </div>
 
       {showComposer && (
-        <div className="shrink-0 border-t border-border bg-white p-4 space-y-4">
+        <div className="shrink-0 border-t border-border bg-card p-4 space-y-4">
           {roadmapReady ? (
-            <div className="rounded-2xl border border-teal-dark/30 bg-teal-dark/5 p-6 space-y-4 animate-slide-up">
-              <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark inline-flex items-center gap-1.5">
-                <span aria-hidden>🎉</span> Feuille de route prête
+            <div className="animate-seal space-y-4 rounded-2xl border border-accent/35 bg-accent/8 p-6">
+              <p className="rule-label inline-flex items-center gap-1.5 text-accent-ink">
+                <PartyPopper className="size-3" aria-hidden /> Feuille de route prête
               </p>
-              <p className="text-sm text-ink/70 leading-relaxed">
-                Votre diagnostic est terminé. Ouvrez le résultat pour voir le régime recommandé
-                et le plan d&apos;étapes.
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Votre diagnostic est terminé. Ouvrez le résultat pour voir le régime recommandé et
+                le plan d&apos;étapes.
               </p>
-              <button
+              <Button
                 type="button"
+                size="lg"
+                variant="accent"
                 onClick={openRoadmap}
-                className="w-full sm:w-auto px-8 py-3.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
+                className="w-full sm:w-auto"
               >
-                {orchestratorQuickReplies[0] || "Voir ma feuille de route"} →
-              </button>
+                {orchestratorQuickReplies[0] || "Voir ma feuille de route"} <ArrowRight />
+              </Button>
             </div>
           ) : (
             <>
@@ -604,14 +636,14 @@ export function Chatbot({
                   parallèle de la voix, PUIS les recommandations, PUIS le temps de répondre). En
                   mode texte, rien ne change : toujours affichées immédiatement, comme avant. */}
               {(mode !== "vocal" || !speaking) && (
-              <div className="flex flex-wrap gap-2 animate-fade-in">
-                {orchestratorQuickReplies.map((r) => (
+              <div className="flex flex-wrap gap-2">
+                {orchestratorQuickReplies.map((r, i) => (
                   <button
                     key={r}
                     onClick={() => handleAnswer(r)}
-                    className="px-4 py-2 bg-white border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96] inline-flex items-center gap-1.5"
+                    style={{ animationDelay: `${i * 60}ms` }}
+                    className="suggestion-chip chip-stagger rounded-full px-4 py-2 text-xs font-medium"
                   >
-                    <span aria-hidden className="opacity-50">💬</span>
                     {r}
                   </button>
                 ))}
@@ -633,27 +665,27 @@ export function Chatbot({
                     onClick={() => (listening ? stopListening() : startListening(true))}
                     title={listening ? "Arrêter le micro" : "Parler ma réponse"}
                     aria-label={listening ? "Arrêter le micro" : "Parler ma réponse"}
-                    className={`shrink-0 size-11 rounded-full grid place-items-center text-lg transition-all duration-200 active:scale-95 ${
+                    aria-pressed={listening}
+                    className={cn(
+                      "grid size-9 shrink-0 place-items-center rounded-full transition-all duration-200 active:scale-95",
                       listening
-                        ? "bg-coral text-background"
-                        : "bg-white border border-border hover:border-teal-dark"
-                    }`}
+                        ? "bg-destructive text-destructive-foreground"
+                        : "border border-border bg-card text-muted-foreground hover:border-ink hover:text-foreground",
+                    )}
                   >
-                    🎙️
+                    {listening ? <MicOff className="size-4" /> : <Mic className="size-4" />}
                   </button>
                 )}
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ou tapez votre réponse librement…"
-                  className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-base placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
+                  aria-label="Votre réponse"
+                  className="flex-1 rounded-full border border-border bg-card px-5 py-2.5 text-sm transition-colors duration-200 placeholder:text-muted-foreground/60 focus:border-ink focus:outline-none"
                 />
-                <button
-                  type="submit"
-                  className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-                >
-                  Envoyer
-                </button>
+                <Button type="submit" variant="accent" className="rounded-full px-5">
+                  <Send /> Envoyer
+                </Button>
               </form>
             </>
           )}

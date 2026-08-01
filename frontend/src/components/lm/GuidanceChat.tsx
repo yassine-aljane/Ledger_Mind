@@ -12,7 +12,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Loader2, Send, ShieldCheck } from "lucide-react";
 import { ConversationHistory } from "@/components/lm/ConversationHistory";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/lm/Markdown";
 import { RoadmapView, type Roadmap } from "@/components/lm/RoadmapView";
 import { StatusCard } from "@/components/lm/StatusCard";
@@ -398,8 +401,8 @@ export function GuidanceChat() {
             que de faire défiler toute la page à mesure que la discussion s'allonge. */}
         <div className="chat-scroll flex-1 overflow-y-auto pr-2 space-y-6">
           {empty && (
-            <div className="bg-white border border-border rounded-2xl p-6 animate-fade-in">
-              <p className="text-sm text-ink/60 leading-relaxed">
+            <div className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 Un clic suffit pour répondre — ou décrivez votre activité avec vos mots, la saisie
                 libre reste toujours possible via « Autre ».
               </p>
@@ -415,11 +418,12 @@ export function GuidanceChat() {
                   />
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {suggestions.map((s) => (
+                    {suggestions.map((s, i) => (
                       <button
                         key={s}
                         onClick={() => void send(s)}
-                        className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96] text-left"
+                        style={{ animationDelay: `${i * 60}ms` }}
+                        className="suggestion-chip chip-stagger rounded-full px-4 py-2 text-left text-xs font-medium"
                       >
                         {s}
                       </button>
@@ -433,21 +437,21 @@ export function GuidanceChat() {
           {turns.map((turn, index) =>
             turn.role === "assistant" ? (
               <div key={turn.id} className="space-y-3">
-                <div className="flex flex-col gap-1 max-w-[85%] animate-slide-up">
-                  <div className="p-4 bg-white border border-border rounded-2xl rounded-bl-none text-[15px] leading-relaxed text-ink shadow-sm">
+                <div className="animate-rise flex max-w-[85%] flex-col gap-1.5">
+                  <div className="rounded-2xl rounded-bl-none border border-border bg-card p-4 text-sm leading-relaxed shadow-soft">
                     {turn.error ? (
-                      <span className="text-coral">Erreur : {turn.error}</span>
+                      <span className="text-destructive">Erreur : {turn.error}</span>
                     ) : (
                       <Markdown text={turn.text} />
                     )}
                   </div>
-                  <span className="text-[10px] uppercase opacity-40 font-mono ml-1">Assistant</span>
+                  <span className="rule-label ml-1 text-muted-foreground">Assistant</span>
                 </div>
 
                 {turn.options && (
-                  <div className="max-w-[85%] rounded-2xl border border-teal-dark/30 bg-teal-light/10 p-4 animate-slide-up">
+                  <div className="animate-rise max-w-[85%] rounded-2xl border border-accent/35 bg-accent/8 p-4">
                     {turn.options.prompt && (
-                      <p className="text-sm text-ink/70 mb-3">{turn.options.prompt}</p>
+                      <p className="mb-3 text-sm text-muted-foreground">{turn.options.prompt}</p>
                     )}
                     <div className="flex flex-wrap gap-2">
                       {turn.options.choices.map((choice) => {
@@ -459,11 +463,12 @@ export function GuidanceChat() {
                             onClick={() =>
                               void send(choice.label, { kind: turn.options!.kind, value: choice.value }, index)
                             }
-                            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100 ${
+                            className={cn(
+                              "rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100",
                               picked
-                                ? "bg-ink text-background"
-                                : "bg-white border border-border hover:border-teal-dark hover:text-teal-dark"
-                            }`}
+                                ? "bg-primary text-primary-foreground"
+                                : "border border-border bg-card hover:border-ink",
+                            )}
                           >
                             {choice.label}
                           </button>
@@ -476,20 +481,20 @@ export function GuidanceChat() {
             ) : (
               <div
                 key={turn.id}
-                className="flex flex-col gap-1 max-w-[85%] ml-auto items-end animate-slide-up"
+                className="animate-rise ml-auto flex max-w-[85%] flex-col items-end gap-1.5"
               >
-                <div className="p-4 bg-teal-dark text-background rounded-2xl rounded-br-none text-[15px] font-medium">
+                <div className="rounded-2xl rounded-br-none bg-primary p-4 text-sm font-medium text-primary-foreground">
                   {turn.text}
                 </div>
-                <span className="text-[10px] uppercase opacity-40 font-mono mr-1">Vous</span>
+                <span className="rule-label mr-1 text-muted-foreground">Vous</span>
               </div>
             ),
           )}
 
           {busy && (
-            <div className="flex items-center gap-2 text-ink/40 text-sm animate-fade-in">
-              <span className="size-1.5 rounded-full bg-teal-dark animate-pulse" />
-              <span className="font-mono text-xs">L&apos;assistant réfléchit…</span>
+            <div className="animate-fade-in flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" />
+              <span className="rule-label">L&apos;assistant réfléchit…</span>
             </div>
           )}
 
@@ -505,33 +510,35 @@ export function GuidanceChat() {
                 onPdf={() => downloadRoadmapPdf(sessionId, profil)}
               />
 
-              <div className="rounded-2xl border border-teal-dark/30 bg-teal-dark/5 p-5 space-y-3 animate-slide-up">
-                <button
-                  onClick={openRoadmap}
-                  className="px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-                >
-                  Ouvrir la vue détaillée →
-                </button>
+              <div className="animate-rise space-y-3 rounded-2xl border border-accent/35 bg-accent/8 p-5">
+                <Button onClick={openRoadmap}>
+                  Ouvrir la vue détaillée <ArrowRight />
+                </Button>
                 {/* Suite du parcours : une fois immatriculé, on rejoint la vérification SIREN/avis
                     — le même écran que pour ceux qui avaient déjà un SIREN. */}
-                <div className="pt-4 border-t border-teal-dark/20">
-                  <p className="text-xs text-ink/50 leading-relaxed mb-3">
+                <div className="border-t border-accent/25 pt-4">
+                  <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
                     Une fois votre immatriculation obtenue, vérifiez votre SIREN et votre avis de
                     situation pour activer le suivi complet.
                   </p>
-                  <button
+                  <Button
+                    variant="outline"
                     onClick={() => void navigate({ to: "/onboarding/verification" })}
-                    className="px-5 py-2.5 bg-white border border-teal-dark/40 text-teal-dark rounded-xl text-sm font-semibold hover:bg-teal-dark hover:text-background transition-all duration-200 active:scale-[0.97]"
                   >
-                    J&apos;ai déjà mon SIREN → Vérification
-                  </button>
+                    <ShieldCheck /> J&apos;ai déjà mon SIREN
+                  </Button>
                 </div>
               </div>
             </div>
           )}
 
           {error && (
-            <p className="text-sm text-coral font-mono animate-fade-in">{error}</p>
+            <p
+              role="alert"
+              className="animate-fade-in rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-2.5 text-sm text-destructive"
+            >
+              {error}
+            </p>
           )}
 
           <div ref={bottomRef} />
@@ -558,22 +565,24 @@ export function GuidanceChat() {
                 e.preventDefault();
                 void send(input);
               }}
-              className="flex gap-2 animate-slide-up"
+              className="animate-rise flex gap-2"
             >
               <input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Décrivez votre activité, ou posez votre question…"
-                className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
+                aria-label="Votre message"
+                className="flex-1 rounded-full border border-border bg-card px-5 py-2.5 text-sm transition-colors duration-200 placeholder:text-muted-foreground/60 focus:border-ink focus:outline-none"
               />
-              <button
+              <Button
                 type="submit"
+                variant="accent"
+                className="rounded-full px-5"
                 disabled={busy || !input.trim()}
-                className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
               >
-                Envoyer
-              </button>
+                <Send /> Envoyer
+              </Button>
             </form>
           )}
         </div>

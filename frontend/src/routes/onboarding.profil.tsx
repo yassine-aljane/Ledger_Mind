@@ -1,6 +1,23 @@
 import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  CalendarDays,
+  Coins,
+  Euro,
+  FileText,
+  Gift,
+  Globe,
+  Puzzle,
+  ReceiptText,
+  RefreshCw,
+  Rocket,
+  Rss,
+  Target,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
+import { cn } from "@/lib/utils";
 import { Chatbot, type ChatTurn } from "@/components/lm/Chatbot";
 import {
   getStoredSessionId,
@@ -116,7 +133,7 @@ function ProfilPage() {
   if (loading) {
     return (
       <div className="min-h-screen px-6 py-16 max-w-4xl mx-auto">
-        <p className="text-ink/40 font-mono text-sm">Chargement…</p>
+        <p className="text-muted-foreground font-mono text-sm">Chargement…</p>
       </div>
     );
   }
@@ -126,7 +143,7 @@ function ProfilPage() {
       <div className="flex items-center justify-between gap-4">
         <Link
           to="/onboarding/verification"
-          className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink transition-colors duration-200"
+          className="text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-ink transition-colors duration-200"
         >
           ← Retour
         </Link>
@@ -154,16 +171,16 @@ function ProfilPage() {
                 </p>
                 <button
                   onClick={handleRestart}
-                  className="text-xs font-semibold text-ink/50 hover:text-coral transition-colors duration-200"
+                  className="text-xs font-semibold text-muted-foreground hover:text-destructive transition-colors duration-200"
                 >
                   ↺ Recommencer
                 </button>
               </div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-balance inline-flex items-center gap-3">
+              <h1 className="text-4xl md:text-5xl font-medium text-balance inline-flex items-center gap-3">
                 <span aria-hidden>✨</span>
                 Vérifiez et ajustez <span className="italic font-normal">votre profil</span>.
               </h1>
-              <p className="mt-3 text-ink/60 text-pretty">
+              <p className="mt-3 text-muted-foreground text-pretty">
                 Ces informations proviennent de la vérification SIRET et de vos réponses. Vous pouvez
                 modifier n'importe quelle donnée avant de valider.
               </p>
@@ -175,9 +192,9 @@ function ProfilPage() {
                   <span aria-hidden>✅</span> Vérification SIRET
                 </p>
                 <p className="font-semibold">{profile.denomination ?? "—"}</p>
-                <p className="font-mono text-sm text-ink/60 mt-1">{profile.siret}</p>
+                <p className="font-mono text-sm text-muted-foreground mt-1">{profile.siret}</p>
                 {profile.tax_category && (
-                  <p className="text-sm text-ink/70 mt-2">
+                  <p className="text-sm text-muted-foreground mt-2">
                     Régime : {profile.recommended_regime} ({profile.tax_category}) — {profile.regime_plafond}
                   </p>
                 )}
@@ -185,9 +202,9 @@ function ProfilPage() {
             )}
 
             {profile.fiscal_classification_status === "requires_expert" && (
-              <div className="rounded-2xl bg-coral/10 border border-coral/30 p-5">
-                <p className="font-semibold text-coral">Classification bloquée — incohérence détectée</p>
-                <p className="text-sm text-ink/70 mt-2">
+              <div className="rounded-2xl bg-destructive/10 border border-destructive/30 p-5">
+                <p className="font-semibold text-destructive">Classification bloquée — incohérence détectée</p>
+                <p className="text-sm text-muted-foreground mt-2">
                   {profile.fiscal_inconsistency_reason ??
                     "Contactez votre SIE ou demandez un rescrit fiscal via impots.gouv.fr."}
                 </p>
@@ -195,17 +212,17 @@ function ProfilPage() {
             )}
 
             {profile.activity_mismatch && profile.mismatches.length > 0 && (
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5">
-                <p className="font-semibold text-amber-900">Écart d'activité détecté</p>
+              <div className="rounded-2xl border border-warning/40 bg-warning/12 p-5">
+                <p className="font-medium text-warning-ink">Écart d'activité détecté</p>
                 {profile.mismatches.map((m, i) => (
-                  <p key={i} className="text-sm text-amber-800 mt-1">{m.note}</p>
+                  <p key={i} className="mt-1 text-sm text-muted-foreground">{m.note}</p>
                 ))}
               </div>
             )}
 
-            <Section icon="🎯" title="Votre activité">
+            <Section icon={Target} title="Votre activité">
               <ProfileListField
-                icon="🧩"
+                icon={Puzzle}
                 label="Types d'activité"
                 field="activity_types"
                 profile={profile}
@@ -216,17 +233,17 @@ function ProfilPage() {
                 render={(val) =>
                   (val as string[]).length > 0 ? (
                     (val as string[]).map((act, i) => (
-                      <span key={i} className="px-2.5 py-1 bg-teal-dark/10 text-teal-dark rounded-md text-xs font-medium">
+                      <span key={i} className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                         {act}
                       </span>
                     ))
                   ) : (
-                    <span className="text-sm italic text-ink/40">Non renseigné</span>
+                    <span className="text-sm italic text-muted-foreground">Non renseigné</span>
                   )
                 }
               />
               <ProfileListField
-                icon="📡"
+                icon={Rss}
                 label="Sources de revenus / Plateformes"
                 field="revenue_sources"
                 profile={profile}
@@ -237,20 +254,20 @@ function ProfilPage() {
                 render={(val) =>
                   (val as string[]).length > 0 ? (
                     (val as string[]).map((src, i) => (
-                      <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium">
+                      <span key={i} className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
                         {src}
                       </span>
                     ))
                   ) : (
-                    <span className="text-sm italic text-ink/40">Non renseigné</span>
+                    <span className="text-sm italic text-muted-foreground">Non renseigné</span>
                   )
                 }
               />
             </Section>
 
-            <Section icon="💶" title="Revenus & devises">
+            <Section icon={Euro} title="Revenus & devises">
               <ProfileStringField
-                icon="📅"
+                icon={CalendarDays}
                 label="Revenu mensuel estimé"
                 field="estimated_monthly_revenue"
                 profile={profile}
@@ -259,7 +276,7 @@ function ProfilPage() {
                 updateProfileField={updateProfileField}
               />
               <ProfileListField
-                icon="💱"
+                icon={Coins}
                 label="Devises de paiement"
                 field="currencies"
                 profile={profile}
@@ -269,17 +286,17 @@ function ProfilPage() {
                 render={(val) =>
                   (val as string[]).length > 0 ? (
                     (val as string[]).map((cur, i) => (
-                      <span key={i} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-xs font-mono font-medium">
+                      <span key={i} className="num rounded-md border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-medium text-success-ink">
                         {cur}
                       </span>
                     ))
                   ) : (
-                    <span className="text-sm italic text-ink/40">Non renseigné</span>
+                    <span className="text-sm italic text-muted-foreground">Non renseigné</span>
                   )
                 }
               />
               <BoolField
-                icon="🌍"
+                icon={Globe}
                 label="Clients internationaux"
                 value={profile.international_clients}
                 onToggle={() =>
@@ -291,9 +308,9 @@ function ProfilPage() {
               <VariabilityField profile={profile} updateProfileField={updateProfileField} />
             </Section>
 
-            <Section icon="📄" title="Facturation & contrats">
+            <Section icon={FileText} title="Facturation & contrats">
               <BoolField
-                icon="🧾"
+                icon={ReceiptText}
                 label="Factures déjà émises"
                 value={profile.invoices_already_issued}
                 onToggle={() =>
@@ -301,7 +318,7 @@ function ProfilPage() {
                 }
               />
               <BoolField
-                icon="🔄"
+                icon={RefreshCw}
                 label="Contrats récurrents"
                 value={profile.has_recurring_contracts}
                 onToggle={() =>
@@ -311,7 +328,7 @@ function ProfilPage() {
                 falseLabel="Non (one-shot / par mission)"
               />
               <BoolField
-                icon="🎁"
+                icon={Gift}
                 label="Cadeaux & dotations en nature"
                 value={profile.in_kind_gifts}
                 onToggle={() =>
@@ -320,7 +337,7 @@ function ProfilPage() {
                 trueLabel="Oui (produits, voyages, dotations)"
               />
               <ProfileStringField
-                icon="🚀"
+                icon={Rocket}
                 label="Début des premiers revenus"
                 field="first_income_date"
                 profile={profile}
@@ -331,10 +348,10 @@ function ProfilPage() {
             </Section>
 
             {doneTranscript && doneTranscript.length > 0 && (
-              <div className="border border-border rounded-2xl bg-slate-50 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/40 p-4">
                 <button
                   onClick={() => setShowTranscript(!showTranscript)}
-                  className="flex items-center justify-between w-full text-xs font-mono uppercase tracking-wider text-ink/60 hover:text-ink"
+                  className="flex items-center justify-between w-full text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-ink"
                 >
                   <span>{showTranscript ? "Masquer" : "Voir"} l'historique ({doneTranscript.length} messages)</span>
                   <span>{showTranscript ? "▲" : "▼"}</span>
@@ -346,7 +363,7 @@ function ProfilPage() {
                         key={t.id}
                         className={`text-xs p-3 rounded-xl ${
                           t.role === "assistant"
-                            ? "bg-white border border-border text-ink/80"
+                            ? "bg-card border border-border text-muted-foreground"
                             : "bg-teal-dark/10 text-teal-dark font-medium"
                         }`}
                       >
@@ -360,7 +377,7 @@ function ProfilPage() {
 
             <button
               onClick={() => navigate({ to: "/dashboard" })}
-              className="w-full px-8 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] text-center text-base shadow-md inline-flex items-center justify-center gap-2"
+              className="w-full px-8 py-5 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] text-center text-base shadow-md inline-flex items-center justify-center gap-2"
             >
               <span aria-hidden>🚀</span>
               Confirmer mon profil et continuer vers mon dashboard →
@@ -375,21 +392,21 @@ function ProfilPage() {
 /** Petite tuile qui encadre chaque champ de la fiche — icône + libellé + valeur + action,
  * plus vivante qu'une simple ligne de liste tout en gardant la même logique d'édition. */
 function FieldTile({
-  icon,
+  icon: Icon,
   label,
   action,
   children,
 }: {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl bg-background border border-border p-4 hover:border-teal-dark/40 hover:shadow-[0_4px_16px_-8px_rgba(22,36,31,0.15)] transition-all duration-200">
+    <div className="card-hover rounded-xl border border-border bg-secondary/40 p-4">
       <div className="flex items-start justify-between gap-3">
-        <span className="text-sm font-semibold uppercase tracking-wider text-ink/45 inline-flex items-center gap-1.5">
-          <span aria-hidden className="text-base leading-none">{icon}</span>
+        <span className="rule-label inline-flex items-center gap-1.5 text-muted-foreground">
+          <Icon aria-hidden className="size-3.5 shrink-0" />
           {label}
         </span>
         {action}
@@ -400,14 +417,24 @@ function FieldTile({
 }
 
 /** En-tête de section — regroupe des champs apparentés sous un même thème visuel. */
-function Section({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+function Section({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="bg-white border border-border rounded-2xl p-6 shadow-sm">
-      <p className="font-semibold text-lg mb-4 inline-flex items-center gap-2">
-        <span aria-hidden className="text-xl leading-none">{icon}</span>
+    <section className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
+      <h2 className="mb-5 inline-flex items-center gap-2.5 text-lg">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/8 text-primary">
+          <Icon aria-hidden className="size-4" />
+        </span>
         {title}
-      </p>
-      <div className="grid sm:grid-cols-2 gap-3">{children}</div>
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
     </section>
   );
 }
@@ -423,7 +450,7 @@ function ProfileListField<K extends keyof UserProfile>({
   render,
   full = false,
 }: {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   field: K;
   profile: UserProfile;
@@ -442,7 +469,7 @@ function ProfileListField<K extends keyof UserProfile>({
         action={
           <button
             onClick={() => setEditingField(editingField === field ? null : (field as string))}
-            className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 shrink-0"
+            className="shrink-0 text-xs font-medium text-primary transition-colors duration-200 hover:underline"
           >
             {editingField === field ? "Valider" : "Modifier"}
           </button>
@@ -451,7 +478,7 @@ function ProfileListField<K extends keyof UserProfile>({
         {editingField === field ? (
           <input
             type="text"
-            className="w-full text-sm p-2 border border-teal-dark rounded-lg input-boxed focus:outline-none"
+            className="input-boxed w-full rounded-lg border border-ink bg-card p-2 text-sm focus:outline-none"
             defaultValue={(val as string[]).join(", ")}
             onBlur={(e) => {
               const items = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
@@ -477,7 +504,7 @@ function ProfileStringField({
   setEditingField,
   updateProfileField,
 }: {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   field: "estimated_monthly_revenue" | "first_income_date";
   profile: UserProfile;
@@ -493,7 +520,7 @@ function ProfileStringField({
       action={
         <button
           onClick={() => setEditingField(editingField === field ? null : field)}
-          className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 shrink-0"
+          className="shrink-0 text-xs font-medium text-primary transition-colors duration-200 hover:underline"
         >
           {editingField === field ? "Valider" : "Modifier"}
         </button>
@@ -502,7 +529,7 @@ function ProfileStringField({
       {editingField === field ? (
         <input
           type="text"
-          className="w-full text-sm p-2 border border-teal-dark rounded-lg input-boxed focus:outline-none"
+          className="input-boxed w-full rounded-lg border border-ink bg-card p-2 text-sm focus:outline-none"
           defaultValue={val ?? ""}
           onBlur={(e) => {
             updateProfileField(field, e.target.value || null);
@@ -511,8 +538,8 @@ function ProfileStringField({
           autoFocus
         />
       ) : (
-        <p className="text-base font-semibold text-ink">
-          {val || <span className="italic text-ink/40 font-normal">Non renseigné</span>}
+        <p className="text-sm font-medium">
+          {val || <span className="font-normal italic text-muted-foreground">Non renseigné</span>}
         </p>
       )}
     </FieldTile>
@@ -527,7 +554,7 @@ function BoolField({
   trueLabel = "Oui",
   falseLabel = "Non",
 }: {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   value: boolean | null;
   onToggle: () => void;
@@ -541,13 +568,13 @@ function BoolField({
       action={
         <button
           onClick={onToggle}
-          className="text-xs font-semibold text-teal-dark hover:underline transition-colors duration-200 shrink-0"
+          className="shrink-0 text-xs font-medium text-primary transition-colors duration-200 hover:underline"
         >
           Changer
         </button>
       }
     >
-      <span className="text-base font-medium text-ink">
+      <span className="text-sm font-medium">
         {value === null ? "Non précisé" : value ? trueLabel : falseLabel}
       </span>
     </FieldTile>
@@ -562,9 +589,9 @@ function VariabilityField({
   updateProfileField: <K extends keyof UserProfile>(field: K, value: UserProfile[K]) => void;
 }) {
   return (
-    <FieldTile icon="📈" label="Stabilité des revenus">
+    <FieldTile icon={TrendingUp} label="Stabilité des revenus">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <span className="text-base font-medium text-ink">
+        <span className="text-sm font-medium">
           {profile.revenue_variability === "stable"
             ? "Revenus stables"
             : profile.revenue_variability === "spiky"
@@ -576,11 +603,12 @@ function VariabilityField({
             <button
               key={v}
               onClick={() => updateProfileField("revenue_variability", v)}
-              className={`px-3 py-1 text-xs rounded-full border transition-all duration-200 active:scale-[0.95] ${
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs transition-all duration-200 active:scale-[0.95]",
                 profile.revenue_variability === v
-                  ? "bg-teal-dark text-white border-teal-dark"
-                  : "bg-white text-ink/60 border-border hover:border-teal-dark"
-              }`}
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:border-ink",
+              )}
             >
               {v === "stable" ? "Stables" : "Irréguliers"}
             </button>

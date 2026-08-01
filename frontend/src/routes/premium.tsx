@@ -1,7 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Check, Loader2, Minus, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { setPlan, usePlan } from "@/lib/plan";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/premium")({
   head: () => ({
@@ -80,41 +84,49 @@ function PremiumPage() {
         {TIERS.map((t) => (
           <div
             key={t.id}
-            className={`relative rounded-3xl border p-8 md:p-10 overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
+            className={cn(
+              "animate-rise relative overflow-hidden rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 md:p-10",
               t.highlight
-                ? "border-ink bg-ink text-background shadow-[0_40px_80px_-40px_rgba(22,36,31,0.5)] hover:shadow-[0_48px_90px_-36px_rgba(22,36,31,0.6)]"
-                : "border-border bg-white card-hover"
-            }`}
+                ? "surface-ink border-ink shadow-lift"
+                : "card-hover border-border bg-card",
+            )}
           >
             {t.highlight && (
               <>
-                <div className="absolute -top-24 -right-24 size-72 rounded-full bg-amber-fiscal/30 blur-3xl" />
-                <div className="absolute inset-0 grain-overlay opacity-40" />
+                <div className="absolute -right-24 -top-24 size-72 rounded-full bg-accent/30 blur-3xl" />
+                <div className="surface-grain absolute inset-0 opacity-50" />
               </>
             )}
             <div className="relative">
               <div className="flex items-center justify-between mb-6">
                 <span
-                  className={`font-mono text-[11px] uppercase tracking-[0.25em] ${
-                    t.highlight ? "text-amber-fiscal" : "text-teal-dark"
-                  }`}
+                  className={cn(
+                    "rule-label",
+                    t.highlight ? "text-accent" : "text-accent-ink",
+                  )}
                 >
                   {t.name}
                 </span>
-                {t.highlight && (
-                  <span className="px-3 py-1 rounded-full bg-amber-fiscal text-ink font-mono text-[10px] uppercase tracking-widest">
-                    Recommandé
-                  </span>
-                )}
+                {t.highlight && <Badge variant="accent">Recommandé</Badge>}
               </div>
 
               <div className="flex items-baseline gap-2 mb-4">
-                <span className="text-5xl font-extrabold tracking-tighter">{t.price}</span>
-                <span className={`text-sm ${t.highlight ? "text-background/60" : "text-ink/50"}`}>
+                <span className="num text-4xl font-medium">{t.price}</span>
+                <span
+                  className={cn(
+                    "text-sm",
+                    t.highlight ? "text-ink-foreground/60" : "text-muted-foreground",
+                  )}
+                >
                   {t.tag}
                 </span>
               </div>
-              <p className={`text-sm mb-8 ${t.highlight ? "text-background/70" : "text-ink/60"}`}>
+              <p
+                className={cn(
+                  "mb-8 text-sm",
+                  t.highlight ? "text-ink-foreground/70" : "text-muted-foreground",
+                )}
+              >
                 {t.desc}
               </p>
 
@@ -122,26 +134,26 @@ function PremiumPage() {
                 {t.features.map((f) => (
                   <li key={f.label} className="flex items-center gap-3 text-sm">
                     <span
-                      className={`size-5 shrink-0 rounded-full flex items-center justify-center text-[10px] ${
+                      className={cn(
+                        "flex size-5 shrink-0 items-center justify-center rounded-full",
                         f.on
                           ? t.highlight
-                            ? "bg-teal-light text-ink"
-                            : "bg-teal-dark text-background"
+                            ? "bg-accent text-accent-foreground"
+                            : "bg-success text-success-foreground"
                           : t.highlight
-                            ? "bg-background/10 text-background/40"
-                            : "bg-border text-ink/30"
-                      }`}
+                            ? "bg-ink-foreground/10 text-ink-foreground/40"
+                            : "bg-border text-muted-foreground",
+                      )}
                     >
-                      {f.on ? "✓" : "—"}
+                      {f.on ? <Check className="size-3" /> : <Minus className="size-3" />}
                     </span>
                     <span
-                      className={
-                        f.on
-                          ? ""
-                          : t.highlight
-                            ? "text-background/40 line-through"
-                            : "text-ink/40 line-through"
-                      }
+                      className={cn(
+                        !f.on &&
+                          (t.highlight
+                            ? "text-ink-foreground/40 line-through"
+                            : "text-muted-foreground line-through"),
+                      )}
                     >
                       {f.label}
                     </span>
@@ -150,20 +162,30 @@ function PremiumPage() {
               </ul>
 
               {t.id === "premium" ? (
-                <button
+                <Button
                   type="button"
+                  size="lg"
+                  variant="accent"
                   onClick={activate}
                   disabled={loading || plan === "premium"}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 bg-background text-ink rounded-full text-sm font-semibold hover:bg-amber-fiscal hover:text-ink transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
+                  className="w-full rounded-full"
                 >
-                  {plan === "premium"
-                    ? "Premium actif ✓"
-                    : loading
-                      ? "Activation…"
-                      : "Démarrer l'essai — 14 jours"}
-                </button>
+                  {plan === "premium" ? (
+                    <>
+                      <Check /> Premium actif
+                    </>
+                  ) : loading ? (
+                    <>
+                      <Loader2 className="animate-spin" /> Activation…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles /> Démarrer l&apos;essai — 14 jours
+                    </>
+                  )}
+                </Button>
               ) : (
-                <div className="w-full text-center text-xs text-ink/40 font-mono uppercase tracking-widest py-4">
+                <div className="rule-label w-full py-4 text-center text-muted-foreground">
                   Plan actuel par défaut
                 </div>
               )}
@@ -173,8 +195,8 @@ function PremiumPage() {
       </div>
 
       {/* Social proof / faux testimonial strip */}
-      <section className="bg-white border border-border rounded-3xl p-10 md:p-14 relative overflow-hidden">
-        <div className="absolute inset-0 grain-overlay" />
+      <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-10 shadow-soft md:p-14">
+        <div className="surface-grain absolute inset-0" />
         <div className="relative grid md:grid-cols-3 gap-10">
           <Metric k="2 400+" v="freelances accompagnés" />
           <Metric k="18 h" v="économisées par mois en moyenne" />
@@ -187,7 +209,7 @@ function PremiumPage() {
           <button
             type="button"
             onClick={() => setPlan("free")}
-            className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-coral transition-colors duration-200"
+            className="rule-label text-muted-foreground transition-colors duration-200 hover:text-destructive"
           >
             (démo) revenir au plan gratuit
           </button>
@@ -200,8 +222,8 @@ function PremiumPage() {
 function Metric({ k, v }: { k: string; v: string }) {
   return (
     <div>
-      <p className="text-4xl font-extrabold tracking-tighter mb-2">{k}</p>
-      <p className="text-sm text-ink/60">{v}</p>
+      <p className="num mb-2 text-3xl font-medium">{k}</p>
+      <p className="text-sm text-muted-foreground">{v}</p>
     </div>
   );
 }

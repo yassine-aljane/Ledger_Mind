@@ -1,6 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Lock, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { FiscalReceipt } from "@/components/lm/FiscalReceipt";
 import {
   displayFirstName,
@@ -268,19 +272,23 @@ function DashboardPage() {
       />
 
       {error && (
-        <p className="mb-8 text-sm text-coral font-mono">{error}</p>
+        <p
+          role="alert"
+          className="mb-8 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive"
+        >
+          {error}
+        </p>
       )}
 
       {!loading && !detail && !error && (
-        <div className="mb-10 rounded-2xl border border-border bg-white p-8 text-center space-y-4">
-          <p className="text-ink/60">Aucune session trouvée pour votre compte.</p>
+        <div className="mb-10 space-y-4 rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">Aucune session trouvée pour votre compte.</p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link
-              to="/onboarding"
-              className="inline-block px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-            >
-              Commencer l&apos;onboarding →
-            </Link>
+            <Button asChild>
+              <Link to="/onboarding">
+                Commencer l&apos;onboarding <ArrowRight />
+              </Link>
+            </Button>
           </div>
         </div>
       )}
@@ -290,21 +298,22 @@ function DashboardPage() {
           (vérification SIREN/avis de situation). On l'explique plutôt que de laisser des
           cartes vides sans raison apparente. */}
       {!loading && detail && isGuidanceOnly && (
-        <div className="mb-10 rounded-2xl border border-amber-fiscal/40 bg-amber-fiscal/8 p-6 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+        <div className="animate-rise mb-10 flex flex-col justify-between gap-4 rounded-2xl border border-accent/40 bg-accent/8 p-5 sm:flex-row sm:items-center">
           <div>
-            <p className="font-semibold text-ink">Dashboard partiellement déverrouillé</p>
-            <p className="mt-1 text-sm text-ink/60 leading-relaxed max-w-2xl">
+            <Badge variant="accent">
+              <Lock /> Accès partiel
+            </Badge>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               Votre diagnostic et votre feuille de route sont prêts. Le reçu fiscal, la catégorie
               précise et les alertes de conformité s&apos;activent après la vérification de votre
               SIREN et de votre avis de situation.
             </p>
           </div>
-          <Link
-            to="/onboarding/verification"
-            className="shrink-0 px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] text-center"
-          >
-            Vérifier mon SIREN →
-          </Link>
+          <Button asChild className="shrink-0">
+            <Link to="/onboarding/verification">
+              <ShieldCheck /> Vérifier mon SIREN
+            </Link>
+          </Button>
         </div>
       )}
 
@@ -337,33 +346,34 @@ function DashboardPage() {
           </div>
 
           {profile && isSirenVerified && profile.compliance_alerts.length > 0 && (
-            <section className="bg-white border border-border rounded-2xl p-8">
-              <h2 className="text-xl font-semibold mb-4">Alertes de conformité</h2>
-              <ul className="space-y-3">
+            <section className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <h2 className="text-lg">Alertes de conformité</h2>
+              <ul className="mt-4 space-y-3">
                 {profile.compliance_alerts.map((a, i) => (
-                  <li key={i} className="text-sm text-ink/70 flex gap-2">
-                    <span
-                      className={`shrink-0 px-2 py-0.5 rounded text-xs font-semibold uppercase ${
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                    <Badge
+                      variant={
                         a.severity === "critical"
-                          ? "bg-coral/10 text-coral"
+                          ? "destructive"
                           : a.severity === "warning"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-teal-dark/10 text-teal-dark"
-                      }`}
+                            ? "warning"
+                            : "info"
+                      }
+                      className="mt-0.5 shrink-0"
                     >
                       {a.severity}
-                    </span>
-                    {a.message}
+                    </Badge>
+                    <span className="leading-relaxed">{a.message}</span>
                   </li>
                 ))}
               </ul>
             </section>
           )}
 
-          <section className="bg-white border border-border rounded-2xl p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Pipeline de traitement</h2>
-              <span className="text-[10px] font-mono uppercase tracking-widest text-teal-dark">
+          <section className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <h2 className="text-lg">Pipeline de traitement</h2>
+              <Badge variant="outline">
                 {branch === "guidance"
                   ? "Branche B · Guidance"
                   : branch === "intake"
@@ -371,44 +381,52 @@ function DashboardPage() {
                     : loading
                       ? "…"
                       : "En attente"}
-              </span>
+              </Badge>
             </div>
             <div className="grid grid-cols-4 gap-3">
               {pipeline.map((p) => (
                 <div key={p.l} className="space-y-2">
-                  <div className={`h-1.5 rounded-full ${p.done ? "bg-teal-light" : "bg-border"}`} />
-                  <span className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">
-                    {p.l}
-                  </span>
+                  <div
+                    className={cn(
+                      "h-1.5 rounded-full transition-colors",
+                      p.done ? "bg-success" : "bg-border",
+                    )}
+                  />
+                  <span className="rule-label block text-muted-foreground">{p.l}</span>
                 </div>
               ))}
             </div>
           </section>
 
           {profile && profile.recommended_actions.length > 0 && (
-            <section className="bg-white border border-border rounded-2xl overflow-hidden">
-              <div className="p-6 flex items-center justify-between border-b border-border">
-                <h2 className="text-xl font-semibold">Prochaines actions</h2>
+            <section className="animate-rise overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+              <div className="flex items-center justify-between gap-3 border-b border-border p-5">
+                <h2 className="text-lg">Prochaines actions</h2>
                 {isGuidance && (
                   <Link
                     to="/parametres"
-                    className="text-xs font-semibold text-teal-dark hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                   >
-                    Voir le profil →
+                    Voir le profil <ArrowRight className="size-3" />
                   </Link>
                 )}
               </div>
               <ul className="divide-y divide-border">
                 {profile.recommended_actions.slice(0, 6).map((item) => (
-                  <li key={item.step} className="p-6 flex items-center justify-between gap-4 card-hover hover:bg-background/40">
-                    <div className="flex items-center gap-5 min-w-0">
-                      <span className="font-mono text-xs text-ink/40 shrink-0">
+                  <li
+                    key={item.step}
+                    className="flex items-center justify-between gap-4 p-5 transition-colors hover:bg-secondary/40"
+                  >
+                    <div className="flex min-w-0 items-center gap-4">
+                      <span className="num shrink-0 rounded-lg bg-secondary px-2 py-1 text-xs text-muted-foreground">
                         {item.step.toString().padStart(2, "0")}
                       </span>
                       <div className="min-w-0">
-                        <p className="font-semibold truncate">{item.title}</p>
+                        <p className="truncate font-medium">{item.title}</p>
                         {item.description ? (
-                          <p className="text-sm text-ink/60 truncate">{item.description}</p>
+                          <p className="truncate text-sm text-muted-foreground">
+                            {item.description}
+                          </p>
                         ) : null}
                       </div>
                     </div>
@@ -419,30 +437,27 @@ function DashboardPage() {
           )}
         </div>
 
-        <div className="lg:col-span-5 lg:sticky lg:top-24 animate-slide-up">
+        <div className="animate-rise lg:sticky lg:top-24 lg:col-span-5">
           {loading ? (
-            <div className="text-ink/40 font-mono text-sm text-center">Chargement…</div>
+            <div className="rule-label text-center text-muted-foreground">Chargement…</div>
           ) : isSirenVerified ? (
             <>
-              <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark text-center mb-6">
+              <p className="rule-label mb-6 text-center text-accent-ink">
                 Dernier reçu fiscal
               </p>
               <FiscalReceipt qualification={data.qualification} calcul={data.calcul} />
             </>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border bg-white p-8 text-center space-y-4">
-              <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-ink/40">
-                Reçu fiscal — verrouillé
-              </p>
-              <p className="text-sm text-ink/60 leading-relaxed">
+            <div className="space-y-4 rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+              <p className="rule-label text-muted-foreground">Reçu fiscal — verrouillé</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 Ce document se génère une fois votre SIREN et votre avis de situation vérifiés.
               </p>
-              <Link
-                to="/onboarding/verification"
-                className="inline-block px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-              >
-                Vérifier mon SIREN →
-              </Link>
+              <Button asChild>
+                <Link to="/onboarding/verification">
+                  <ShieldCheck /> Vérifier mon SIREN
+                </Link>
+              </Button>
             </div>
           )}
         </div>
@@ -466,25 +481,21 @@ function Stat({
   locked?: boolean;
 }) {
   return (
-    <div className={`bg-white border border-border rounded-2xl p-6 card-hover ${locked ? "opacity-60" : ""}`}>
-      <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-3 flex items-center gap-1.5">
+    <div
+      className={cn(
+        "card-hover animate-rise rounded-2xl border border-border bg-card p-5 shadow-soft",
+        locked && "opacity-60",
+      )}
+    >
+      <p className="rule-label mb-3 flex items-center gap-1.5 text-muted-foreground">
         {label}
         {locked && (
-          <svg
-            width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden
-            className="text-ink/30"
-          >
+          <Lock className="size-3 text-muted-foreground">
             <title>Déverrouillé après vérification SIREN</title>
-            <rect x="2" y="5.5" width="8" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-            <path d="M4 5.5V4a2 2 0 1 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" />
-          </svg>
+          </Lock>
         )}
       </p>
-      <p
-        className={`${mono ? "font-mono" : ""} text-2xl ${
-          accent ? "text-amber-fiscal font-medium" : ""
-        }`}
-      >
+      <p className={cn("text-xl", mono && "num", accent && "font-medium text-amber-fiscal")}>
         {value}
       </p>
     </div>

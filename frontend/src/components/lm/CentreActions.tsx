@@ -1,7 +1,33 @@
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  Check,
+  ExternalLink,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  fetchCaptureInvoices,
+  fetchCaptureVirements,
+  formatMoney,
+  type CaptureInvoiceItem,
+  type CaptureVirementItem,
+} from "@/lib/api";
 import { usePlan } from "@/lib/plan";
+import { cn } from "@/lib/utils";
 import {
   fetchAgenda,
   fetchHistorique,
@@ -17,10 +43,10 @@ import {
 type Vue = "agenda" | "veille" | "historique";
 
 const COULEUR_STATUT: Record<Echeance["statut"], string> = {
-  en_retard: "bg-coral",
-  urgent: "bg-amber-fiscal",
-  regularisee: "bg-teal-dark",
-  a_venir: "bg-ink/20",
+  en_retard: "bg-destructive",
+  urgent: "bg-warning",
+  regularisee: "bg-success",
+  a_venir: "bg-muted-foreground/40",
 };
 
 const LABEL_STATUT: Record<Echeance["statut"], string> = {
@@ -28,6 +54,16 @@ const LABEL_STATUT: Record<Echeance["statut"], string> = {
   urgent: "Approche",
   regularisee: "Réglée",
   a_venir: "À venir",
+};
+
+const VARIANTE_STATUT: Record<
+  Echeance["statut"],
+  "destructive" | "warning" | "success" | "outline"
+> = {
+  en_retard: "destructive",
+  urgent: "warning",
+  regularisee: "success",
+  a_venir: "outline",
 };
 
 function libelleBouton(e: Echeance): string {
@@ -38,13 +74,13 @@ function libelleBouton(e: Echeance): string {
 
 function EcheanceCard({ e, onMarquerPaye }: { e: Echeance; onMarquerPaye: (e: Echeance) => void }) {
   return (
-    <div className="bg-white border border-border rounded-2xl p-5 space-y-3 card-hover">
+    <div className="card-hover space-y-3 rounded-2xl border border-border bg-card p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className={`mt-1 size-2.5 rounded-full shrink-0 ${COULEUR_STATUT[e.statut]}`} />
-          <div>
-            <p className="font-semibold text-sm">{e.libelle}</p>
-            <p className="text-xs text-ink/50">
+        <div className="flex items-start gap-2.5">
+          <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", COULEUR_STATUT[e.statut])} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{e.libelle}</p>
+            <p className="text-xs text-muted-foreground">
               {e.date_limite
                 ? `Avant le ${new Date(e.date_limite).toLocaleDateString("fr-FR")}`
                 : e.fenetre_indicative}
@@ -53,30 +89,23 @@ function EcheanceCard({ e, onMarquerPaye }: { e: Echeance; onMarquerPaye: (e: Ec
             </p>
           </div>
         </div>
-        <span className="text-[10px] uppercase tracking-widest font-semibold text-ink/50 shrink-0">
+        <Badge variant={VARIANTE_STATUT[e.statut]} className="shrink-0">
           {LABEL_STATUT[e.statut]}
-        </span>
+        </Badge>
       </div>
       {e.statut !== "regularisee" && (
         <div className="flex flex-wrap gap-2">
-          <a
-            href={e.portail_paiement}
-            target="_blank"
-            rel="noreferrer"
-            className="px-4 py-2 bg-ink text-background rounded-lg text-xs font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-          >
-            {libelleBouton(e)} — {e.portail_label}
-          </a>
-          <button
-            type="button"
-            onClick={() => onMarquerPaye(e)}
-            className="px-4 py-2 border border-border rounded-lg text-xs font-medium hover:border-ink transition-all duration-200 active:scale-[0.97]"
-          >
-            Marquer comme payé
-          </button>
+          <Button asChild size="sm">
+            <a href={e.portail_paiement} target="_blank" rel="noreferrer">
+              {libelleBouton(e)} — {e.portail_label}
+            </a>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => onMarquerPaye(e)}>
+            <Check /> Marquer comme payé
+          </Button>
         </div>
       )}
-      <p className="text-[10px] text-ink/30">Source : {e.source}</p>
+      <p className="text-xs text-muted-foreground/70">Source : {e.source}</p>
     </div>
   );
 }
@@ -89,7 +118,9 @@ function FormulaireParametres({
   onEnregistre: () => void;
 }) {
   const [periodicite, setPeriodicite] = useState<"mensuelle" | "trimestrielle">("mensuelle");
-  const [regimeTva, setRegimeTva] = useState<"franchise" | "reel_simplifie" | "reel_normal">("franchise");
+  const [regimeTva, setRegimeTva] = useState<"franchise" | "reel_simplifie" | "reel_normal">(
+    "franchise",
+  );
   const [clientsUe, setClientsUe] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -99,7 +130,8 @@ function FormulaireParametres({
       const valeurs: Record<string, unknown> = {};
       if (manquants.includes("periodicite_urssaf")) valeurs.periodicite_urssaf = periodicite;
       if (manquants.includes("regime_tva")) valeurs.regime_tva = regimeTva;
-      if (manquants.includes("revenus_intracommunautaires")) valeurs.revenus_intracommunautaires = clientsUe;
+      if (manquants.includes("revenus_intracommunautaires"))
+        valeurs.revenus_intracommunautaires = clientsUe;
       await mettreAJourParametres(valeurs);
       onEnregistre();
     } finally {
@@ -108,19 +140,20 @@ function FormulaireParametres({
   }
 
   return (
-    <div className="bg-amber-fiscal/10 border border-amber-fiscal/30 rounded-2xl p-5 space-y-4">
-      <p className="text-base font-semibold">
+    <div className="animate-rise space-y-4 rounded-2xl border border-accent/40 bg-accent/10 p-5">
+      <p className="text-sm font-medium">
         Quelques informations pour affiner votre agenda (demandées une seule fois) :
       </p>
       {manquants.includes("periodicite_urssaf") && (
         <div>
-          <label className="text-xs uppercase tracking-widest text-ink/50 font-semibold">
+          <label htmlFor="ca-periodicite" className="rule-label text-muted-foreground">
             Périodicité URSSAF
           </label>
           <select
+            id="ca-periodicite"
             value={periodicite}
             onChange={(e) => setPeriodicite(e.target.value as typeof periodicite)}
-            className="w-full mt-1 px-3 py-2 bg-white border border-border rounded-lg text-sm input-boxed"
+            className="input-boxed mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
           >
             <option value="mensuelle">Mensuelle</option>
             <option value="trimestrielle">Trimestrielle</option>
@@ -129,13 +162,14 @@ function FormulaireParametres({
       )}
       {manquants.includes("regime_tva") && (
         <div>
-          <label className="text-xs uppercase tracking-widest text-ink/50 font-semibold">
+          <label htmlFor="ca-tva" className="rule-label text-muted-foreground">
             Régime de TVA
           </label>
           <select
+            id="ca-tva"
             value={regimeTva}
             onChange={(e) => setRegimeTva(e.target.value as typeof regimeTva)}
-            className="w-full mt-1 px-3 py-2 bg-white border border-border rounded-lg text-sm input-boxed"
+            className="input-boxed mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
           >
             <option value="franchise">Franchise en base (pas de TVA)</option>
             <option value="reel_simplifie">Réel simplifié</option>
@@ -144,19 +178,25 @@ function FormulaireParametres({
         </div>
       )}
       {manquants.includes("revenus_intracommunautaires") && (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={clientsUe} onChange={(e) => setClientsUe(e.target.checked)} />
-          Je facture des clients professionnels établis dans un autre pays de l'UE
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={clientsUe}
+            onChange={(e) => setClientsUe(e.target.checked)}
+            className="mt-0.5"
+          />
+          Je facture des clients professionnels établis dans un autre pays de l&apos;UE
         </label>
       )}
-      <button
-        type="button"
-        onClick={enregistrer}
-        disabled={loading}
-        className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
-      >
-        {loading ? "Enregistrement…" : "Enregistrer"}
-      </button>
+      <Button type="button" onClick={enregistrer} disabled={loading}>
+        {loading ? (
+          <>
+            <Loader2 className="animate-spin" /> Enregistrement…
+          </>
+        ) : (
+          "Enregistrer"
+        )}
+      </Button>
     </div>
   );
 }
@@ -178,7 +218,10 @@ function grilleMoisCourant(): { jours: (Date | null)[]; label: string } {
   const decalage = (premierJour.getDay() + 6) % 7; // grille Lundi -> Dimanche
   const jours: (Date | null)[] = Array(decalage).fill(null);
   for (let j = 1; j <= nbJours; j++) jours.push(new Date(annee, mois, j));
-  return { jours, label: premierJour.toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) };
+  return {
+    jours,
+    label: premierJour.toLocaleDateString("fr-FR", { month: "long", year: "numeric" }),
+  };
 }
 
 /** Rouge = échéance en retard ou urgente (imminente) ; orange = échéance à venir plus loin. */
@@ -193,11 +236,130 @@ function couleursParDate(echeances: Echeance[]): Record<string, "rouge" | "orang
   return map;
 }
 
-function CalendrierFiscal({ echeances }: { echeances: Echeance[] }) {
+// -------- Documents déposés, épinglés au calendrier --------
+/**
+ * Une pièce déposée (facture ou virement) reportée sur le calendrier, à SA date.
+ *
+ * Ces repères ne sont pas des obligations légales : une facture à régler est un engagement
+ * commercial, pas une échéance URSSAF ou TVA. Ils portent donc un marquage distinct (pastille
+ * sous le quantième, jamais la pastille pleine des obligations) pour qu'on ne puisse pas
+ * confondre les deux natures d'un simple coup d'œil.
+ */
+type DocumentEcheance = {
+  id: string;
+  date: string; // ISO court (AAAA-MM-JJ)
+  kind: "facture" | "virement";
+  /** `a_regler` = facture impayée à venir ; `en_retard` = impayée dont la date est passée ;
+   *  `archive` = facture réglée ou virement déjà exécuté (repère, pas action). */
+  etat: "a_regler" | "en_retard" | "archive";
+  libelle: string;
+  montant: string | null;
+};
+
+function montantLisible(
+  montant: number | null | undefined,
+  devise: string | null | undefined,
+  montantEur: number | null | undefined,
+): string | null {
+  if (montant == null) return null;
+  const cur = devise ?? "EUR";
+  const base = `${formatMoney(montant)} ${cur}`;
+  return montantEur != null && cur !== "EUR" ? `${base} (≈ ${formatMoney(montantEur)} €)` : base;
+}
+
+/** Décale une date ISO de `jours` jours (utilisé pour reconstituer une échéance depuis les
+ *  conditions de paiement quand la facture ne porte pas de date limite explicite). */
+function decalerIso(iso: string, jours: number): string {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  d.setDate(d.getDate() + jours);
+  return toISODate(d);
+}
+
+function documentsVersEcheances(
+  factures: CaptureInvoiceItem[],
+  virements: CaptureVirementItem[],
+): DocumentEcheance[] {
+  const aujourdHui = toISODate(new Date());
+  const out: DocumentEcheance[] = [];
+
+  for (const f of factures) {
+    // Date de référence : l'échéance annoncée, sinon reconstituée depuis les conditions de
+    // paiement, sinon la date d'émission. Une facture sans aucune date n'est pas épinglée :
+    // la caler sur la date de dépôt donnerait un repère faux dans un calendrier fiscal.
+    const inv = f.invoice;
+    const date =
+      inv.due_date?.slice(0, 10) ||
+      (inv.issue_date && inv.payment_terms_days != null
+        ? decalerIso(inv.issue_date, inv.payment_terms_days)
+        : null) ||
+      inv.issue_date?.slice(0, 10) ||
+      null;
+    if (!date) continue;
+
+    const reglee = (f.paid ?? inv.paid) === true;
+    out.push({
+      id: `f-${f.document_id}`,
+      date,
+      kind: "facture",
+      etat: reglee ? "archive" : date < aujourdHui ? "en_retard" : "a_regler",
+      libelle: inv.issuer_name ?? "Facture",
+      montant: montantLisible(inv.total_ttc, inv.currency, inv.amount_eur),
+    });
+  }
+
+  for (const v of virements) {
+    const t = v.transfer;
+    const date = t.execution_date?.slice(0, 10) || t.value_date?.slice(0, 10) || null;
+    if (!date) continue;
+    out.push({
+      id: `v-${v.document_id}`,
+      date,
+      kind: "virement",
+      etat: "archive",
+      libelle:
+        t.direction === "emis"
+          ? `Virement émis${t.beneficiary_name ? ` — ${t.beneficiary_name}` : ""}`
+          : `Virement reçu${t.sender_name ? ` — ${t.sender_name}` : ""}`,
+      montant: montantLisible(t.amount, t.currency, t.amount_eur),
+    });
+  }
+
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const PASTILLE_DOCUMENT: Record<DocumentEcheance["etat"], string> = {
+  en_retard: "bg-destructive",
+  a_regler: "bg-info",
+  archive: "bg-muted-foreground/50",
+};
+
+function CalendrierFiscal({
+  echeances,
+  documents,
+}: {
+  echeances: Echeance[];
+  documents: DocumentEcheance[];
+}) {
   const { jours, label } = grilleMoisCourant();
   const couleurs = couleursParDate(echeances);
   const aujourdHui = toISODate(new Date());
   const joursDuMois = new Set(jours.filter((j): j is Date => j !== null).map(toISODate));
+
+  const docsParDate = new Map<string, DocumentEcheance[]>();
+  for (const d of documents) {
+    if (!joursDuMois.has(d.date)) continue;
+    const liste = docsParDate.get(d.date);
+    if (liste) liste.push(d);
+    else docsParDate.set(d.date, [d]);
+  }
+  const docsDuMois = documents.filter((d) => joursDuMois.has(d.date));
+  // La grille ne montre qu'un mois : sans ce repli, une facture à régler datée du mois suivant
+  // resterait totalement invisible. Seules les pièces encore actionnables sont reprises ici —
+  // les documents archivés n'ont pas à encombrer la vue au-delà de leur mois.
+  const docsHorsMois = documents
+    .filter((d) => !joursDuMois.has(d.date) && d.etat !== "archive")
+    .slice(0, 6);
 
   const horsMois = echeances
     .filter((e) => e.date_limite && !joursDuMois.has(e.date_limite.slice(0, 10)))
@@ -206,23 +368,29 @@ function CalendrierFiscal({ echeances }: { echeances: Echeance[] }) {
     .slice(0, 6);
 
   return (
-    <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="font-semibold text-sm capitalize">{label}</p>
-        <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-ink/50 font-semibold">
+    <div className="animate-rise space-y-4 rounded-2xl border border-border bg-card p-5 shadow-soft">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium capitalize">{label}</p>
+        <div className="rule-label flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-coral" />
+            <span className="size-2 rounded-full bg-destructive" />
             En retard / urgent
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-amber-fiscal" />À venir
+            <span className="size-2 rounded-full bg-warning" />À venir
           </span>
+          {docsDuMois.length > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-info" />
+              Document
+            </span>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-7 gap-1">
         {["L", "M", "M", "J", "V", "S", "D"].map((j, i) => (
-          <span key={i} className="text-center text-[10px] font-semibold text-ink/40 pb-1">
+          <span key={i} className="rule-label pb-1 text-center text-muted-foreground">
             {j}
           </span>
         ))}
@@ -230,37 +398,101 @@ function CalendrierFiscal({ echeances }: { echeances: Echeance[] }) {
           if (!jour) return <span key={i} />;
           const iso = toISODate(jour);
           const couleur = couleurs[iso];
+          const docs = docsParDate.get(iso) ?? [];
+          const infobulle = [
+            iso === aujourdHui ? "Aujourd'hui" : null,
+            ...docs.map((d) => `${d.libelle}${d.montant ? ` — ${d.montant}` : ""}`),
+          ]
+            .filter(Boolean)
+            .join(" · ");
           return (
             <div
               key={i}
-              className={`aspect-square rounded-lg grid place-items-center text-xs font-medium transition-all duration-200 ${
+              className={cn(
+                "num flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-xs transition-all duration-200",
                 couleur === "rouge"
-                  ? "bg-coral text-background"
+                  ? "bg-destructive font-medium text-destructive-foreground"
                   : couleur === "orange"
-                    ? "bg-amber-fiscal text-ink"
+                    ? "bg-warning font-medium text-warning-foreground"
                     : iso === aujourdHui
-                      ? "border border-ink/40 text-ink font-semibold"
-                      : "text-ink/50"
-              }`}
-              title={iso === aujourdHui ? "Aujourd'hui" : undefined}
+                      ? "border border-ink/40 font-medium text-foreground"
+                      : "text-muted-foreground",
+              )}
+              title={infobulle || undefined}
             >
-              {jour.getDate()}
+              <span>{jour.getDate()}</span>
+              {/* Les pièces déposées se signalent SOUS le quantième, jamais par un aplat :
+                  l'aplat reste réservé aux obligations légales. */}
+              <span className="flex h-1 items-center gap-0.5">
+                {docs.slice(0, 3).map((d) => (
+                  <span
+                    key={d.id}
+                    className={cn(
+                      "size-1 rounded-full",
+                      couleur ? "bg-current opacity-70" : PASTILLE_DOCUMENT[d.etat],
+                    )}
+                  />
+                ))}
+              </span>
             </div>
           );
         })}
       </div>
 
-      {horsMois.length > 0 && (
-        <div className="border-t border-border pt-3 space-y-1.5">
-          <p className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">Plus loin</p>
-          {horsMois.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 text-xs text-ink/70">
+      {docsDuMois.length > 0 && (
+        <div className="space-y-1.5 border-t border-border pt-3">
+          <p className="rule-label text-muted-foreground">Documents du mois</p>
+          {docsDuMois.map((d) => (
+            <div key={d.id} className="flex items-center gap-2 text-xs">
               <span
-                className={`size-1.5 rounded-full shrink-0 ${
-                  e.statut === "a_venir" ? "bg-amber-fiscal" : "bg-coral"
-                }`}
+                className={cn("size-1.5 shrink-0 rounded-full", PASTILLE_DOCUMENT[d.etat])}
               />
-              {new Date(e.date_limite!).toLocaleDateString("fr-FR")} — {e.libelle}
+              <span className="num shrink-0 text-muted-foreground">
+                {new Date(`${d.date}T00:00:00`).toLocaleDateString("fr-FR")}
+              </span>
+              <span
+                className={cn(
+                  "truncate",
+                  d.etat === "archive" ? "text-muted-foreground" : "font-medium text-foreground",
+                )}
+              >
+                {d.libelle}
+              </span>
+              {d.etat !== "archive" && (
+                <Badge
+                  variant={d.etat === "en_retard" ? "destructive" : "info"}
+                  className="ml-auto shrink-0"
+                >
+                  {d.etat === "en_retard" ? "En retard" : "À régler"}
+                </Badge>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(horsMois.length > 0 || docsHorsMois.length > 0) && (
+        <div className="space-y-1.5 border-t border-border pt-3">
+          <p className="rule-label text-muted-foreground">Plus loin</p>
+          {horsMois.map((e) => (
+            <div key={e.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full",
+                  e.statut === "a_venir" ? "bg-warning" : "bg-destructive",
+                )}
+              />
+              <span className="num">{new Date(e.date_limite!).toLocaleDateString("fr-FR")}</span>
+              <span className="truncate">— {e.libelle}</span>
+            </div>
+          ))}
+          {docsHorsMois.map((d) => (
+            <div key={d.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className={cn("size-1.5 shrink-0 rounded-full", PASTILLE_DOCUMENT[d.etat])} />
+              <span className="num">
+                {new Date(`${d.date}T00:00:00`).toLocaleDateString("fr-FR")}
+              </span>
+              <span className="truncate">— {d.libelle}</span>
             </div>
           ))}
         </div>
@@ -269,8 +501,24 @@ function CalendrierFiscal({ echeances }: { echeances: Echeance[] }) {
   );
 }
 
+function EtatVide({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="py-10 text-center text-sm text-muted-foreground">{children}</p>
+  );
+}
+
+function EtatChargement({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+      <Loader2 className="size-3.5 animate-spin" />
+      {children}
+    </p>
+  );
+}
+
 function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
   const [data, setData] = useState<AgendaResponse | null>(null);
+  const [documents, setDocuments] = useState<DocumentEcheance[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -281,6 +529,12 @@ function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
       .then(setData)
       .catch((e) => setErreur(e instanceof Error ? e.message : "Erreur de chargement."))
       .finally(() => setLoading(false));
+
+    // Les pièces déposées enrichissent le calendrier, elles ne le conditionnent pas : si cet
+    // appel échoue, l'agenda fiscal s'affiche quand même, simplement sans les repères documents.
+    Promise.all([fetchCaptureInvoices(), fetchCaptureVirements()])
+      .then(([factures, virements]) => setDocuments(documentsVersEcheances(factures, virements)))
+      .catch(() => setDocuments([]));
   }
 
   useEffect(recharger, []);
@@ -290,18 +544,15 @@ function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
     recharger();
   }
 
-  if (loading) return <p className="text-sm text-ink/40 text-center py-10">Chargement de l'agenda…</p>;
+  if (loading) return <EtatChargement>Chargement de l&apos;agenda…</EtatChargement>;
 
   if (erreur) {
     return (
-      <div className="bg-white border border-border rounded-2xl p-8 text-center space-y-4">
-        <p className="text-sm text-ink/60">{erreur}</p>
-        <Link
-          to="/onboarding/verification"
-          className="inline-flex px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-        >
-          Vérifier mon SIREN
-        </Link>
+      <div className="space-y-4 rounded-2xl border border-border bg-card p-8 text-center shadow-soft">
+        <p className="text-sm text-muted-foreground">{erreur}</p>
+        <Button asChild>
+          <Link to="/onboarding/verification">Vérifier mon SIREN</Link>
+        </Button>
       </div>
     );
   }
@@ -313,20 +564,18 @@ function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
       {data.parametres_manquants.length > 0 && (
         <FormulaireParametres manquants={data.parametres_manquants} onEnregistre={recharger} />
       )}
-      <CalendrierFiscal echeances={data.echeances} />
+      <CalendrierFiscal echeances={data.echeances} documents={documents} />
       {data.echeances.length === 0 ? (
-        <p className="text-sm text-ink/40 text-center py-10">Aucune échéance applicable à votre profil.</p>
+        <EtatVide>Aucune échéance applicable à votre profil.</EtatVide>
       ) : (
-        data.echeances.map((e) => (
-          <EcheanceCard key={e.id} e={e} onMarquerPaye={handleMarquerPaye} />
-        ))
+        data.echeances.map((e) => <EcheanceCard key={e.id} e={e} onMarquerPaye={handleMarquerPaye} />)
       )}
       <button
         type="button"
         onClick={onOuvrirHistorique}
-        className="w-full text-center text-sm text-teal-dark font-medium hover:underline pt-2"
+        className="inline-flex w-full items-center justify-center gap-1 pt-2 text-center text-sm font-medium text-primary hover:underline"
       >
-        Voir l'historique fiscal complet →
+        Voir l&apos;historique fiscal complet <ArrowRight className="size-3" />
       </button>
     </div>
   );
@@ -344,22 +593,31 @@ function VueHistorique({ onRetour }: { onRetour: () => void }) {
 
   return (
     <div className="space-y-4">
-      <button type="button" onClick={onRetour} className="text-sm text-teal-dark font-medium hover:underline">
-        ← Retour à l'agenda
+      <button
+        type="button"
+        onClick={onRetour}
+        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+      >
+        <ArrowLeft className="size-3" /> Retour à l&apos;agenda
       </button>
       {loading ? (
-        <p className="text-sm text-ink/40 text-center py-10">Chargement…</p>
+        <EtatChargement>Chargement…</EtatChargement>
       ) : items.length === 0 ? (
-        <p className="text-sm text-ink/40 text-center py-10">Aucun élément dans l'historique.</p>
+        <EtatVide>Aucun élément dans l&apos;historique.</EtatVide>
       ) : (
         <div className="space-y-3">
           {items.map((it) => (
-            <div key={`${it.type}-${it.id}`} className="bg-white border border-border rounded-2xl p-4 card-hover">
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-sm">{it.libelle}</p>
-                <span className="text-[10px] uppercase tracking-widest text-ink/40">{it.statut}</span>
+            <div
+              key={`${it.type}-${it.id}`}
+              className="card-hover rounded-2xl border border-border bg-card p-4 shadow-soft"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">{it.libelle}</p>
+                <Badge variant="outline" className="shrink-0">
+                  {it.statut}
+                </Badge>
               </div>
-              <p className="text-xs text-ink/50">
+              <p className="num mt-1 text-xs text-muted-foreground">
                 {new Date(it.date).toLocaleDateString("fr-FR")}
                 {it.montant != null ? ` · ${it.montant.toFixed(2)} €` : ""}
               </p>
@@ -373,23 +631,23 @@ function VueHistorique({ onRetour }: { onRetour: () => void }) {
 
 function VeilleCard({ n }: { n: VeilleNouveaute }) {
   return (
-    <div className="bg-white border border-border rounded-2xl p-5 space-y-2 card-hover">
-      <p className="font-semibold text-sm">{n.titre}</p>
-      {n.resume && <p className="text-sm text-ink/70 leading-relaxed">{n.resume}</p>}
+    <div className="card-hover animate-rise space-y-2 rounded-2xl border border-border bg-card p-5 shadow-soft">
+      <p className="text-sm font-medium">{n.titre}</p>
+      {n.resume && <p className="text-sm leading-relaxed text-muted-foreground">{n.resume}</p>}
       {n.impact && (
-        <p className="text-xs text-teal-dark bg-teal-dark/5 rounded-lg px-3 py-2">{n.impact}</p>
+        <p className="rounded-lg border border-success/25 bg-success/8 px-3 py-2 text-xs text-success-ink">
+          {n.impact}
+        </p>
       )}
-      <div className="flex items-center justify-between pt-1">
-        <span className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">
-          {n.source}
-        </span>
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <span className="rule-label text-muted-foreground">{n.source}</span>
         <a
           href={n.url}
           target="_blank"
           rel="noreferrer"
-          className="text-xs text-teal-dark font-medium hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
-          Voir la source →
+          Voir la source <ExternalLink className="size-3" />
         </a>
       </div>
     </div>
@@ -397,7 +655,9 @@ function VeilleCard({ n }: { n: VeilleNouveaute }) {
 }
 
 function VueVeille() {
-  const [data, setData] = useState<{ date: string | null; nouveautes: VeilleNouveaute[] } | null>(null);
+  const [data, setData] = useState<{ date: string | null; nouveautes: VeilleNouveaute[] } | null>(
+    null,
+  );
   const [erreur, setErreur] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -408,11 +668,11 @@ function VueVeille() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-sm text-ink/40 text-center py-10">Chargement de la veille…</p>;
+  if (loading) return <EtatChargement>Chargement de la veille…</EtatChargement>;
 
   if (erreur) {
     return (
-      <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-ink/50">
+      <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
         {erreur}
       </div>
     );
@@ -420,9 +680,9 @@ function VueVeille() {
 
   if (!data || data.nouveautes.length === 0) {
     return (
-      <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-ink/50">
-        Aucune nouveauté réglementaire pour votre activité pour l'instant — vous ne verrez ici que
-        les actualités qui ont une réelle valeur pour votre situation.
+      <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm leading-relaxed text-muted-foreground">
+        Aucune nouveauté réglementaire pour votre activité pour l&apos;instant — vous ne verrez ici
+        que les actualités qui ont une réelle valeur pour votre situation.
       </div>
     );
   }
@@ -430,7 +690,7 @@ function VueVeille() {
   return (
     <div className="space-y-4">
       {data.date && (
-        <p className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">
+        <p className="rule-label text-muted-foreground">
           Dernière vérification : {new Date(data.date).toLocaleDateString("fr-FR")}
         </p>
       )}
@@ -441,97 +701,93 @@ function VueVeille() {
   );
 }
 
+/**
+ * Ouvre le Centre d'Actions dans un panneau latéral.
+ *
+ * Le panneau s'appuie sur le Sheet shadcn (Radix Dialog), qui porte son contenu dans <body> :
+ * c'est ce qui l'empêche d'être rogné par le `backdrop-blur` de la barre de navigation — un
+ * filtre CSS crée un « containing block » pour les descendants en `position: fixed`, et sans
+ * cette mise en portail le panneau restait contraint à la hauteur du <nav>.
+ */
 export function CentreActionsButton() {
   const [ouvert, setOuvert] = useState(false);
+  const [vue, setVue] = useState<Vue>("agenda");
   const plan = usePlan();
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOuvert(true)}
-        title="Centre d'Actions"
-        className="size-9 rounded-full border border-border flex items-center justify-center hover:border-ink transition-all duration-200 active:scale-[0.95] shrink-0"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" strokeWidth="1.6" />
-          <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      </button>
-      {ouvert &&
-        createPortal(
-          // Rendu en portail dans <body> : le <nav> parent a un fond flouté (`backdrop-blur`),
-          // qui en CSS établit un « containing block » pour tout descendant en `position: fixed`.
-          // Sans le portail, ce panneau se retrouvait donc contraint à la boîte du <nav> (64px de
-          // haut) au lieu de couvrir tout l'écran — il semblait « coincé dans la barre de nav ».
-          <div className="fixed inset-0 z-50 flex justify-end">
-            <div
-              className="absolute inset-0 bg-ink/30 backdrop-blur-sm"
-              onClick={() => setOuvert(false)}
-            />
-            <div className="relative w-full max-w-md h-full bg-background border-l border-border shadow-2xl overflow-y-auto animate-slide-in-right">
-              <PanneauCentreActions plan={plan} onFermer={() => setOuvert(false)} />
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
-  );
-}
-
-function PanneauCentreActions({ plan, onFermer }: { plan: string; onFermer: () => void }) {
-  const [vue, setVue] = useState<Vue>("agenda");
-
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-xl">Centre d'Actions</h2>
-        <button type="button" onClick={onFermer} className="text-ink/40 hover:text-ink text-xl leading-none">
-          ×
+    <Sheet
+      open={ouvert}
+      onOpenChange={(next) => {
+        setOuvert(next);
+        if (next) setVue("agenda");
+      }}
+    >
+      <SheetTrigger asChild>
+        <button
+          type="button"
+          title="Centre d'Actions"
+          aria-label="Ouvrir le Centre d'Actions"
+          className="grid size-8 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-all duration-200 hover:border-ink hover:text-foreground active:scale-95"
+        >
+          <CalendarDays className="size-3.5" />
         </button>
-      </div>
+      </SheetTrigger>
 
-      {plan === "free" ? (
-        <div className="bg-white border border-border rounded-2xl p-8 text-center space-y-4">
-          <p className="text-sm text-ink/60">
-            L'agenda fiscal et la veille personnalisée font partie des fonctionnalités Premium.
-          </p>
-          <Link
-            to="/premium"
-            className="inline-flex px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-          >
-            Découvrir Premium
-          </Link>
-        </div>
-      ) : (
-        <>
-          {vue !== "historique" && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setVue("agenda")}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  vue === "agenda" ? "bg-ink text-background" : "bg-white border border-border text-ink/70 hover:border-ink"
-                }`}
-              >
-                Agenda fiscal
-              </button>
-              <button
-                type="button"
-                onClick={() => setVue("veille")}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  vue === "veille" ? "bg-ink text-background" : "bg-white border border-border text-ink/70 hover:border-ink"
-                }`}
-              >
-                Veille réglementaire
-              </button>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+        <SheetHeader className="shrink-0 space-y-1 border-b border-border px-6 py-5 pr-14 text-left">
+          <SheetDescription className="rule-label text-accent-ink">
+            Échéances &amp; veille
+          </SheetDescription>
+          <SheetTitle className="font-display text-lg font-medium">Centre d&apos;Actions</SheetTitle>
+        </SheetHeader>
+
+        <div className="chat-scroll flex-1 space-y-5 overflow-y-auto p-6">
+          {plan === "free" ? (
+            <div className="space-y-4 rounded-2xl border border-accent/35 bg-accent/8 p-8 text-center">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                L&apos;agenda fiscal et la veille personnalisée font partie des fonctionnalités
+                Premium.
+              </p>
+              <Button asChild variant="accent">
+                <Link to="/premium">
+                  <Sparkles /> Découvrir Premium
+                </Link>
+              </Button>
             </div>
+          ) : (
+            <>
+              {vue !== "historique" && (
+                <div className="flex gap-2">
+                  {(
+                    [
+                      { value: "agenda" as const, label: "Agenda fiscal" },
+                      { value: "veille" as const, label: "Veille réglementaire" },
+                    ]
+                  ).map((onglet) => (
+                    <button
+                      key={onglet.value}
+                      type="button"
+                      onClick={() => setVue(onglet.value)}
+                      aria-pressed={vue === onglet.value}
+                      className={cn(
+                        "flex-1 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200",
+                        vue === onglet.value
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-border bg-card text-muted-foreground hover:border-ink hover:text-foreground",
+                      )}
+                    >
+                      {onglet.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {vue === "agenda" && <VueAgenda onOuvrirHistorique={() => setVue("historique")} />}
+              {vue === "veille" && <VueVeille />}
+              {vue === "historique" && <VueHistorique onRetour={() => setVue("agenda")} />}
+            </>
           )}
-          {vue === "agenda" && <VueAgenda onOuvrirHistorique={() => setVue("historique")} />}
-          {vue === "veille" && <VueVeille />}
-          {vue === "historique" && <VueHistorique onRetour={() => setVue("agenda")} />}
-        </>
-      )}
-    </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

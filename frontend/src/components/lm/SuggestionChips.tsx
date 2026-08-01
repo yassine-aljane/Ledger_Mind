@@ -54,7 +54,7 @@ export function SuggestionChips({
         Autre…
       </button>
       {refining && (
-        <span className="inline-flex items-center gap-1.5 px-2 text-[11px] font-mono text-ink/40 self-center">
+        <span className="inline-flex items-center gap-1.5 px-2 text-[11px] font-mono text-muted-foreground self-center">
           <span className="size-1.5 rounded-full bg-teal-dark animate-pulse" />
           suggestions affinées…
         </span>

@@ -5,7 +5,10 @@
  * cases cochées sont rechargés depuis le serveur), renommable et supprimable.
  */
 
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "@/lib/guidance-api";
 
 function formatDate(iso: string): string {
@@ -44,34 +47,30 @@ export function ConversationHistory({
   };
 
   return (
-    <aside className="bg-white border border-border rounded-2xl p-4 h-fit lg:sticky lg:top-6">
-      <button
-        onClick={onNew}
-        className="w-full px-4 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98]"
-      >
-        + Nouvelle conversation
-      </button>
+    <aside className="h-fit rounded-2xl border border-border bg-card p-4 shadow-soft lg:sticky lg:top-24">
+      <Button onClick={onNew} className="w-full">
+        <Plus /> Nouvelle conversation
+      </Button>
 
-      <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink/40">
-        Historique
-      </p>
+      <p className="rule-label mt-5 text-muted-foreground">Historique</p>
 
       {conversations.length === 0 ? (
-        <p className="mt-3 text-xs text-ink/40 leading-relaxed">
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           Aucune conversation pour l&apos;instant.
         </p>
       ) : (
-        <ul className="mt-3 space-y-1.5 max-h-[52vh] overflow-y-auto">
+        <ul className="chat-scroll mt-3 max-h-[52vh] space-y-1.5 overflow-y-auto">
           {conversations.map((conv) => {
             const active = conv.id === currentId;
             return (
               <li key={conv.id}>
                 <div
-                  className={`group rounded-xl border px-3 py-2 transition-all duration-200 cursor-pointer ${
+                  className={cn(
+                    "group cursor-pointer rounded-xl border px-3 py-2 transition-all duration-200",
                     active
-                      ? "border-teal-dark bg-teal-light/20"
-                      : "border-transparent hover:border-border hover:bg-background"
-                  }`}
+                      ? "border-accent bg-accent/10"
+                      : "border-transparent hover:border-border hover:bg-secondary/60",
+                  )}
                   onClick={() => renaming !== conv.id && onOpen(conv.id)}
                 >
                   {renaming === conv.id ? (
@@ -85,33 +84,34 @@ export function ConversationHistory({
                       }}
                       onBlur={() => commitRename(conv.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-full px-2 py-1 bg-background border border-border rounded-lg text-sm input-boxed focus:outline-none focus:border-teal-dark"
+                      aria-label="Renommer la conversation"
+                      className="input-boxed w-full rounded-lg border border-border bg-background px-2 py-1 text-sm focus:border-ink focus:outline-none"
                     />
                   ) : (
                     <>
-                      <p className="text-sm font-medium text-ink truncate">{conv.title}</p>
-                      <p className="text-[11px] text-ink/40 truncate">
+                      <p className="truncate text-sm font-medium">{conv.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">
                         {formatDate(conv.date)}
                         {conv.apercu ? ` · ${conv.apercu}` : ""}
                       </p>
-                      <div className="flex gap-3 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="mt-1.5 flex gap-3 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             startRename(conv);
                           }}
-                          className="text-[10px] font-mono uppercase tracking-wider text-ink/40 hover:text-teal-dark transition-colors duration-200"
+                          className="rule-label inline-flex items-center gap-1 text-muted-foreground transition-colors duration-200 hover:text-foreground"
                         >
-                          Renommer
+                          <Pencil className="size-3" /> Renommer
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             onDelete(conv.id);
                           }}
-                          className="text-[10px] font-mono uppercase tracking-wider text-ink/40 hover:text-coral transition-colors duration-200"
+                          className="rule-label inline-flex items-center gap-1 text-muted-foreground transition-colors duration-200 hover:text-destructive"
                         >
-                          Supprimer
+                          <Trash2 className="size-3" /> Supprimer
                         </button>
                       </div>
                     </>

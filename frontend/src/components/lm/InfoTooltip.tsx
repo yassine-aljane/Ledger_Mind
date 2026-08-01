@@ -49,7 +49,7 @@ export function InfoTooltip({ content, label }: { content: InfoContent; label: s
         aria-expanded={open}
         aria-label={`À propos de : ${label}`}
         title={`À propos de : ${label}`}
-        className="inline-flex items-center justify-center size-4 rounded-full border border-ink/30 text-ink/50 hover:border-teal-dark hover:text-teal-dark transition-colors duration-200 focus-visible:border-teal-dark focus-visible:text-teal-dark"
+        className="inline-flex items-center justify-center size-4 rounded-full border border-ink/30 text-muted-foreground hover:border-teal-dark hover:text-teal-dark transition-colors duration-200 focus-visible:border-teal-dark focus-visible:text-teal-dark"
       >
         <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden>
           <circle cx="6" cy="6" r="5.3" stroke="currentColor" strokeWidth="1.1" />
@@ -62,18 +62,18 @@ export function InfoTooltip({ content, label }: { content: InfoContent; label: s
         <div
           role="dialog"
           aria-label={`Aide : ${content.titre}`}
-          className="absolute z-30 top-full left-0 mt-2 w-72 p-4 bg-white border border-border rounded-2xl shadow-xl animate-slide-up text-left"
+          className="absolute z-30 top-full left-0 mt-2 w-72 p-4 bg-card border border-border rounded-2xl shadow-xl animate-slide-up text-left"
         >
-          <p className="font-mono text-[10px] uppercase tracking-widest text-teal-dark mb-3">
+          <p className="rule-label text-teal-dark mb-3">
             {content.titre}
           </p>
           <dl className="space-y-2.5">
             {content.items.map((it) => (
               <div key={it.label}>
-                <dt className="text-[10px] uppercase tracking-wider text-ink/40 font-semibold">
+                <dt className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                   {it.label}
                 </dt>
-                <dd className="text-xs text-ink/75 leading-relaxed mt-0.5">{it.value}</dd>
+                <dd className="text-xs text-muted-foreground leading-relaxed mt-0.5">{it.value}</dd>
               </div>
             ))}
           </dl>

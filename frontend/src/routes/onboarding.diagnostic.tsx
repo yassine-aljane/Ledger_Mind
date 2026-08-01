@@ -59,7 +59,7 @@ function DiagnosticChat() {
   return (
     <div className="min-h-screen px-6 py-16 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-4">
-        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink transition-colors duration-200">
+        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-ink transition-colors duration-200">
           ← Retour
         </Link>
         <LogoutBubble />
@@ -70,11 +70,11 @@ function DiagnosticChat() {
           <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-teal-dark mb-6">
             Étape 02 · Diagnostic
           </p>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tighter text-balance">
+          <h1 className="text-4xl md:text-6xl font-medium text-balance">
             On va faire le point,{" "}
             <span className="italic font-normal">ensemble.</span>
           </h1>
-          <p className="mt-8 text-lg text-ink/60 text-pretty">
+          <p className="mt-8 text-lg text-muted-foreground text-pretty">
             Aucun jugement, aucun jargon. Quelques questions simples pour comprendre où vous en
             êtes et vous proposer la meilleure marche à suivre pour devenir légal et actif.
           </p>
@@ -85,16 +85,16 @@ function DiagnosticChat() {
               { n: "3 min", l: "de discussion" },
               { n: "1", l: "feuille de route" },
             ].map((s) => (
-              <div key={s.l} className="bg-white border border-border rounded-2xl p-6 card-hover">
+              <div key={s.l} className="bg-card border border-border rounded-2xl p-6 card-hover">
                 <p className="font-mono text-2xl font-medium text-teal-dark">{s.n}</p>
-                <p className="text-sm text-ink/60 mt-1">{s.l}</p>
+                <p className="text-sm text-muted-foreground mt-1">{s.l}</p>
               </div>
             ))}
           </div>
 
           <button
             onClick={() => setStarted(true)}
-            className="mt-12 px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
+            className="mt-12 px-10 py-5 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
           >
             Commencer le diagnostic
           </button>
@@ -114,8 +114,8 @@ function DiagnosticChat() {
                   onClick={() => setEspace(e.id)}
                   className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
                     actif
-                      ? "bg-ink text-background"
-                      : "bg-white border border-border text-ink/60 hover:border-teal-dark hover:text-teal-dark"
+                      ? "bg-ink text-ink-foreground"
+                      : "bg-card border border-border text-muted-foreground hover:border-teal-dark hover:text-teal-dark"
                   }`}
                 >
                   {e.label}
@@ -125,10 +125,10 @@ function DiagnosticChat() {
           </div>
 
           <header className="mt-8 mb-8 animate-slide-up">
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tighter text-balance">
+            <h1 className="text-3xl md:text-4xl font-medium text-balance">
               {actuel.titre}
             </h1>
-            <p className="mt-2 text-ink/60 text-pretty max-w-2xl">{actuel.sous}</p>
+            <p className="mt-2 text-muted-foreground text-pretty max-w-2xl">{actuel.sous}</p>
           </header>
 
           {espace === "guidance" ? <GuidanceChat /> : <FiscalAssistant />}

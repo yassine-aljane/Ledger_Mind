@@ -9,23 +9,25 @@ import {
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { Toaster } from "@/components/ui/sonner";
+import { THEME_BOOTSTRAP } from "@/lib/theme";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">Erreur 404</p>
-        <h1 className="mt-4 text-5xl font-extrabold tracking-tighter text-ink">
-          Cette page <span className="italic font-normal">n'existe pas</span>
+      <div className="animate-rise max-w-md text-center">
+        <p className="rule-label text-muted-foreground">Erreur 404</p>
+        <h1 className="mt-4 text-4xl">
+          Cette page <span className="font-normal italic">n'existe pas</span>
         </h1>
         <p className="mt-4 text-sm text-muted-foreground">
           Le lien que vous avez suivi est peut-être obsolète.
         </p>
         <div className="mt-8">
           <Link
-            to="/onboarding"
-            className="inline-flex items-center justify-center rounded-xl bg-ink px-6 py-3 text-sm font-semibold text-background transition-colors hover:bg-teal-dark"
+            to="/"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
           >
             Retour à l'accueil
           </Link>
@@ -41,22 +43,25 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Cette page n'a pas pu se charger</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Un incident est survenu. Vous pouvez réessayer.</p>
+      <div className="animate-rise max-w-md text-center">
+        <p className="rule-label text-destructive">Incident</p>
+        <h1 className="mt-3 text-3xl">Cette page n'a pas pu se charger</h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Un incident est survenu. Vous pouvez réessayer.
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-background transition-colors hover:bg-teal-dark"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
           >
             Réessayer
           </button>
           <a
-            href="/onboarding"
-            className="inline-flex items-center justify-center rounded-xl border border-border bg-background px-5 py-2.5 text-sm font-semibold text-ink hover:border-ink"
+            href="/"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-5 text-sm font-medium text-foreground transition-colors hover:border-ink"
           >
             Accueil
           </a>
@@ -94,7 +99,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=Manrope:wght@300..800&family=JetBrains+Mono:wght@400;500;600&display=swap",
       },
     ],
   }),
@@ -106,9 +111,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <HeadContent />
+        {/* Applique le thème mémorisé avant la première peinture (pas de flash clair en sombre). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body>
         {children}
@@ -122,9 +129,10 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background text-ink relative">
-        <div aria-hidden className="fixed inset-0 grain-overlay z-[100]" />
+      <div className="relative min-h-screen bg-background text-foreground">
+        <div aria-hidden className="grain-overlay fixed inset-0 z-[100]" />
         <Outlet />
+        <Toaster position="bottom-right" richColors closeButton />
       </div>
     </QueryClientProvider>
   );

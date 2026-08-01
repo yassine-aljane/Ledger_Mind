@@ -213,31 +213,31 @@ function VerificationPage() {
   return (
     <div className="min-h-screen px-6 py-16 max-w-3xl mx-auto animate-slide-up">
       <div className="flex items-center justify-between gap-4">
-        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-ink/40 hover:text-ink transition-colors duration-200">
+        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-ink transition-colors duration-200">
           ← Retour
         </Link>
         <LogoutBubble />
       </div>
 
       <div className="mt-8 mb-12">
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark mb-4">
+        <p className="rule-label text-teal-dark mb-4">
           Étape 02 · Vérification
         </p>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-balance">
+        <h1 className="text-4xl md:text-5xl font-medium text-balance">
           Vérifions votre <span className="italic font-normal">SIREN / SIRET</span>.
         </h1>
-        <p className="mt-4 text-ink/60 text-lg text-pretty max-w-xl">
+        <p className="mt-4 text-muted-foreground text-lg text-pretty max-w-xl">
           Identité registre, vérification RCS/RNE et archivage de votre avis SIRENE.
         </p>
       </div>
 
       {!orchestratorResult && (
         <>
-          <div className="flex gap-1 p-1 bg-white border border-border rounded-full w-fit mb-8">
+          <div className="flex gap-1 p-1 bg-card border border-border rounded-full w-fit mb-8">
             <button
               onClick={() => setTab("manual")}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
-                tab === "manual" ? "bg-ink text-background" : "text-ink/60 hover:text-ink"
+                tab === "manual" ? "bg-ink text-ink-foreground" : "text-muted-foreground hover:text-ink"
               }`}
             >
               Saisie manuelle
@@ -245,7 +245,7 @@ function VerificationPage() {
             <button
               onClick={() => setTab("upload")}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
-                tab === "upload" ? "bg-ink text-background" : "text-ink/60 hover:text-ink"
+                tab === "upload" ? "bg-ink text-ink-foreground" : "text-muted-foreground hover:text-ink"
               }`}
             >
               Uploader un document
@@ -259,10 +259,10 @@ function VerificationPage() {
                 setTouched(true);
                 if (isValid) runVerify(digits);
               }}
-              className="bg-white border border-border rounded-2xl p-8 space-y-6"
+              className="bg-card border border-border rounded-2xl p-8 space-y-6"
             >
               <div>
-                <label className="text-xs font-semibold uppercase tracking-widest text-ink/50">
+                <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Numéro SIREN / SIRET
                 </label>
                 <input
@@ -278,13 +278,13 @@ function VerificationPage() {
                   className="w-full mt-3 px-0 py-3 bg-transparent border-b-2 border-border font-mono text-2xl focus:outline-none focus:border-teal-dark transition-colors duration-200"
                 />
                 {showError && (
-                  <p className="text-xs text-coral mt-2">SIREN (9) ou SIRET (14 chiffres) requis.</p>
+                  <p className="text-xs text-destructive mt-2">SIREN (9) ou SIRET (14 chiffres) requis.</p>
                 )}
               </div>
               <button
                 type="submit"
                 disabled={loading || !isValid}
-                className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
+                className="w-full px-8 py-4 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
               >
                 {loading ? "Vérification…" : "Étape 1 — Vérifier mon numéro"}
               </button>
@@ -298,7 +298,7 @@ function VerificationPage() {
               <div className="absolute top-3 right-3 z-10">
                 <InfoTooltip content={AIDE_JUSTIFICATIF} label="justificatif accepté" />
               </div>
-              <label className="block bg-white border-2 border-dashed border-border hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200 rounded-2xl p-16 text-center cursor-pointer">
+              <label className="block bg-card border-2 border-dashed border-border hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200 rounded-2xl p-16 text-center cursor-pointer">
                 <input
                   type="file"
                   accept="image/*,application/pdf"
@@ -310,7 +310,7 @@ function VerificationPage() {
                   }}
                 />
                 <p className="font-semibold">{loading ? "Extraction…" : "Déposez votre justificatif"}</p>
-                {ocrError && <p className="text-sm text-coral mt-2">{ocrError}</p>}
+                {ocrError && <p className="text-sm text-destructive mt-2">{ocrError}</p>}
               </label>
             </div>
           )}
@@ -319,52 +319,52 @@ function VerificationPage() {
 
       {orchestratorResult && profile && (
         <div className="space-y-6">
-          <section className="bg-white border border-border rounded-2xl p-8">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-teal-dark mb-4">
+          <section className="bg-card border border-border rounded-2xl p-8">
+            <p className="rule-label text-teal-dark mb-4">
               Étape 1 · Identité registre
             </p>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <dt className="text-xs uppercase text-ink/40">SIREN</dt>
+                <dt className="text-xs uppercase text-muted-foreground">SIREN</dt>
                 <dd className="font-semibold font-mono">
                   {profile.siren ? formatSiren(profile.siren) : "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-ink/40">SIRET</dt>
+                <dt className="text-xs uppercase text-muted-foreground">SIRET</dt>
                 <dd className="font-semibold font-mono">
                   {profile.siret ? formatSiret(profile.siret) : profile.siren ? "(siège)" : "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-ink/40">Dénomination</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Dénomination</dt>
                 <dd className="font-semibold">{profile.denomination ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-ink/40">Forme juridique</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Forme juridique</dt>
                 <dd className="font-semibold">{profile.legal_form ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-ink/40">Code NAF (statistique)</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Code NAF (statistique)</dt>
                 <dd className="font-semibold">{profile.ape_code ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-ink/40">Micro-éligible</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Micro-éligible</dt>
                 <dd className="font-semibold">{profile.micro_eligible ? "Oui (EI)" : "—"}</dd>
               </div>
               {profile.registry_tax_base && !profile.registry_document_required && (
                 <div className="col-span-2">
-                  <dt className="text-xs uppercase text-ink/40">Base fiscale registre</dt>
+                  <dt className="text-xs uppercase text-muted-foreground">Base fiscale registre</dt>
                   <dd className="font-semibold text-teal-dark">{profile.registry_tax_base}</dd>
                 </div>
               )}
             </dl>
-            <p className="mt-4 text-sm text-ink/60">{orchestratorResult.message}</p>
+            <p className="mt-4 text-sm text-muted-foreground">{orchestratorResult.message}</p>
           </section>
 
           {profile.verification_status === "verified" && (
-            <section className="bg-white border border-border rounded-2xl p-8">
-              <p className="font-mono text-[11px] uppercase tracking-widest text-teal-dark mb-4">
+            <section className="bg-card border border-border rounded-2xl p-8">
+              <p className="rule-label text-teal-dark mb-4">
                 Étape 2 · Vérification RCS / RNE
               </p>
               {profile.registry_document_uploaded ? (
@@ -375,7 +375,7 @@ function VerificationPage() {
                 </p>
               ) : profile.registry_document_required ? (
                 <>
-                  <p className="text-sm text-ink/70 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Déposez votre Kbis (greffe / RCS)
                     <InfoTooltip content={AIDE_KBIS} label="extrait Kbis" />{" "}
                     ou votre extrait RNE (INPI)
@@ -398,11 +398,11 @@ function VerificationPage() {
                     </span>
                   </label>
                   {registryUploadError && (
-                    <p className="text-xs text-coral mt-2">{registryUploadError}</p>
+                    <p className="text-xs text-destructive mt-2">{registryUploadError}</p>
                   )}
                 </>
               ) : (
-                <p className="text-sm text-ink/70">
+                <p className="text-sm text-muted-foreground">
                   Société commerciale détectée — inscription RCS confirmée → BIC (pas de document
                   requis).
                 </p>
@@ -411,8 +411,8 @@ function VerificationPage() {
           )}
 
           {profile.verification_status === "verified" && !showRegistryDocStep && (
-            <section className="bg-white border border-border rounded-2xl p-8">
-              <p className="font-mono text-[11px] uppercase tracking-widest text-teal-dark mb-4 inline-flex items-center gap-1.5">
+            <section className="bg-card border border-border rounded-2xl p-8">
+              <p className="rule-label text-teal-dark mb-4 inline-flex items-center gap-1.5">
                 Étape 3 · Avis de situation SIRENE
                 <InfoTooltip content={AIDE_AVIS_SIRENE} label="avis de situation SIRENE" />
               </p>
@@ -420,12 +420,12 @@ function VerificationPage() {
                 <div className="text-sm space-y-1">
                   <p>✓ Document archivé</p>
                   {profile.sirene_document_activity_label && (
-                    <p className="text-ink/60">Activité : {profile.sirene_document_activity_label}</p>
+                    <p className="text-muted-foreground">Activité : {profile.sirene_document_activity_label}</p>
                   )}
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-ink/70 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Téléchargez votre avis sur{" "}
                     <a
                       href="https://avis-situation-sirene.insee.fr/"
@@ -452,8 +452,8 @@ function VerificationPage() {
                       {loading ? "Archivage…" : "Déposer l'avis SIRENE (PDF)"}
                     </span>
                   </label>
-                  {sireneUploadError && <p className="text-xs text-coral mt-2">{sireneUploadError}</p>}
-                  {turnError && <p className="text-xs text-coral mt-2">{turnError}</p>}
+                  {sireneUploadError && <p className="text-xs text-destructive mt-2">{sireneUploadError}</p>}
+                  {turnError && <p className="text-xs text-destructive mt-2">{turnError}</p>}
                 </>
               )}
             </section>
@@ -463,7 +463,7 @@ function VerificationPage() {
             <button
               onClick={() => advanceVerification()}
               disabled={loading || !showContinueToProfil}
-              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
+              className="w-full px-8 py-4 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
             >
               {loading ? "Chargement…" : "Continuer vers mon profil →"}
             </button>
@@ -472,7 +472,7 @@ function VerificationPage() {
           {profile.verification_status !== "verified" && (
             <button
               onClick={() => setOrchestratorResult(null)}
-              className="w-full px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98]"
+              className="w-full px-8 py-4 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98]"
             >
               Réessayer
             </button>

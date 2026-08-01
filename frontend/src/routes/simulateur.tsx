@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { usePlan } from "@/lib/plan";
-import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
+import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { Play } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/simulateur")({
   head: () => ({
@@ -12,11 +13,18 @@ export const Route = createFileRoute("/simulateur")({
       { property: "og:description", content: "Simulez l'impact fiscal d'un contrat en langage naturel." },
     ],
   }),
-  component: SimulateurPage,
+  component: SimulateurRoute,
 });
 
+function SimulateurRoute() {
+  return (
+    <PremiumGate kind="simulateur">
+      <SimulateurPage />
+    </PremiumGate>
+  );
+}
+
 function SimulateurPage() {
-  if (usePlan() === "free") return <PremiumPagePlaceholder kind="simulateur" />;
   return (
     <AppShell>
       <PageHeader
@@ -29,45 +37,50 @@ function SimulateurPage() {
         description="Décrivez la situation en français simple, on vous montre l'impact fiscal, ligne par ligne."
       />
 
-      <div className="bg-white border border-border rounded-2xl p-8">
-        <label className="text-xs uppercase tracking-widest text-ink/50 font-semibold">
+      <div className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
+        <label htmlFor="sim-situation" className="rule-label text-muted-foreground">
           Votre situation
         </label>
         <textarea
+          id="sim-situation"
           rows={4}
           defaultValue="Si je signe ce contrat de 5000 € avec un client français, combien je garde ?"
-          className="w-full mt-3 px-0 py-3 bg-transparent border-b border-border text-lg focus:outline-none focus:border-ink transition-colors duration-200 resize-none"
+          className="mt-3 w-full resize-none border-b border-border bg-transparent py-3 text-base transition-colors duration-200 focus:border-ink focus:outline-none"
         />
-        <button className="mt-6 px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]">
-          Simuler
-        </button>
+        <Button size="lg" variant="accent" className="mt-6">
+          <Play /> Simuler
+        </Button>
       </div>
 
-      <div className="mt-10 overflow-hidden bg-white border border-border rounded-2xl">
-        <table className="w-full">
-          <thead className="bg-background">
-            <tr className="text-xs uppercase tracking-widest text-ink/50">
-              <th className="text-left px-6 py-4 font-semibold">Scénario</th>
-              <th className="text-right px-6 py-4 font-semibold">Net perçu</th>
-              <th className="text-right px-6 py-4 font-semibold">Provision</th>
-              <th className="text-right px-6 py-4 font-semibold">Impact</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border font-mono text-sm">
-            {[
-              { s: "Actuel", n: "0,00", p: "0,00", i: "—" },
-              { s: "+ Contrat 5 000 €", n: "4 025,00", p: "660,00", i: "+ 4 025 €" },
-              { s: "+ Contrat 15 000 €", n: "12 075,00", p: "1 980,00", i: "+ 12 075 €" },
-            ].map((r) => (
-              <tr key={r.s} className="hover:bg-background/50 transition-colors duration-150">
-                <td className="px-6 py-4 font-sans font-medium">{r.s}</td>
-                <td className="px-6 py-4 text-right">{r.n} €</td>
-                <td className="px-6 py-4 text-right text-amber-fiscal">{r.p} €</td>
-                <td className="px-6 py-4 text-right text-teal-dark">{r.i}</td>
+      <div className="animate-rise mt-8 overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border bg-secondary/50">
+              <tr>
+                <th className="rule-label px-5 py-3.5 text-left text-muted-foreground">Scénario</th>
+                {["Net perçu", "Provision", "Impact"].map((h) => (
+                  <th key={h} className="rule-label px-5 py-3.5 text-right text-muted-foreground">
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {[
+                { s: "Actuel", n: "0,00", p: "0,00", i: "—" },
+                { s: "+ Contrat 5 000 €", n: "4 025,00", p: "660,00", i: "+ 4 025 €" },
+                { s: "+ Contrat 15 000 €", n: "12 075,00", p: "1 980,00", i: "+ 12 075 €" },
+              ].map((r) => (
+                <tr key={r.s} className="transition-colors duration-150 hover:bg-secondary/40">
+                  <td className="px-5 py-3.5 font-medium">{r.s}</td>
+                  <td className="num px-5 py-3.5 text-right">{r.n} €</td>
+                  <td className="num px-5 py-3.5 text-right text-amber-fiscal">{r.p} €</td>
+                  <td className="num px-5 py-3.5 text-right text-teal-dark">{r.i}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </AppShell>
   );

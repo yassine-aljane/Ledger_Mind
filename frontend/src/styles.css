@@ -4,14 +4,30 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * LedgerMind — design system « encre & parchemin ».
+ * Encre vert-noir profonde, surfaces parchemin chaudes, safran comme couleur d'action,
+ * cyan froid pour la donnée / la vérification.
+ * Titres : Fraunces (autorité éditoriale, fiscale). Texte : Manrope. Chiffres : JetBrains Mono.
+ *
+ * Les jetons sémantiques historiques (ink, teal-dark, amber-fiscal, marine, butter…) sont
+ * conservés et redéfinis sur cette palette : tout l'applicatif existant hérite du nouveau
+ * rendu sans réécriture classe par classe.
+ */
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 14px);
+  --radius-3xl: calc(var(--radius) + 24px);
+  --radius-4xl: calc(var(--radius) + 32px);
+
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -28,28 +44,52 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  /* Variantes « encre » des couleurs de signal : à utiliser dès que la couleur porte du TEXTE
+     posé sur une surface (fond de page, carte, pastille translucide) plutôt que sur un aplat
+     plein. Elles s'inversent en thème sombre, là où les `*-foreground` — pensées pour du texte
+     SUR l'aplat — resteraient sombres sur sombre. */
+  --color-accent-ink: var(--accent-ink);
+  --color-success-ink: var(--success-ink);
+  --color-warning-ink: var(--warning-ink);
+  --color-info-ink: var(--info-ink);
+
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
 
-  /* LedgerMind semantic tokens */
+  /* Jetons sémantiques LedgerMind (compatibilité + intention) */
   --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-parchment: var(--parchment);
   --color-teal-dark: var(--teal-dark);
   --color-teal-light: var(--teal-light);
   --color-amber-fiscal: var(--amber-fiscal);
   --color-coral: var(--coral);
   --color-purple-flow: var(--purple-flow);
 
-  /* Palette stricte du profilage (chips + panneau profil) : marine/butter/prune/crème. Jamais de
-     texte clair sur butter — butter n'est utilisé qu'avec du texte marine dessus. */
+  /* Palette stricte du profilage (chips + panneau profil) : marine/butter/prune/crème.
+     Jamais de texte clair sur butter — butter ne porte que du texte marine. */
   --color-marine: var(--marine);
   --color-butter: var(--butter);
   --color-prune: var(--prune);
   --color-creme: var(--creme);
 
-  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --shadow-soft: 0 1px 2px oklch(0.22 0.04 160 / 0.05), 0 8px 24px -12px oklch(0.22 0.04 160 / 0.18);
+  --shadow-lift: 0 2px 4px oklch(0.22 0.04 160 / 0.06), 0 24px 48px -24px oklch(0.22 0.04 160 / 0.35);
+  --shadow-ring: 0 0 0 1px var(--border);
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -57,71 +97,214 @@
 :root {
   --radius: 0.75rem;
 
-  /* LedgerMind palette */
-  --background: #fafaf7;
-  --foreground: #16241f;
-  --ink: #16241f;
-  --teal-dark: #0f6e56;
-  --teal-light: #1d9e75;
-  --amber-fiscal: #ba7517;
-  --coral: #e07a5f;
-  --purple-flow: #8b5cf6;
-  --marine: #1b3a5f;
-  --butter: #f2d98d;
-  --prune: #7a4a63;
-  --creme: #fdfbf6;
+  --parchment: oklch(0.975 0.012 92);
+  --background: oklch(0.978 0.009 95);
+  --foreground: oklch(0.23 0.032 158);
 
-  --card: #ffffff;
-  --card-foreground: #16241f;
-  --popover: #ffffff;
-  --popover-foreground: #16241f;
-  --primary: #0f6e56;
-  --primary-foreground: #fafaf7;
-  --secondary: #f2f1ec;
-  --secondary-foreground: #16241f;
-  --muted: #f2f1ec;
-  --muted-foreground: #6b7570;
-  --accent: #f2f1ec;
-  --accent-foreground: #16241f;
-  --destructive: #b3261e;
-  --destructive-foreground: #fafaf7;
-  --border: #e4e4dc;
-  --input: #e4e4dc;
-  --ring: #1d9e75;
+  --card: oklch(0.995 0.005 95);
+  --card-foreground: oklch(0.23 0.032 158);
+  --popover: oklch(0.995 0.005 95);
+  --popover-foreground: oklch(0.23 0.032 158);
+
+  /* Encre — vert fiscal profond */
+  --primary: oklch(0.29 0.052 162);
+  --primary-foreground: oklch(0.975 0.012 92);
+
+  --secondary: oklch(0.94 0.016 95);
+  --secondary-foreground: oklch(0.29 0.052 162);
+
+  --muted: oklch(0.945 0.012 95);
+  --muted-foreground: oklch(0.5 0.02 155);
+
+  /* Safran — action */
+  --accent: oklch(0.79 0.155 68);
+  --accent-foreground: oklch(0.24 0.045 60);
+
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.98 0.01 95);
+  --success: oklch(0.6 0.13 158);
+  --success-foreground: oklch(0.99 0.01 95);
+  --warning: oklch(0.8 0.15 80);
+  --warning-foreground: oklch(0.26 0.05 70);
+  --info: oklch(0.62 0.09 220);
+  --info-foreground: oklch(0.99 0.01 95);
+
+  /* Texte coloré posé sur parchemin : assombri pour rester lisible (contraste AA). */
+  --accent-ink: oklch(0.47 0.115 62);
+  --success-ink: oklch(0.44 0.09 160);
+  --warning-ink: oklch(0.45 0.11 72);
+  --info-ink: oklch(0.45 0.09 230);
+
+  --border: oklch(0.9 0.014 95);
+  --input: oklch(0.9 0.014 95);
+  --ring: oklch(0.55 0.08 162);
+
+  --ink: oklch(0.21 0.035 160);
+  --ink-foreground: oklch(0.96 0.014 92);
+
+  /* Anciens jetons produit, réexprimés sur la palette encre & parchemin */
+  --teal-dark: oklch(0.38 0.075 163);
+  --teal-light: oklch(0.6 0.13 158);
+  --amber-fiscal: oklch(0.62 0.135 65);
+  --coral: oklch(0.65 0.14 40);
+  --purple-flow: oklch(0.62 0.09 220);
+
+  /* Profilage : marine = encre bleutée, butter = safran pâle, prune, crème = parchemin clair */
+  --marine: oklch(0.32 0.06 200);
+  --butter: oklch(0.88 0.095 82);
+  --prune: oklch(0.45 0.09 350);
+  --creme: oklch(0.985 0.008 92);
+
+  --chart-1: oklch(0.29 0.052 162);
+  --chart-2: oklch(0.79 0.155 68);
+  --chart-3: oklch(0.62 0.09 220);
+  --chart-4: oklch(0.6 0.13 158);
+  --chart-5: oklch(0.55 0.2 25);
+
+  --gradient-ink: linear-gradient(155deg, oklch(0.25 0.04 165), oklch(0.18 0.03 158) 60%, oklch(0.22 0.05 140));
+  --gradient-safran: linear-gradient(100deg, oklch(0.82 0.15 78), oklch(0.75 0.16 55));
+  --grain: radial-gradient(oklch(0.29 0.052 162 / 0.055) 1px, transparent 1px);
+}
+
+.dark {
+  --parchment: oklch(0.24 0.03 160);
+  --background: oklch(0.18 0.026 160);
+  --foreground: oklch(0.95 0.012 92);
+  --card: oklch(0.225 0.03 160);
+  --card-foreground: oklch(0.95 0.012 92);
+  --popover: oklch(0.225 0.03 160);
+  --popover-foreground: oklch(0.95 0.012 92);
+  --primary: oklch(0.93 0.02 92);
+  --primary-foreground: oklch(0.2 0.03 160);
+  --secondary: oklch(0.28 0.032 160);
+  --secondary-foreground: oklch(0.95 0.012 92);
+  --muted: oklch(0.28 0.032 160);
+  --muted-foreground: oklch(0.72 0.02 130);
+  --accent: oklch(0.79 0.155 68);
+  --accent-foreground: oklch(0.22 0.045 60);
+  --destructive: oklch(0.62 0.19 25);
+  --destructive-foreground: oklch(0.98 0.01 95);
+  --success: oklch(0.68 0.12 158);
+  --success-foreground: oklch(0.18 0.026 160);
+  --warning: oklch(0.83 0.14 80);
+  --warning-foreground: oklch(0.24 0.045 70);
+  --info: oklch(0.72 0.09 220);
+  --info-foreground: oklch(0.18 0.026 160);
+  /* Sur fond encre, le texte coloré est au contraire éclairci. */
+  --accent-ink: oklch(0.85 0.13 75);
+  --success-ink: oklch(0.8 0.11 158);
+  --warning-ink: oklch(0.86 0.12 82);
+  --info-ink: oklch(0.79 0.09 225);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7 0.08 150);
+  --ink: oklch(0.16 0.024 160);
+  --ink-foreground: oklch(0.95 0.012 92);
+
+  /* Jetons produit en sombre : on remonte la clarté pour rester lisible sur fond encre */
+  --teal-dark: oklch(0.72 0.11 160);
+  --teal-light: oklch(0.78 0.12 158);
+  --amber-fiscal: oklch(0.82 0.14 70);
+  --coral: oklch(0.74 0.13 42);
+  --purple-flow: oklch(0.74 0.09 220);
+  --marine: oklch(0.72 0.07 205);
+  --butter: oklch(0.84 0.11 82);
+  --prune: oklch(0.72 0.09 350);
+  --creme: oklch(0.26 0.03 160);
+
+  --gradient-ink: linear-gradient(155deg, oklch(0.24 0.035 165), oklch(0.16 0.026 158) 60%, oklch(0.2 0.04 140));
+  --grain: radial-gradient(oklch(0.95 0.012 92 / 0.045) 1px, transparent 1px);
 }
 
 @layer base {
   * {
     border-color: var(--color-border);
   }
+
   html {
     /* Hausse de la taille de police de base (16px navigateur -> 23px) : comme les utilitaires
        Tailwind (text-sm, text-lg, ...) sont en rem, tout le site grandit proportionnellement
-       depuis ce seul endroit, sans retoucher chaque composant. */
+       depuis ce seul endroit, sans retoucher chaque composant. Décision de lisibilité
+       volontaire — les primitives shadcn ont été recalibrées pour cette base (voir
+       components/ui/button.tsx & co.), et non l'inverse. */
     font-size: 23px;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
   }
+
   html,
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-feature-settings: "ss01", "cv11";
+    font-feature-settings: "ss01", "cv01";
   }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
   ::selection {
-    background-color: color-mix(in oklab, var(--color-teal-light) 25%, transparent);
-    color: var(--color-ink);
+    background: var(--accent);
+    color: var(--accent-foreground);
   }
+
   :focus-visible {
-    outline: 2px solid var(--color-teal-dark);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+
   input[type="checkbox"] {
     accent-color: var(--color-teal-dark);
   }
 }
 
-/* ============ LedgerMind signature utilities ============ */
+/* ============ Surfaces & lettrage signature ============ */
 
+@utility surface-ink {
+  background-image: var(--gradient-ink);
+  color: var(--ink-foreground);
+}
+
+@utility surface-grain {
+  background-image: var(--grain);
+  background-size: 16px 16px;
+}
+
+@utility text-safran {
+  background-image: var(--gradient-safran);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Micro-titre en capitales espacées, en mono : sert d'étiquette de section partout dans l'app. */
+@utility rule-label {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Tout chiffre monétaire ou fiscal : mono + chasse tabulaire pour que les colonnes s'alignent. */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+@utility grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+/* Bord perforé « ticket » du reçu fiscal. */
 @utility perforated-top {
   background-image: radial-gradient(
     circle at 50% 0%,
@@ -144,12 +327,6 @@
   background-repeat: repeat-x;
 }
 
-@utility grain-overlay {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity: 0.035;
-  pointer-events: none;
-}
-
 @utility dotted-divider {
   background-image: linear-gradient(
     to right,
@@ -162,6 +339,65 @@
   height: 1px;
 }
 
+/* ============ Mouvement : trois gestes intentionnels ============ */
+
+/* 1. « Levée d'encre » — le contenu monte en se posant */
+@keyframes lm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-rise {
+  animation: lm-rise 0.55s var(--ease-out-expo) both;
+}
+
+/* 2. « Sceau » — le tampon qui valide un état */
+@keyframes lm-seal {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) rotate(-6deg);
+  }
+  60% {
+    transform: scale(1.04) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-seal {
+  animation: lm-seal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 3. « Filigrane » — balayage lent sur les surfaces premium verrouillées */
+@keyframes lm-sweep {
+  0% {
+    background-position: -160% 0;
+  }
+  100% {
+    background-position: 260% 0;
+  }
+}
+
+@utility shimmer-premium {
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    oklch(0.79 0.155 68 / 0.18) 45%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: lm-sweep 3.4s linear infinite;
+}
+
+/* Gestes hérités, réexprimés sur les mêmes courbes que « levée d'encre ». */
 @keyframes lm-slide-up {
   from {
     opacity: 0;
@@ -205,22 +441,23 @@
   animation: lm-fade-in 0.6s var(--ease-out-expo) both;
 }
 
-/* Carte "consultable" (ligne d'historique, facture/rapport listé, résultat de recherche...) :
+/* Carte « consultable » (ligne d'historique, facture/rapport listé, résultat de recherche...) :
    élévation douce au survol pour signaler l'interactivité sans casser le style plat des cartes. */
 @utility card-hover {
   transition:
     border-color 0.2s var(--ease-out-expo),
-    box-shadow 0.2s var(--ease-out-expo);
+    box-shadow 0.2s var(--ease-out-expo),
+    transform 0.2s var(--ease-out-expo);
 }
 .card-hover:hover {
   border-color: color-mix(in oklab, var(--color-ink) 30%, var(--color-border));
-  box-shadow: 0 6px 24px -8px color-mix(in oklab, var(--color-ink) 12%, transparent);
+  box-shadow: var(--shadow-soft);
 }
 
-/* Chip de suggestion de profilage (chantier "profilage rapide") — palette stricte marine/butter/
-   prune/crème. Rempli progressivement au survol en butter, texte TOUJOURS marine sur butter
-   (jamais de texte clair dessus). Sélectionné = plein marine, texte crème. Focus clavier = même
-   rendu que le survol (accessibilité). */
+/* Chip de suggestion de profilage (chantier « profilage rapide ») — palette stricte marine/
+   butter/prune/crème. Rempli progressivement au survol en butter, texte TOUJOURS marine sur
+   butter (jamais de texte clair dessus). Sélectionné = plein marine, texte crème. Focus clavier
+   = même rendu que le survol (accessibilité). */
 @keyframes lm-stagger-in {
   from {
     opacity: 0;
@@ -278,8 +515,8 @@
   cursor: default;
 }
 
-/* Input "boxed" (fond plein, coins arrondis) : focus visible cohérent avec le style "underline"
-   qui, lui, définit déjà focus:border-ink ailleurs dans l'app. */
+/* Input « boxed » (fond plein, coins arrondis) : focus visible cohérent avec le style
+   « underline » qui, lui, définit déjà focus:border-ink ailleurs dans l'app. */
 @utility input-boxed {
   transition:
     border-color 0.15s var(--ease-out-expo),
@@ -288,7 +525,7 @@
 .input-boxed:focus {
   outline: none;
   border-color: var(--color-ink);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-teal-light) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-ring) 25%, transparent);
 }
 
 /* Panneau de conversation à hauteur fixe (Guidance, Assistant fiscal) : les anciens messages
@@ -310,4 +547,14 @@
 }
 .chat-scroll::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-teal-light);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

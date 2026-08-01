@@ -1,9 +1,18 @@
+import { Bot, Loader2, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   askCaptureQuestion,
   fetchCaptureDocumentMessages,
   type CaptureDocumentMessage,
 } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 type Props = {
   documentId: string;
@@ -13,6 +22,14 @@ type Props = {
 
 type Turn = { role: "user" | "assistant"; content: string; pending?: boolean };
 
+/**
+ * Discussion attachée à un document précis (facture ou virement), avec son historique
+ * persisté côté serveur.
+ *
+ * Le panneau est monté sur le Sheet shadcn (Radix Dialog) : le contenu est porté dans <body>,
+ * donc il n'est jamais rogné par le `backdrop-blur` de la barre de navigation, qui crée un bloc
+ * conteneur pour les descendants `fixed`.
+ */
 export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +43,12 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
     fetchCaptureDocumentMessages(documentId)
       .then((messages: CaptureDocumentMessage[]) => {
         if (cancelled) return;
-        setTurns(messages.map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.content })));
+        setTurns(
+          messages.map((m) => ({
+            role: m.role === "user" ? "user" : "assistant",
+            content: m.content,
+          })),
+        );
       })
       .catch(() => {})
       .finally(() => {
@@ -40,14 +62,6 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns, sending]);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -73,54 +87,39 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <button
-        type="button"
-        aria-label="Fermer le chat"
-        onClick={onClose}
-        className="absolute inset-0 bg-ink/30 animate-fade-in"
-      />
-      <div className="relative w-full sm:w-[420px] h-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
-        <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-5 border-b border-border">
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-widest text-ink/40 font-semibold">
-              Question sur ce document
-            </p>
-            <h3 className="font-semibold truncate">{label}</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 size-9 rounded-full border border-border hover:border-ink transition-all duration-200 active:scale-[0.95] grid place-items-center text-ink/60"
-          >
-            ✕
-          </button>
-        </div>
+    <Sheet open onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+        <SheetHeader className="shrink-0 space-y-1 border-b border-border px-6 py-5 pr-14 text-left">
+          <SheetDescription className="rule-label text-accent-ink">
+            Question sur ce document
+          </SheetDescription>
+          <SheetTitle className="truncate font-display text-base font-medium">{label}</SheetTitle>
+        </SheetHeader>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll px-6 py-6 space-y-4">
+        <div ref={scrollRef} className="chat-scroll flex-1 space-y-4 overflow-y-auto px-6 py-6">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-ink/40">
-              <span className="inline-block size-4 border-2 border-ink/20 border-t-teal-dark rounded-full animate-spin" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" />
               Chargement de la conversation…
             </div>
           ) : turns.length === 0 ? (
-            <p className="text-sm text-ink/40 text-center pt-10">
+            <p className="pt-10 text-center text-sm text-muted-foreground">
               Posez une question sur ce document — montant, échéance, cohérence, IBAN…
             </p>
           ) : (
             turns.map((t, i) =>
               t.role === "assistant" ? (
-                <div key={i} className="flex gap-3">
-                  <div className="shrink-0 size-8 rounded-full bg-teal-dark/10 text-teal-dark grid place-items-center text-sm">
-                    🤖
+                <div key={i} className="animate-rise flex gap-3">
+                  <div className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                    <Bot className="size-3.5" />
                   </div>
-                  <div className="p-3.5 bg-background border border-border rounded-2xl rounded-bl-none text-sm leading-relaxed text-ink">
+                  <div className="rounded-2xl rounded-bl-none border border-border bg-secondary/50 p-3.5 text-sm leading-relaxed">
                     {t.content}
                   </div>
                 </div>
               ) : (
-                <div key={i} className="flex justify-end">
-                  <div className="p-3.5 bg-teal-dark text-background rounded-2xl rounded-br-none text-sm font-medium max-w-[85%]">
+                <div key={i} className="animate-rise flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-none bg-primary p-3.5 text-sm font-medium text-primary-foreground">
                     {t.content}
                   </div>
                 </div>
@@ -129,35 +128,33 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
           )}
           {sending && (
             <div className="flex gap-3">
-              <div className="shrink-0 size-8 rounded-full bg-teal-dark/10 text-teal-dark grid place-items-center text-sm">
-                🤖
+              <div className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                <Bot className="size-3.5" />
               </div>
-              <div className="p-3.5 bg-background border border-border rounded-2xl rounded-bl-none flex gap-1.5">
-                <span className="size-1.5 rounded-full bg-teal-dark animate-pulse" />
-                <span className="size-1.5 rounded-full bg-teal-dark animate-pulse [animation-delay:150ms]" />
-                <span className="size-1.5 rounded-full bg-teal-dark animate-pulse [animation-delay:300ms]" />
+              <div className="flex gap-1.5 rounded-2xl rounded-bl-none border border-border bg-secondary/50 p-3.5">
+                <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+                <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:150ms]" />
+                <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:300ms]" />
               </div>
             </div>
           )}
         </div>
 
-        <form onSubmit={handleSend} className="shrink-0 border-t border-border p-4 flex gap-2">
+        <form onSubmit={handleSend} className="flex shrink-0 gap-2 border-t border-border p-4">
           <input
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ex. Ce virement est-il cohérent ?"
-            className="flex-1 px-4 py-3 border border-border rounded-xl text-sm input-boxed focus:outline-none focus:border-ink"
+            aria-label="Votre question sur ce document"
+            className="input-boxed flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
           />
-          <button
-            type="submit"
-            disabled={sending || !question.trim()}
-            className="px-5 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
-          >
-            {sending ? "…" : "Envoyer"}
-          </button>
+          <Button type="submit" size="icon" disabled={sending || !question.trim()}>
+            {sending ? <Loader2 className="animate-spin" /> : <Send />}
+            <span className="sr-only">Envoyer</span>
+          </Button>
         </form>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -7,3 +7,8 @@ venv/
 .pytest_cache/
 sessions.db
 backend/sessions.db
+# Dossier de référence du fork v2 (design system source) — jamais versionné dans ce dépôt.
+ledger_mind_v2/
+
+# Pieces de test generees pour la capture (voir docs-test/README.md) — jamais versionnees.
+docs-test/

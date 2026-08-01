@@ -1,9 +1,19 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { usePlan } from "@/lib/plan";
-import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
+import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import {
+  ArrowLeftRight,
+  FileText,
+  Loader2,
+  MessageSquare,
+  Send,
+  UploadCloud,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { isAuthed } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { DocumentChatDrawer } from "@/components/lm/DocumentChatDrawer";
 import {
   analyzeCapture,
@@ -25,8 +35,16 @@ export const Route = createFileRoute("/capture")({
       { property: "og:description", content: "Déposez vos factures, relevés et justificatifs." },
     ],
   }),
-  component: CapturePage,
+  component: CaptureRoute,
 });
+
+function CaptureRoute() {
+  return (
+    <PremiumGate kind="capture">
+      <CapturePage />
+    </PremiumGate>
+  );
+}
 
 const PIPELINE = ["OCR", "Extraction", "Classification", "Vérifications", "Sauvegarde"];
 
@@ -83,12 +101,16 @@ function unifyDocs(invoices: CaptureInvoiceItem[], virements: CaptureVirementIte
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-1">{label}</p>
+      <p className="rule-label mb-1 text-muted-foreground">{label}</p>
       <div className="font-medium">{children}</div>
     </div>
   );
 }
 
+/**
+ * Montant dans sa devise d'origine, suivi de son équivalent euro quand la devise n'est pas
+ * l'euro (conversion serveur au taux BCE du jour de la pièce — voir backend fx.py).
+ */
 function EurAmount({
   amount,
   currency,
@@ -98,20 +120,43 @@ function EurAmount({
   currency?: string | null;
   amountEur?: number | null;
 }) {
-  if (amount == null) return <span className="font-mono">—</span>;
+  if (amount == null) return <span className="num">—</span>;
   const cur = currency ?? "EUR";
   return (
-    <span className="font-mono">
+    <span className="num">
       {formatMoney(amount)} {cur}
       {amountEur != null && cur !== "EUR" && (
-        <span className="ml-2 text-ink/40 text-sm">≈ {formatMoney(amountEur)} €</span>
+        <span className="ml-2 text-sm text-muted-foreground">≈ {formatMoney(amountEur)} €</span>
       )}
     </span>
   );
 }
 
+/** Déclencheur du panneau de discussion propre à un document. */
+function ChatDocButton({
+  onClick,
+  size = "md",
+}: {
+  onClick: () => void;
+  size?: "sm" | "md";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "grid shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-all duration-200 hover:border-ink hover:text-foreground active:scale-95",
+        size === "sm" ? "size-7" : "size-8",
+      )}
+      title="Poser une question sur ce document"
+      aria-label="Poser une question sur ce document"
+    >
+      <MessageSquare className={size === "sm" ? "size-3" : "size-3.5"} />
+    </button>
+  );
+}
+
 function CapturePage() {
-  if (usePlan() === "free") return <PremiumPagePlaceholder kind="capture" />;
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -202,7 +247,7 @@ function CapturePage() {
 
       <div className="grid lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-7 space-y-6">
-          <label className="block bg-white border border-dashed border-border hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200 rounded-2xl p-16 text-center cursor-pointer">
+          <label className="animate-rise block cursor-pointer rounded-2xl border border-dashed border-border bg-card p-14 text-center transition-all duration-200 hover:border-accent hover:bg-accent/5">
             <input
               ref={fileRef}
               type="file"
@@ -211,69 +256,69 @@ function CapturePage() {
               disabled={loading}
               onChange={(e) => handleFiles(e.target.files)}
             />
-            <div className="mx-auto size-16 rounded-full bg-teal-dark/10 grid place-items-center mb-6">
-              <span className="text-3xl text-teal-dark">↑</span>
+            <div className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-accent/15 text-accent-ink">
+              <UploadCloud className="size-5" />
             </div>
-            <p className="font-semibold text-lg">
+            <p className="text-base font-medium">
               {loading ? "Analyse en cours…" : "Glissez une facture ou un virement ici"}
             </p>
-            <p className="text-sm text-ink/50 mt-2">
+            <p className="mt-2 text-sm text-muted-foreground">
               PDF, image · facture ou justificatif de virement · détection automatique · 20 Mo max
             </p>
           </label>
 
           {loading && (
-            <div className="bg-white border border-border rounded-2xl p-8 text-center">
-              <div className="inline-block size-8 border-[3px] border-ink/20 border-t-teal-dark rounded-full animate-spin" />
-              <p className="text-sm text-ink/50 mt-4">
+            <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-soft">
+              <Loader2 className="mx-auto size-6 animate-spin text-primary" />
+              <p className="mt-4 text-sm text-muted-foreground">
                 OCR, extraction et classification… Cela peut prendre 30 à 90 secondes.
               </p>
             </div>
           )}
 
           {error && (
-            <div className="bg-coral/10 border border-coral/30 rounded-2xl p-6 text-sm text-coral font-medium">
+            <div
+              role="alert"
+              className="rounded-2xl border border-destructive/30 bg-destructive/8 p-5 text-sm font-medium text-destructive"
+            >
               {error}
             </div>
           )}
 
           {result && (
-            <section className="bg-white border border-border rounded-2xl p-8 space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Résultat d'analyse</h2>
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`text-[10px] font-mono uppercase tracking-widest ${
+            <section className="animate-rise space-y-6 rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg">Résultat d&apos;analyse</h2>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={
                       result.status === "completed"
-                        ? "text-teal-dark"
+                        ? "success"
                         : result.status === "en_attente_utilisateur"
-                          ? "text-amber-600"
-                          : "text-coral"
-                    }`}
+                          ? "warning"
+                          : "destructive"
+                    }
                   >
                     {result.status === "completed"
                       ? "Terminé"
                       : result.status === "en_attente_utilisateur"
                         ? "Info requise"
                         : "Erreur"}
-                  </span>
+                  </Badge>
                   {result.status === "completed" && result.document_id && (
-                    <button
-                      type="button"
+                    <ChatDocButton
                       onClick={() =>
                         setChatDoc({
                           id: result.document_id!,
                           label:
                             result.document_type === "virement"
-                              ? (result.transfer?.beneficiary_name ?? result.transfer?.sender_name ?? "Virement")
+                              ? (result.transfer?.beneficiary_name ??
+                                result.transfer?.sender_name ??
+                                "Virement")
                               : (result.invoice?.issuer_name ?? "Facture"),
                         })
                       }
-                      className="size-9 rounded-full border border-border hover:border-teal-dark transition-all duration-200 active:scale-[0.95] grid place-items-center text-lg"
-                      title="Poser une question sur ce document"
-                    >
-                      💬
-                    </button>
+                    />
                   )}
                 </div>
               </div>
@@ -282,13 +327,12 @@ function CapturePage() {
                 {PIPELINE.map((step, i) => (
                   <div key={step} className="space-y-2">
                     <div
-                      className={`h-1.5 rounded-full ${
-                        pipelineStep(result.status, i) ? "bg-teal-light" : "bg-border"
-                      }`}
+                      className={cn(
+                        "h-1.5 rounded-full transition-colors",
+                        pipelineStep(result.status, i) ? "bg-success" : "bg-border",
+                      )}
                     />
-                    <span className="text-[9px] uppercase tracking-widest text-ink/40 font-semibold">
-                      {step}
-                    </span>
+                    <span className="rule-label block text-muted-foreground">{step}</span>
                   </div>
                 ))}
               </div>
@@ -303,7 +347,7 @@ function CapturePage() {
                           key={s}
                           type="button"
                           onClick={() => setHitlAnswer(s)}
-                          className="px-3 py-1.5 text-xs border border-border rounded-lg hover:border-ink transition-all duration-200 active:scale-[0.97]"
+                          className="suggestion-chip rounded-full px-3 py-1.5 text-xs font-medium"
                         >
                           {s}
                         </button>
@@ -315,15 +359,11 @@ function CapturePage() {
                     value={hitlAnswer}
                     onChange={(e) => setHitlAnswer(e.target.value)}
                     placeholder="Votre réponse…"
-                    className="w-full px-4 py-3 border border-border rounded-xl text-sm input-boxed focus:outline-none focus:border-ink"
+                    className="input-boxed w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
                   />
-                  <button
-                    type="submit"
-                    disabled={!hitlAnswer.trim() || loading}
-                    className="px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
-                  >
-                    Envoyer
-                  </button>
+                  <Button type="submit" disabled={!hitlAnswer.trim() || loading}>
+                    <Send /> Envoyer
+                  </Button>
                 </form>
               )}
 
@@ -331,7 +371,7 @@ function CapturePage() {
                 <div className="space-y-4 border-t border-border pt-6">
                   <div className="grid sm:grid-cols-2 gap-4 text-sm">
                     <Field label="Référence">
-                      <span className="font-mono">{result.transfer.transfer_reference ?? "—"}</span>
+                      <span className="num">{result.transfer.transfer_reference ?? "—"}</span>
                     </Field>
                     <Field label="Date d'exécution">{result.transfer.execution_date ?? "—"}</Field>
                     <Field label="Montant">
@@ -348,9 +388,9 @@ function CapturePage() {
                     <Field label="Bénéficiaire">{result.transfer.beneficiary_name ?? "—"}</Field>
                     <Field label="IBAN émetteur">
                       <span
-                        className={`font-mono text-xs break-all ${
+                        className={`num text-xs break-all ${
                           result.incoherences?.some((i) => i.includes(result.transfer!.sender_iban ?? "\0"))
-                            ? "text-coral"
+                            ? "text-destructive"
                             : ""
                         }`}
                       >
@@ -359,9 +399,9 @@ function CapturePage() {
                     </Field>
                     <Field label="IBAN bénéficiaire">
                       <span
-                        className={`font-mono text-xs break-all ${
+                        className={`num text-xs break-all ${
                           result.incoherences?.some((i) => i.includes(result.transfer!.beneficiary_iban ?? "\0"))
-                            ? "text-coral"
+                            ? "text-destructive"
                             : ""
                         }`}
                       >
@@ -369,7 +409,7 @@ function CapturePage() {
                       </span>
                     </Field>
                     <Field label="BIC">
-                      <span className="font-mono text-xs">{result.transfer.beneficiary_bic ?? "—"}</span>
+                      <span className="num text-xs">{result.transfer.beneficiary_bic ?? "—"}</span>
                     </Field>
                     <Field label="Banque">{result.transfer.bank_name ?? "—"}</Field>
                     <Field label="Type">{result.transfer.transfer_type ?? "—"}</Field>
@@ -378,17 +418,15 @@ function CapturePage() {
 
                   {result.analysis && (
                     <div>
-                      <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-2">
-                        Analyse
-                      </p>
-                      <p className="text-sm text-ink/80 leading-relaxed">{result.analysis}</p>
+                      <p className="rule-label mb-2 text-muted-foreground">Analyse</p>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{result.analysis}</p>
                     </div>
                   )}
 
                   {result.incoherences && result.incoherences.length > 0 && (
                     <ul className="space-y-2">
                       {result.incoherences.map((inc, i) => (
-                        <li key={i} className="text-sm text-coral bg-coral/10 px-4 py-2 rounded-lg">
+                        <li key={i} className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
                           {inc}
                         </li>
                       ))}
@@ -403,16 +441,16 @@ function CapturePage() {
                     <Field label="Émetteur">{result.invoice.issuer_name ?? "—"}</Field>
                     <Field label="Client">{result.invoice.client_name ?? "—"}</Field>
                     <Field label="N° facture">
-                      <span className="font-mono">{result.invoice.invoice_number ?? "—"}</span>
+                      <span className="num">{result.invoice.invoice_number ?? "—"}</span>
                     </Field>
                     <Field label="Date d'émission">{result.invoice.issue_date ?? "—"}</Field>
                     <Field label="Sous-total HT">
-                      <span className="font-mono">
+                      <span className="num">
                         {result.invoice.subtotal_ht != null ? `${formatMoney(result.invoice.subtotal_ht)} ${result.invoice.currency ?? "€"}` : "—"}
                       </span>
                     </Field>
                     <Field label="TVA">
-                      <span className="font-mono">
+                      <span className="num">
                         {result.invoice.vat_amount != null ? `${formatMoney(result.invoice.vat_amount)} ${result.invoice.currency ?? "€"}` : "—"}
                       </span>
                     </Field>
@@ -438,16 +476,14 @@ function CapturePage() {
 
                   {result.invoice.line_items && result.invoice.line_items.length > 0 && (
                     <div>
-                      <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-2">
-                        Lignes de facture
-                      </p>
+                      <p className="rule-label mb-2 text-muted-foreground">Lignes de facture</p>
                       <div className="space-y-1.5">
                         {result.invoice.line_items.map((li, i) => (
-                          <div key={i} className="flex justify-between text-sm bg-background rounded-lg px-3 py-2">
-                            <span className="text-ink/70">
+                          <div key={i} className="flex justify-between gap-3 rounded-lg bg-secondary/60 px-3 py-2 text-sm">
+                            <span className="text-muted-foreground">
                               {li.description ?? "—"} {li.quantity != null && `× ${li.quantity}`}
                             </span>
-                            <span className="font-mono">{li.total != null ? formatMoney(li.total) : "—"}</span>
+                            <span className="num shrink-0">{li.total != null ? formatMoney(li.total) : "—"}</span>
                           </div>
                         ))}
                       </div>
@@ -456,17 +492,15 @@ function CapturePage() {
 
                   {result.analysis && (
                     <div>
-                      <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-2">
-                        Analyse
-                      </p>
-                      <p className="text-sm text-ink/80 leading-relaxed">{result.analysis}</p>
+                      <p className="rule-label mb-2 text-muted-foreground">Analyse</p>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{result.analysis}</p>
                     </div>
                   )}
 
                   {result.incoherences && result.incoherences.length > 0 && (
                     <ul className="space-y-2">
                       {result.incoherences.map((inc, i) => (
-                        <li key={i} className="text-sm text-amber-700 bg-amber-50 px-4 py-2 rounded-lg">
+                        <li key={i} className="rounded-lg border border-warning/40 bg-warning/12 px-4 py-2 text-sm text-warning-ink">
                           {inc}
                         </li>
                       ))}
@@ -478,57 +512,61 @@ function CapturePage() {
           )}
         </div>
 
-        <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
-          <h3 className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-            Mes documents
-          </h3>
+        <div className="space-y-5 lg:sticky lg:top-24 lg:col-span-5">
+          <h2 className="rule-label text-accent-ink">Mes documents</h2>
           {unified.length === 0 ? (
-            <div className="bg-white border border-border rounded-2xl p-6 text-center text-ink/40 text-sm">
+            <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               Aucun document analysé.
             </div>
           ) : (
             <div className="space-y-3">
+              {/* Factures et virements vivent dans une seule liste, triée par date d'ajout : du
+                  point de vue de l'utilisateur, ce sont « ses documents », pas deux registres. */}
               {unified.map((doc) => (
                 <div
                   key={doc.document_id}
-                  className={`w-full bg-white border rounded-2xl p-5 space-y-1 card-hover transition-all duration-200 ${
-                    selectedId === doc.document_id ? "border-teal-dark" : "border-border hover:border-ink/30"
-                  }`}
+                  className={cn(
+                    "card-hover w-full space-y-1 rounded-2xl border bg-card p-4 shadow-soft transition-all duration-200",
+                    selectedId === doc.document_id
+                      ? "border-accent ring-1 ring-accent/40"
+                      : "border-border",
+                  )}
                 >
                   <button
                     type="button"
                     onClick={() => setSelectedId(doc.document_id)}
                     className="w-full text-left"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0 ${
-                            doc.kind === "virement" ? "bg-prune/10 text-prune" : "bg-teal-dark/10 text-teal-dark"
-                          }`}
-                        >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Badge variant={doc.kind === "virement" ? "info" : "success"}>
+                          {doc.kind === "virement" ? (
+                            <ArrowLeftRight />
+                          ) : (
+                            <FileText />
+                          )}
                           {doc.kind === "virement" ? "Virement" : "Facture"}
-                        </span>
-                        <span className="font-semibold text-sm truncate">{doc.label}</span>
+                        </Badge>
+                        <span className="truncate text-sm font-medium">{doc.label}</span>
                       </span>
-                      <span className="font-mono text-xs text-ink/50 shrink-0 text-right">
-                        {doc.amount != null ? `${formatMoney(doc.amount)} ${doc.currency ?? "€"}` : "—"}
+                      <span className="num shrink-0 text-right text-xs text-muted-foreground">
+                        {doc.amount != null
+                          ? `${formatMoney(doc.amount)} ${doc.currency ?? "€"}`
+                          : "—"}
                         {doc.amount_eur != null && doc.currency !== "EUR" && (
-                          <span className="block text-ink/30">≈ {formatMoney(doc.amount_eur)} €</span>
+                          <span className="block text-muted-foreground/70">
+                            ≈ {formatMoney(doc.amount_eur)} €
+                          </span>
                         )}
                       </span>
                     </div>
-                    <p className="text-xs text-ink/50 mt-1">{doc.subtitle}</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">{doc.subtitle}</p>
                   </button>
                   <div className="flex justify-end pt-1">
-                    <button
-                      type="button"
+                    <ChatDocButton
+                      size="sm"
                       onClick={() => setChatDoc({ id: doc.document_id, label: doc.label })}
-                      className="size-7 rounded-full border border-border hover:border-teal-dark transition-all duration-200 active:scale-[0.95] grid place-items-center text-sm"
-                      title="Poser une question sur ce document"
-                    >
-                      💬
-                    </button>
+                    />
                   </div>
                 </div>
               ))}
@@ -536,11 +574,9 @@ function CapturePage() {
           )}
 
           {activeDoc && !result && (
-            <div className="bg-white border border-border rounded-2xl p-6">
-              <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-2">
-                Synthèse
-              </p>
-              <p className="text-sm text-ink/80 leading-relaxed">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+              <p className="rule-label mb-2 text-muted-foreground">Synthèse</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {(activeInvoice?.analysis ?? activeVirement?.analysis) || "—"}
               </p>
             </div>

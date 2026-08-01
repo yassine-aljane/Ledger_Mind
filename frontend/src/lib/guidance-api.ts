@@ -213,3 +213,13 @@ export async function downloadRoadmapPdf(sessionId: string | null, profil?: Guid
   link.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * État du corpus documentaire derrière l'agent pédagogue (nombre d'extraits indexés).
+ * Sert à afficher honnêtement, sur l'écran Éducation, si les réponses peuvent être sourcées.
+ */
+export type CorpusStatus = { chunks: number; pret: boolean };
+
+export function fetchCorpusStatus(): Promise<CorpusStatus> {
+  return request("/corpus");
+}

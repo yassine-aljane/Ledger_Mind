@@ -1,6 +1,6 @@
 /** Mongo-backed auth client (JWT). No Supabase. */
 
-import { setPlan } from "@/lib/plan";
+import { refreshPlan } from "@/lib/plan";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
@@ -168,20 +168,13 @@ export function isAuthed(): boolean {
 export function storeAuth(res: AuthResponse): void {
   const s = storage();
   if (!s) return;
-  // Le plan (démo) vit dans une clé localStorage globale au navigateur, pas au compte : sans ce
-  // garde-fou, un autre utilisateur connecté ensuite sur le même navigateur hérite du "premium"
-  // du compte précédent (ou d'un simple essai sur /premium), alors qu'il n'a rien débloqué lui-
-  // même. On ne réinitialise que si le compte change réellement.
-  let previousUserId: string | null = null;
-  try {
-    previousUserId = (JSON.parse(s.getItem(USER_KEY) ?? "null") as AuthUser | null)?.id ?? null;
-  } catch {
-    previousUserId = null;
-  }
-  if (previousUserId !== res.user.id) setPlan("free");
 
   s.setItem(TOKEN_KEY, res.access_token);
   s.setItem(USER_KEY, JSON.stringify(res.user));
+  // Le plan (démo) est stocké par compte (voir lib/plan.ts) : il suffit de signaler le
+  // changement de compte pour que l'interface réaffiche la formule du nouvel utilisateur —
+  // sans écraser celle du précédent, et sans lui faire hériter du Premium d'un autre.
+  refreshPlan();
   // Clear legacy mock flag
   try {
     s.removeItem(LEGACY_AUTH_KEY);
@@ -196,7 +189,9 @@ export function clearAuth(): void {
   if (!s) return;
   s.removeItem(TOKEN_KEY);
   s.removeItem(USER_KEY);
-  setPlan("free");
+  // La formule reste attachée au compte : on ne l'efface pas, on signale juste que la session
+  // visible redevient anonyme (l'utilisateur retrouvera son Premium en se reconnectant).
+  refreshPlan();
   try {
     s.removeItem(LEGACY_AUTH_KEY);
     sessionStorage.removeItem(LEGACY_AUTH_KEY);

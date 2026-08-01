@@ -1,6 +1,20 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  BookOpen,
+  FileStack,
+  Gauge,
+  History,
+  Lock,
+  LogOut,
+  Moon,
+  Receipt,
+  Sparkles,
+  Sun,
+  Users,
+  Wallet,
+} from "lucide-react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import {
   displayShortName,
   getStoredUser,
@@ -9,20 +23,30 @@ import {
   type AuthUser,
 } from "@/lib/auth";
 import { usePlan } from "@/lib/plan";
+import { useTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 import { CentreActionsButton } from "@/components/lm/CentreActions";
+import { Wordmark } from "@/components/lm/Logo";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 // Dashboard et Éducation restent accessibles sans premium (guidance/pédagogue + le dashboard,
 // dont le contenu s'adapte lui-même selon la vérification SIREN — voir dashboard.tsx). Tout le
 // reste (expert-comptable, documents, simulateur, historique) est une fonctionnalité premium.
 const nav = [
-  { to: "/dashboard", label: "Dashboard", premium: false },
-  { to: "/activite", label: "Activité", premium: true },
-  { to: "/referral", label: "Expert-Comptable", premium: true },
-  { to: "/capture", label: "Documents", premium: true },
-  { to: "/simulateur", label: "Simulateur", premium: true },
-  { to: "/historique", label: "Historique", premium: true },
-  { to: "/education", label: "Éducation", premium: false },
-] as const;
+  { to: "/dashboard", label: "Dashboard", icon: Gauge, premium: false },
+  { to: "/activite", label: "Activité", icon: Wallet, premium: true },
+  { to: "/referral", label: "Expert-Comptable", icon: Users, premium: true },
+  { to: "/capture", label: "Documents", icon: Receipt, premium: true },
+  { to: "/simulateur", label: "Simulateur", icon: FileStack, premium: true },
+  { to: "/historique", label: "Historique", icon: History, premium: true },
+  { to: "/education", label: "Éducation", icon: BookOpen, premium: false },
+] as const satisfies readonly {
+  to: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  premium: boolean;
+}[];
 
 export function LogoutBubble() {
   const navigate = useNavigate();
@@ -33,13 +57,26 @@ export function LogoutBubble() {
     navigate({ to: "/auth", replace: true });
   }
   return (
-    <button
-      type="button"
-      onClick={handleSignOut}
-      className="px-4 py-1.5 rounded-full border border-border text-[13px] font-medium text-ink/70 hover:border-ink hover:text-ink transition-all duration-200 active:scale-[0.97]"
+    <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-1.5 text-muted-foreground">
+      <LogOut />
+      <span className="hidden lg:inline">Déconnexion</span>
+    </Button>
+  );
+}
+
+export function ThemeToggle({ className }: { className?: string }) {
+  const { theme, toggle } = useTheme();
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      onClick={toggle}
+      className={cn("text-muted-foreground", className)}
+      aria-label={theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre"}
+      title={theme === "dark" ? "Thème clair" : "Thème sombre"}
     >
-      Déconnexion
-    </button>
+      {theme === "dark" ? <Sun /> : <Moon />}
+    </Button>
   );
 }
 
@@ -54,13 +91,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <nav className="fixed top-0 inset-x-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-6">
-          <Link to="/dashboard" className="flex items-center gap-2 shrink-0">
-            <div className="size-6 rounded-full bg-teal-dark" />
-            <span className="font-semibold tracking-tight uppercase text-sm">LedgerMind</span>
+      <nav className="fixed inset-x-0 top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-6">
+          <Link to="/dashboard" className="shrink-0" aria-label="LedgerMind, tableau de bord">
+            <Wordmark />
           </Link>
-          <div className="hidden md:flex items-center gap-7 text-[13px] font-medium">
+
+          <div className="hidden items-center gap-1 md:flex">
             {nav.map((item) => {
               const active = pathname.startsWith(item.to);
               const locked = item.premium && plan === "free";
@@ -69,42 +106,41 @@ export function AppShell({ children }: { children: ReactNode }) {
                   key={item.to}
                   to={item.to}
                   title={locked ? "Fonctionnalité Premium" : item.label}
-                  className={
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.62rem] font-medium transition-colors",
                     active
-                      ? "text-teal-dark relative after:absolute after:inset-x-0 after:-bottom-[22px] after:h-px after:bg-teal-dark inline-flex items-center gap-1.5"
-                      : "text-ink/60 hover:text-ink transition-colors inline-flex items-center gap-1.5"
-                  }
-                >
-                  {item.label}
-                  {locked && (
-                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden className="text-amber-fiscal">
-                      <rect x="2" y="5.5" width="8" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-                      <path d="M4 5.5V4a2 2 0 1 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" />
-                    </svg>
+                      ? "bg-secondary text-foreground"
+                      : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
                   )}
+                >
+                  <item.icon className="size-3.5 shrink-0" />
+                  {item.label}
+                  {locked && <Lock className="size-3 shrink-0 text-accent" />}
                 </Link>
               );
             })}
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+
+          <div className="flex shrink-0 items-center gap-2">
             {plan === "free" ? (
               <Link
                 to="/premium"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-fiscal/10 border border-amber-fiscal/30 text-amber-fiscal text-[12px] font-semibold hover:bg-amber-fiscal hover:text-ink transition-all duration-200 active:scale-[0.97]"
+                className="shimmer-premium hidden items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 font-mono text-[0.55rem] font-medium uppercase tracking-[0.12em] text-accent-ink transition-colors hover:bg-accent/20 sm:inline-flex"
               >
-                <span className="size-1.5 rounded-full bg-amber-fiscal animate-pulse" />
+                <Sparkles className="size-3" />
                 Passer Premium
               </Link>
             ) : (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-dark/10 border border-teal-dark/30 text-teal-dark text-[12px] font-semibold font-mono uppercase tracking-widest">
-                Premium
-              </span>
+              <Badge variant="accent" className="hidden sm:inline-flex">
+                <Sparkles /> Premium
+              </Badge>
             )}
             {isAuthed() && <CentreActionsButton />}
+            <ThemeToggle />
             <LogoutBubble />
             <Link
               to="/parametres"
-              className="px-4 py-1.5 bg-ink text-background rounded-full text-[13px] font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] max-w-[10rem] truncate"
+              className="inline-flex h-8 max-w-40 items-center truncate rounded-full bg-primary px-3.5 text-[0.62rem] font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
               title={user ? displayShortName(user) : "Compte"}
             >
               {isAuthed() ? displayShortName(user) : "Compte"}
@@ -112,7 +148,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </nav>
-      <main className="pt-24 pb-24 px-6 max-w-7xl mx-auto">{children}</main>
+
+      <main className="mx-auto max-w-7xl px-6 pb-24 pt-24">{children}</main>
     </div>
   );
 }
@@ -121,22 +158,25 @@ export function PageHeader({
   eyebrow,
   title,
   description,
+  actions,
 }: {
   eyebrow?: string;
   title: ReactNode;
   description?: string;
+  actions?: ReactNode;
 }) {
   return (
-    <header className="animate-slide-up mb-12">
-      {eyebrow && (
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark mb-4">
-          {eyebrow}
-        </p>
-      )}
-      <h1 className="text-5xl md:text-6xl font-extrabold tracking-tighter text-balance">{title}</h1>
-      {description && (
-        <p className="mt-4 text-lg md:text-xl text-ink/60 max-w-2xl text-pretty leading-relaxed">{description}</p>
-      )}
+    <header className="animate-rise mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <div className="max-w-2xl">
+        {eyebrow && <p className="rule-label mb-3 text-accent-ink">{eyebrow}</p>}
+        <h1 className="text-balance text-4xl md:text-5xl">{title}</h1>
+        {description && (
+          <p className="mt-4 text-pretty text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+        )}
+      </div>
+      {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
     </header>
   );
 }

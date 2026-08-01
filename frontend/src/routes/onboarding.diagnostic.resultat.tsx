@@ -181,14 +181,14 @@ function ResultatPage() {
         <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-teal-dark mb-4">
           Résultat de votre diagnostic
         </p>
-        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tighter text-balance max-w-3xl">
+        <h1 className="text-4xl md:text-6xl font-medium text-balance max-w-3xl">
           Voici votre situation, <span className="italic font-normal">clairement.</span>
         </h1>
       </header>
 
       {error && !detail && (
         <div className="space-y-4">
-          <div className="text-coral font-mono text-sm">{error}</div>
+          <div className="text-destructive font-mono text-sm">{error}</div>
           <Link
             to="/onboarding/diagnostic"
             className="inline-block text-sm font-semibold text-teal-dark hover:underline transition-colors duration-200"
@@ -198,12 +198,12 @@ function ResultatPage() {
         </div>
       )}
       {!detail && !error ? (
-        <div className="text-ink/40 font-mono text-sm">Analyse en cours…</div>
+        <div className="text-muted-foreground font-mono text-sm">Analyse en cours…</div>
       ) : detail && situation ? (
         <>
           {/* Le régime ouvre la page : c'est la conclusion du diagnostic, elle doit se voir
               avant le détail qui la justifie. */}
-          <div className="bg-teal-dark text-background rounded-2xl p-10 animate-slide-up relative overflow-hidden">
+          <div className="bg-teal-dark text-ink-foreground rounded-2xl p-10 animate-slide-up relative overflow-hidden">
             <div className="absolute -top-24 -right-24 size-64 rounded-full bg-teal-light/30 blur-3xl" />
             <div className="relative">
               <p className="font-mono text-[11px] uppercase tracking-[0.3em] opacity-70 mb-4">
@@ -211,10 +211,10 @@ function ResultatPage() {
               </p>
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
-                  <h2 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
+                  <h2 className="text-4xl md:text-5xl font-medium">
                     {regimeNom}
                   </h2>
-                  <p className="mt-4 text-background/80 max-w-xl text-pretty leading-relaxed">
+                  <p className="mt-4 text-ink-foreground/80 max-w-xl text-pretty leading-relaxed">
                     {regimePourquoi}
                   </p>
                 </div>
@@ -230,7 +230,7 @@ function ResultatPage() {
               seule, la coche se fait depuis la conversation ou le PDF déjà proposés ailleurs. */}
           {roadmap && (roadmap.etapes?.length ?? 0) > 0 && (
             <div className="mt-6">
-              <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ink/40 mb-4">
+              <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-muted-foreground mb-4">
                 02 · Progression du plan de régularisation
               </p>
               <RoadmapStepper roadmap={roadmap} checked={checked} />
@@ -247,7 +247,7 @@ function ResultatPage() {
                   <Row key={d.label} k={d.label} v={d.valeur} />
                 ))}
                 <div>
-                  <dt className="text-xs uppercase tracking-widest text-ink/40 mb-2">
+                  <dt className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
                     Sources / nature
                   </dt>
                   <dd className="flex flex-wrap gap-2">
@@ -273,7 +273,7 @@ function ResultatPage() {
                     : "Non immatriculé à ce jour"}
                 </p>
               </div>
-              <p className="text-ink/60 text-pretty leading-relaxed">
+              <p className="text-muted-foreground text-pretty leading-relaxed">
                 Votre activité n&apos;est pas encore rattachée à un SIREN. Ce n&apos;est pas grave —
                 la feuille de route détaille les étapes pour régulariser.
               </p>
@@ -284,7 +284,7 @@ function ResultatPage() {
             {!roadmap && (
               <Card index="05" label="Plan de régularisation" span="lg:col-span-2">
                 {plan.length === 0 ? (
-                  <p className="text-ink/50 text-sm">Aucune étape disponible pour le moment.</p>
+                  <p className="text-muted-foreground text-sm">Aucune étape disponible pour le moment.</p>
                 ) : (
                   <ol className="space-y-4">
                     {plan.map((s) => (
@@ -295,7 +295,7 @@ function ResultatPage() {
                         <div className="pt-1">
                           <p className="font-semibold">{s.title}</p>
                           {s.description ? (
-                            <p className="text-sm text-ink/60 mt-1">{s.description}</p>
+                            <p className="text-sm text-muted-foreground mt-1">{s.description}</p>
                           ) : null}
                         </div>
                       </li>
@@ -315,7 +315,7 @@ function ResultatPage() {
             </Link>
             <Link
               to="/dashboard"
-              className="px-10 py-5 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
+              className="px-10 py-5 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
             >
               Accéder à mon dashboard →
             </Link>
@@ -339,9 +339,9 @@ function Card({
 }) {
   return (
     <section
-      className={`bg-white border border-border rounded-2xl p-8 animate-slide-up card-hover ${span}`}
+      className={`bg-card border border-border rounded-2xl p-8 animate-slide-up card-hover ${span}`}
     >
-      <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ink/40 mb-6">
+      <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-muted-foreground mb-6">
         {index} · {label}
       </p>
       {children}
@@ -352,7 +352,7 @@ function Card({
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-widest text-ink/40">{k}</dt>
+      <dt className="text-xs uppercase tracking-widest text-muted-foreground">{k}</dt>
       <dd className="mt-1 font-medium text-[15px]">{v}</dd>
     </div>
   );

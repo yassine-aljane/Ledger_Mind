@@ -1,12 +1,16 @@
 import { Link } from "@tanstack/react-router";
+import { ArrowRight, Lock, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { usePlan } from "@/lib/plan";
+
+export type PremiumBullet = { icon: LucideIcon; label: string; hint: string };
 
 type Props = {
   title: string;
   eyebrow?: string;
   pitch: string;
-  bullets: { icon: string; label: string; hint: string }[];
+  bullets: PremiumBullet[];
   preview: ReactNode;
   children: ReactNode;
 };
@@ -16,94 +20,88 @@ export function PremiumLock({ title, eyebrow, pitch, bullets, preview, children 
   if (plan === "premium") return <>{children}</>;
 
   return (
-    <div className="relative animate-fade-in">
-      {/* Blurred, non-interactive preview */}
+    <div className="animate-fade-in relative">
+      {/* Aperçu flouté, non interactif : on montre la forme de l'écran, jamais de fausse donnée
+          lisible. */}
       <div
         aria-hidden
-        className="pointer-events-none select-none blur-[6px] opacity-40 max-h-[520px] overflow-hidden"
+        className="pointer-events-none max-h-[520px] select-none overflow-hidden opacity-40 blur-[6px]"
       >
         {preview}
       </div>
 
-      {/* Fading veil */}
+      {/* Voile de fondu */}
       <div
         aria-hidden
-        className="absolute inset-x-0 top-0 h-full bg-gradient-to-b from-background/60 via-background/95 to-background"
+        className="absolute inset-x-0 top-0 h-full bg-linear-to-b from-background/60 via-background/95 to-background"
       />
 
-      {/* Editorial lock card */}
-      <div className="relative -mt-[420px] max-w-3xl mx-auto animate-slide-up">
-        <div className="relative bg-white border border-border rounded-3xl overflow-hidden shadow-[0_40px_80px_-40px_rgba(22,36,31,0.25)]">
-          {/* subtle grain */}
-          <div className="absolute inset-0 grain-overlay" />
-          {/* amber corner accent */}
-          <div className="absolute -top-24 -right-24 size-64 rounded-full bg-amber-fiscal/20 blur-3xl" />
-          <div className="absolute -bottom-24 -left-24 size-64 rounded-full bg-teal-light/15 blur-3xl" />
+      <div className="animate-rise relative -mt-[420px] mx-auto max-w-3xl">
+        <div className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-lift">
+          <div aria-hidden className="surface-grain absolute inset-0" />
+          <div
+            aria-hidden
+            className="shimmer-premium pointer-events-none absolute inset-0"
+          />
+          <div
+            aria-hidden
+            className="absolute -right-24 -top-24 size-64 rounded-full bg-accent/20 blur-3xl"
+          />
+          <div
+            aria-hidden
+            className="absolute -bottom-24 -left-24 size-64 rounded-full bg-success/15 blur-3xl"
+          />
 
-          <div className="relative p-10 md:p-14">
-            <div className="flex items-center gap-3 mb-8">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-fiscal/30 bg-amber-fiscal/10 text-amber-fiscal font-mono text-[10px] uppercase tracking-[0.25em]">
-                <LockGlyph /> Premium
+          <div className="relative p-8 md:p-12">
+            <div className="mb-7 flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/12 px-3 py-1 font-mono text-[0.55rem] font-medium uppercase tracking-[0.16em] text-accent-ink">
+                <Lock className="size-3" /> Premium
               </span>
-              {eyebrow && (
-                <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-                  {eyebrow}
-                </span>
-              )}
+              {eyebrow && <span className="rule-label text-muted-foreground">{eyebrow}</span>}
             </div>
 
-            <h2 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-balance mb-5">
-              {title}{" "}
-              <span className="italic font-normal text-ink/50">verrouillé.</span>
+            <h2 className="mb-5 text-balance text-3xl md:text-4xl">
+              {title} <span className="font-normal italic text-muted-foreground">verrouillé.</span>
             </h2>
-            <p className="text-lg text-ink/60 max-w-xl text-pretty mb-10">{pitch}</p>
+            <p className="mb-9 max-w-xl text-pretty text-base text-muted-foreground">{pitch}</p>
 
-            <ul className="grid sm:grid-cols-3 gap-4 mb-10">
+            <ul className="mb-9 grid gap-4 sm:grid-cols-3">
               {bullets.map((b) => (
                 <li
                   key={b.label}
-                  className="border border-border rounded-2xl p-4 bg-background/50 card-hover"
+                  className="card-hover rounded-2xl border border-border bg-secondary/40 p-4"
                 >
-                  <div className="text-2xl mb-2">{b.icon}</div>
-                  <p className="font-semibold text-sm mb-1">{b.label}</p>
-                  <p className="text-xs text-ink/55 leading-relaxed">{b.hint}</p>
+                  <span className="mb-3 inline-flex size-8 items-center justify-center rounded-lg bg-primary/8 text-primary">
+                    <b.icon className="size-4" />
+                  </span>
+                  <p className="mb-1 text-sm font-medium">{b.label}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{b.hint}</p>
                 </li>
               ))}
             </ul>
 
             <div className="flex flex-wrap items-center gap-4">
-              <Link
-                to="/premium"
-                className="group inline-flex items-center gap-2 px-6 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-              >
-                Débloquer Premium
-                <span className="transition-transform group-hover:translate-x-0.5">→</span>
-              </Link>
+              <Button asChild size="lg" variant="accent" className="rounded-full">
+                <Link to="/premium">
+                  Débloquer Premium <ArrowRight />
+                </Link>
+              </Button>
               <Link
                 to="/education"
-                className="text-sm font-medium text-ink/60 hover:text-ink transition-colors duration-200 underline underline-offset-4 decoration-dotted"
+                className="text-sm font-medium text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors duration-200 hover:text-foreground"
               >
                 Rester en gratuit (Éducation)
               </Link>
-              <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.25em] text-ink/40">
+              <span className="rule-label ml-auto text-muted-foreground">
                 14 jours d&apos;essai
               </span>
             </div>
           </div>
 
-          {/* perforated bottom edge to echo the receipt */}
-          <div className="h-3 perforated-bottom" />
+          {/* Bord perforé, en écho au reçu fiscal */}
+          <div className="perforated-bottom h-3" />
         </div>
       </div>
     </div>
-  );
-}
-
-function LockGlyph() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
-      <rect x="2" y="5.5" width="8" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M4 5.5V4a2 2 0 1 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" />
-    </svg>
   );
 }

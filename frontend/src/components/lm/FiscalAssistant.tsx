@@ -9,18 +9,23 @@
  * extraits : l'absence de réponse est un résultat acceptable, pas un échec à masquer.
  */
 
+import { Library, Loader2, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConversationHistory } from "@/components/lm/ConversationHistory";
 import { Markdown } from "@/components/lm/Markdown";
 import { Sources } from "@/components/lm/Sources";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   deleteConversation,
   fetchConversation,
   fetchConversations,
+  fetchCorpusStatus,
   renameConversation,
   sendGuidanceMessage,
   type ChatSource,
   type ConversationSummary,
+  type CorpusStatus,
 } from "@/lib/guidance-api";
 
 const SESSION_KEY = "ledgermind_pedagogue_session";
@@ -47,6 +52,7 @@ export function FiscalAssistant() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [corpus, setCorpus] = useState<CorpusStatus | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const refreshConversations = useCallback(() => {
@@ -75,6 +81,11 @@ export function FiscalAssistant() {
 
   useEffect(() => {
     refreshConversations();
+    // L'état du corpus est purement informatif : s'il n'est pas joignable, l'écran fonctionne
+    // à l'identique, on n'affiche simplement pas le badge.
+    fetchCorpusStatus()
+      .then(setCorpus)
+      .catch(() => setCorpus(null));
     const stored = typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
     if (stored) void openConversation(stored, true);
   }, [openConversation, refreshConversations]);
@@ -149,78 +160,88 @@ export function FiscalAssistant() {
         }}
       />
 
-      <div className="min-w-0 flex flex-col h-[75vh] min-h-[520px]">
+      <div className="flex h-[75vh] min-h-[520px] min-w-0 flex-col">
         {/* Même cadre à hauteur fixe que la guidance : les échanges défilent dans leur propre
             zone, la saisie reste toujours visible en bas. */}
-        <div className="chat-scroll flex-1 overflow-y-auto pr-2 space-y-6">
-        {turns.length === 0 && (
-          <div className="bg-white border border-border rounded-2xl p-6 animate-fade-in">
-            <p className="text-sm text-ink/60 leading-relaxed">
-              Posez votre première question. Les réponses s&apos;appuient sur le corpus officiel
-              (Légifrance, BOFiP, URSSAF, impots.gouv.fr) et citent leurs sources. Si
-              l&apos;information n&apos;y figure pas, l&apos;assistant le dit plutôt que de
-              l&apos;inventer.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {QUESTIONS_DEPART.map((q) => (
-                <button
-                  key={q}
-                  onClick={() => void ask(q)}
-                  className="px-4 py-2 bg-background border border-border rounded-full text-xs font-medium text-ink/70 hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.96] text-left"
+        <div className="chat-scroll flex-1 space-y-6 overflow-y-auto pr-2">
+          {turns.length === 0 && (
+            <div className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <div className="flex items-center justify-between gap-3">
+                <p className="rule-label text-accent-ink">Assistant fiscal sourcé</p>
+                {corpus && (
+                  <Badge variant={corpus.pret ? "success" : "warning"}>
+                    <Library />
+                    {corpus.pret
+                      ? `${corpus.chunks.toLocaleString("fr-FR")} extraits indexés`
+                      : "Corpus en cours d'indexation"}
+                  </Badge>
+                )}
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                Posez votre première question. Les réponses s&apos;appuient sur le corpus officiel
+                (Légifrance, BOFiP, URSSAF, impots.gouv.fr) et citent leurs sources. Si
+                l&apos;information n&apos;y figure pas, l&apos;assistant le dit plutôt que de
+                l&apos;inventer.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {QUESTIONS_DEPART.map((q, i) => (
+                  <button
+                    key={q}
+                    onClick={() => void ask(q)}
+                    style={{ animationDelay: `${i * 60}ms` }}
+                    className="suggestion-chip chip-stagger rounded-full px-4 py-2 text-left text-xs font-medium"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {turns.map((turn) =>
+              turn.role === "assistant" ? (
+                <div key={turn.id} className="animate-rise flex max-w-[90%] flex-col gap-1.5">
+                  <div className="rounded-2xl rounded-bl-none border border-border bg-card p-5 text-sm leading-relaxed shadow-soft">
+                    {turn.error ? (
+                      <span className="text-destructive">Erreur : {turn.error}</span>
+                    ) : (
+                      <>
+                        <Markdown text={turn.text} />
+                        <Sources
+                          sources={turn.sources}
+                          fraicheur={turn.fraicheur}
+                          bofipLive={turn.bofipLive}
+                        />
+                      </>
+                    )}
+                  </div>
+                  <span className="rule-label ml-1 text-muted-foreground">Assistant fiscal</span>
+                </div>
+              ) : (
+                <div
+                  key={turn.id}
+                  className="animate-rise ml-auto flex max-w-[85%] flex-col items-end gap-1.5"
                 >
-                  {q}
-                </button>
-              ))}
-            </div>
+                  <div className="rounded-2xl rounded-br-none bg-primary p-4 text-sm font-medium text-primary-foreground">
+                    {turn.text}
+                  </div>
+                  <span className="rule-label mr-1 text-muted-foreground">Vous</span>
+                </div>
+              ),
+            )}
+
+            {busy && (
+              <div className="animate-fade-in flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                <span className="rule-label">Recherche dans les sources officielles…</span>
+              </div>
+            )}
+            <div ref={bottomRef} />
           </div>
-        )}
-
-        <div className="space-y-6">
-          {turns.map((turn) =>
-            turn.role === "assistant" ? (
-              <div key={turn.id} className="flex flex-col gap-1 max-w-[90%] animate-slide-up">
-                <div className="p-5 bg-white border border-border rounded-2xl rounded-bl-none text-[15px] leading-relaxed text-ink shadow-sm">
-                  {turn.error ? (
-                    <span className="text-coral">Erreur : {turn.error}</span>
-                  ) : (
-                    <>
-                      <Markdown text={turn.text} />
-                      <Sources
-                        sources={turn.sources}
-                        fraicheur={turn.fraicheur}
-                        bofipLive={turn.bofipLive}
-                      />
-                    </>
-                  )}
-                </div>
-                <span className="text-[10px] uppercase opacity-40 font-mono ml-1">
-                  Assistant fiscal
-                </span>
-              </div>
-            ) : (
-              <div
-                key={turn.id}
-                className="flex flex-col gap-1 max-w-[85%] ml-auto items-end animate-slide-up"
-              >
-                <div className="p-4 bg-teal-dark text-background rounded-2xl rounded-br-none text-[15px] font-medium">
-                  {turn.text}
-                </div>
-                <span className="text-[10px] uppercase opacity-40 font-mono mr-1">Vous</span>
-              </div>
-            ),
-          )}
-
-          {busy && (
-            <div className="flex items-center gap-2 text-ink/40 text-sm animate-fade-in">
-              <span className="size-1.5 rounded-full bg-teal-dark animate-pulse" />
-              <span className="font-mono text-xs">Recherche dans les sources officielles…</span>
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
         </div>
 
-        <div className="shrink-0 mt-4 pt-4 border-t border-border">
+        <div className="mt-4 shrink-0 border-t border-border pt-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -232,15 +253,17 @@ export function FiscalAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Posez votre question fiscale…"
-              className="flex-1 px-5 py-3 bg-white border border-border rounded-full text-sm placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
+              aria-label="Votre question fiscale"
+              className="flex-1 rounded-full border border-border bg-card px-5 py-2.5 text-sm transition-colors duration-200 placeholder:text-muted-foreground/60 focus:border-ink focus:outline-none"
             />
-            <button
+            <Button
               type="submit"
+              variant="accent"
+              className="rounded-full px-5"
               disabled={busy || !input.trim()}
-              className="px-5 py-3 bg-ink text-background rounded-full text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
             >
-              Demander
-            </button>
+              <Send /> Demander
+            </Button>
           </form>
         </div>
       </div>

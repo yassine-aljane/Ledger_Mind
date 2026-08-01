@@ -13,8 +13,12 @@
  * cliquables du chat, jamais par un bouton codé en dur ici.
  */
 
+import { Check, Download, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Markdown, stripEmoji } from "@/components/lm/Markdown";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type Etape = {
   id: string;
@@ -69,8 +73,8 @@ function Gauge({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between items-baseline gap-3 text-xs">
-        <span className="text-ink/60">{label}</span>
-        <span className="font-mono text-ink/70 tabular-nums">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-mono text-muted-foreground tabular-nums">
           {euro(position)} / {euro(seuil)}
           {plein && plein !== seuil ? ` (plein ${euro(plein)})` : ""}
         </span>
@@ -109,8 +113,8 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
         />
       </svg>
       <div>
-        <p className="text-xl font-extrabold tracking-tight tabular-nums">{pct}%</p>
-        <p className="text-[11px] text-ink/50">
+        <p className="num text-xl font-medium">{pct}%</p>
+        <p className="text-xs text-muted-foreground">
           {done}/{total} étapes
         </p>
       </div>
@@ -132,9 +136,7 @@ function LegalSources({
   const [open, setOpen] = useState<number | null>(null);
   return (
     <div className="pt-1">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-2">
-        Sources légales ({sources.length})
-      </p>
+      <p className="rule-label mb-2 text-muted-foreground">Sources légales ({sources.length})</p>
       <div className="flex flex-wrap gap-2">
         {sources.map((s, i) => {
           const actif = open === i;
@@ -143,12 +145,13 @@ function LegalSources({
               key={i}
               onClick={() => setOpen(actif ? null : i)}
               title="Voir le détail de cette source"
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] transition-colors ${
-                "bg-teal-light/10 border-teal-dark/30 text-teal-dark"
-              } ${actif ? "ring-1 ring-teal-dark/40" : "hover:border-teal-dark/50"}`}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1.5 text-xs text-success-ink transition-colors",
+                actif ? "ring-1 ring-ring/50" : "hover:border-success/60",
+              )}
             >
-              <span className="font-semibold">{s.label}</span>
-              <span className="font-mono tabular-nums opacity-70">{s.valeur}</span>
+              <span className="font-medium">{s.label}</span>
+              <span className="num opacity-70">{s.valeur}</span>
               <a
                 href={s.source}
                 target="_blank"
@@ -157,15 +160,15 @@ function LegalSources({
                 className="opacity-70 hover:opacity-100"
                 aria-label={`Ouvrir la source de ${s.label}`}
               >
-                ↗
+                <ExternalLink className="size-3" />
               </a>
             </button>
           );
         })}
       </div>
       {open != null && sources[open] && (
-        <div className="mt-2.5 rounded-lg bg-background border border-border p-3 animate-fade-in text-[11px] text-ink/60 leading-relaxed">
-          <span className="font-semibold text-ink/80">{sources[open].label}</span> : {sources[open].valeur}{" "}
+        <div className="animate-fade-in mt-2.5 rounded-lg border border-border bg-secondary/50 p-3 text-xs leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">{sources[open].label}</span> : {sources[open].valeur}{" "}
           ({sources[open].annee}) — vérifié le {sources[open].date_verif}
         </div>
       )}
@@ -187,44 +190,44 @@ function StepCard({
   const [open, setOpen] = useState(false);
   return (
     <div
-      className={`rounded-xl border p-4 transition-all duration-200 ${
-        done ? "border-teal-dark/40 bg-teal-light/10" : "border-border bg-white hover:border-teal-dark/40 hover:shadow-[0_6px_20px_-10px_rgba(22,36,31,0.15)]"
-      }`}
+      className={cn(
+        "rounded-xl border p-4 transition-all duration-200",
+        done
+          ? "border-success/40 bg-success/8"
+          : "border-border bg-card hover:border-ink/40 hover:shadow-soft",
+      )}
     >
       <div className="flex items-start gap-3">
         <div
-          className={`shrink-0 size-8 rounded-lg grid place-items-center font-mono text-xs font-semibold ${
-            done ? "bg-teal-dark text-background" : "bg-background border border-border text-ink/60"
-          }`}
+          className={cn(
+            "num grid size-8 shrink-0 place-items-center rounded-lg text-xs font-medium",
+            done
+              ? "bg-success text-success-foreground"
+              : "border border-border bg-secondary/60 text-muted-foreground",
+          )}
         >
-          {done ? "✓" : String(index).padStart(2, "0")}
+          {done ? <Check className="size-3.5" /> : String(index).padStart(2, "0")}
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2 flex-wrap">
-            <p className="font-semibold text-[15px] leading-snug">{stripEmoji(step.titre ?? "")}</p>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider ${
-                step.obligatoire
-                  ? "bg-amber-fiscal/15 text-amber-fiscal"
-                  : "bg-background border border-border text-ink/45"
-              }`}
-            >
+            <p className="text-sm font-medium leading-snug">{stripEmoji(step.titre ?? "")}</p>
+            <Badge variant={step.obligatoire ? "warning" : "outline"}>
               {step.obligatoire ? "Obligatoire" : "Recommandé"}
-            </span>
+            </Badge>
           </div>
 
           {(step.duree || step.cout) && (
             <div className="flex flex-wrap gap-2 mt-2">
               {step.duree && (
-                <span className="px-2 py-0.5 rounded-md bg-background border border-border text-[11px] text-ink/55">
+                <span className="num rounded-md border border-border bg-secondary/60 px-2 py-0.5 text-xs text-muted-foreground">
                   {step.duree}
                 </span>
               )}
               {step.cout && (
                 <span
                   title={step.cout_source ? `Source : ${step.cout_source}` : undefined}
-                  className="px-2 py-0.5 rounded-md bg-teal-light/10 border border-teal-dark/25 text-[11px] text-teal-dark font-medium"
+                  className="num rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-medium text-success-ink"
                 >
                   {step.cout}
                 </span>
@@ -235,23 +238,23 @@ function StepCard({
           {(step.detail || step.lien) && (
             <button
               onClick={() => setOpen((v) => !v)}
-              className="mt-2.5 text-[11px] font-mono uppercase tracking-wider text-teal-dark hover:text-ink transition-colors"
+              className="rule-label mt-2.5 text-accent-ink transition-colors hover:text-foreground"
             >
               {open ? "Masquer le détail" : "Voir le détail"}
             </button>
           )}
 
           {open && (
-            <div className="mt-3 text-sm text-ink/70 animate-fade-in">
+            <div className="animate-fade-in mt-3 text-sm text-muted-foreground">
               <Markdown text={step.detail} />
               {step.lien && (
                 <a
                   href={step.lien}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block mt-2 text-xs text-teal-dark hover:underline break-all"
+                  className="mt-2 inline-flex items-center gap-1 break-all text-xs text-primary hover:underline"
                 >
-                  {step.lien} ↗
+                  {step.lien} <ExternalLink className="size-3 shrink-0" />
                 </a>
               )}
             </div>
@@ -264,7 +267,7 @@ function StepCard({
             checked={done}
             onChange={onToggle}
             aria-label={`Étape faite : ${step.titre ?? ""}`}
-            className="shrink-0 mt-1 size-5 rounded-md border-2 border-border accent-teal-dark cursor-pointer"
+            className="mt-1 size-5 shrink-0 cursor-pointer rounded-md border-2 border-border accent-[var(--success)]"
           />
         )}
       </div>
@@ -308,23 +311,17 @@ export function RoadmapView({
   };
 
   return (
-    <div className="bg-white border border-border rounded-2xl p-6 space-y-5 animate-slide-up">
+    <div className="animate-rise space-y-5 rounded-2xl border border-border bg-card p-6 shadow-soft">
       {/* En-tête : parcours retenu, progression, position vs plafonds */}
       <div className="space-y-4">
         <div className="flex items-start gap-3 flex-wrap">
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              bandeau.type === "bascule"
-                ? "bg-amber-fiscal/15 text-amber-fiscal"
-                : "bg-teal-dark text-background"
-            }`}
-          >
+          <Badge variant={bandeau.type === "bascule" ? "warning" : "default"}>
             {bandeau.titre ?? roadmap.parcours ?? "Votre parcours"}
-          </span>
+          </Badge>
           {roadmap.prorata && (
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-fiscal/10 text-amber-fiscal">
+            <Badge variant="accent">
               Seuil proratisé 1<sup>re</sup> année
-            </span>
+            </Badge>
           )}
           {!isBascule && etapes.length > 0 && (
             <div className="ml-auto">
@@ -333,7 +330,7 @@ export function RoadmapView({
           )}
         </div>
 
-        <div className="text-sm text-ink/75">
+        <div className="text-sm text-muted-foreground">
           <Markdown text={bandeau.texte ?? roadmap.regime_recommande} />
         </div>
 
@@ -342,24 +339,24 @@ export function RoadmapView({
         ))}
 
         {roadmap.mixte && (
-          <div className="rounded-xl border border-amber-fiscal/40 bg-amber-fiscal/8 p-4 text-sm">
-            <p className="font-semibold text-amber-fiscal">{roadmap.mixte.titre}</p>
-            <p className="mt-1 text-ink/70 leading-relaxed">{roadmap.mixte.texte}</p>
+          <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm">
+            <p className="font-medium text-warning-ink">{roadmap.mixte.titre}</p>
+            <p className="mt-1 leading-relaxed text-muted-foreground">{roadmap.mixte.texte}</p>
             {roadmap.mixte.source && (
               <a
                 href={roadmap.mixte.source}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1.5 inline-block text-xs text-teal-dark hover:underline"
+                className="mt-1.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"
               >
-                Source ↗
+                Source <ExternalLink className="size-3" />
               </a>
             )}
           </div>
         )}
 
         {roadmap.meta?.fraicheur?.perime && (
-          <p className="text-[11px] text-amber-fiscal leading-snug">
+          <p className="text-xs leading-snug text-amber-fiscal">
             Seuils vérifiés il y a plus de {roadmap.meta.fraicheur.max_days} jours — une mise à jour
             officielle est peut-être disponible.
           </p>
@@ -373,9 +370,9 @@ export function RoadmapView({
       {/* Bascule micro / société : comparatif tant que le choix n'est pas fait */}
       {isBascule && roadmap.comparatif && (
         <div className="pt-2">
-          <p className="font-semibold text-ink">Comparatif micro vs société</p>
+          <p className="text-base font-medium">Comparatif micro vs société</p>
           {roadmap.comparatif.regle_franchissement && (
-            <p className="mt-1 text-xs text-ink/55 leading-relaxed">
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               {roadmap.comparatif.regle_franchissement}
             </p>
           )}
@@ -386,7 +383,7 @@ export function RoadmapView({
                   {roadmap.comparatif.colonnes.map((c, i) => (
                     <th
                       key={i}
-                      className="text-left px-3 py-2.5 bg-teal-dark text-background font-semibold first:rounded-tl-xl last:rounded-tr-xl"
+                      className="bg-primary px-3 py-2.5 text-left font-medium text-primary-foreground first:rounded-tl-xl last:rounded-tr-xl"
                     >
                       {c}
                     </th>
@@ -399,9 +396,10 @@ export function RoadmapView({
                     {ligne.map((cell, j) => (
                       <td
                         key={j}
-                        className={`px-3 py-2.5 ${
-                          j === 0 ? "font-semibold text-teal-dark w-40" : "text-ink/70"
-                        }`}
+                        className={cn(
+                          "px-3 py-2.5",
+                          j === 0 ? "w-40 font-medium text-foreground" : "text-muted-foreground",
+                        )}
                       >
                         {cell}
                       </td>
@@ -411,7 +409,7 @@ export function RoadmapView({
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-xs text-ink/50">
+          <p className="mt-3 text-xs text-muted-foreground">
             Répondez dans la conversation pour choisir votre parcours — les étapes s&apos;afficheront
             ensuite.
           </p>
@@ -425,11 +423,11 @@ export function RoadmapView({
           return (
             <div key={phase.id} className="pt-2">
               <div className="flex items-center gap-3 mb-3">
-                <div className="size-7 rounded-full bg-teal-dark text-background grid place-items-center font-mono text-xs font-bold">
+                <div className="num grid size-7 place-items-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
                   {PHASE_ORDER[phase.id] ?? "•"}
                 </div>
-                <p className="font-semibold text-teal-dark">{stripEmoji(phase.titre ?? "")}</p>
-                <span className="ml-auto font-mono text-[11px] text-ink/40 tabular-nums">
+                <p className="font-medium">{stripEmoji(phase.titre ?? "")}</p>
+                <span className="num ml-auto text-xs text-muted-foreground">
                   {phaseDone}/{phase.etapes.length}
                 </span>
               </div>
@@ -451,21 +449,22 @@ export function RoadmapView({
       {!isBascule && (onPdf || onReset) && (
         <div className="flex flex-wrap gap-3 pt-2">
           {onPdf && (
-            <button
-              onClick={() => void exportPdf()}
-              disabled={pdfBusy}
-              className="px-5 py-2.5 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
-            >
-              {pdfBusy ? "Préparation du PDF…" : "Télécharger la feuille de route (PDF)"}
-            </button>
+            <Button onClick={() => void exportPdf()} disabled={pdfBusy}>
+              {pdfBusy ? (
+                <>
+                  <Loader2 className="animate-spin" /> Préparation du PDF…
+                </>
+              ) : (
+                <>
+                  <Download /> Télécharger la feuille de route (PDF)
+                </>
+              )}
+            </Button>
           )}
           {onReset && done > 0 && (
-            <button
-              onClick={onReset}
-              className="px-5 py-2.5 bg-white border border-border rounded-xl text-sm font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.97]"
-            >
-              Réinitialiser les coches
-            </button>
+            <Button variant="outline" onClick={onReset}>
+              <RotateCcw /> Réinitialiser les coches
+            </Button>
           )}
         </div>
       )}
@@ -492,10 +491,10 @@ export function RoadmapStepper({
   if (etapes.length === 0) return null;
 
   return (
-    <div className="bg-white border border-border rounded-2xl p-6 space-y-5 animate-slide-up">
+    <div className="animate-rise space-y-5 rounded-2xl border border-border bg-card p-6 shadow-soft">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-semibold text-ink">Votre progression</p>
-        <p className="font-mono text-xs text-ink/50 tabular-nums">
+        <p className="text-base font-medium">Votre progression</p>
+        <p className="num text-xs text-muted-foreground">
           {done}/{etapes.length} étapes faites
         </p>
       </div>
@@ -510,34 +509,42 @@ export function RoadmapStepper({
                 <div className="flex items-stretch gap-2.5 w-44 shrink-0 px-2">
                   <div
                     aria-hidden
-                    className={`w-1.5 rounded-full shrink-0 ${isDone ? "bg-teal-dark" : "bg-border"}`}
+                    className={cn("w-1.5 shrink-0 rounded-full", isDone ? "bg-success" : "bg-border")}
                   />
                   <div className="min-w-0 py-0.5">
                     <p
-                      className={`font-mono text-[10px] tracking-wider uppercase ${
-                        isDone ? "text-teal-dark" : "text-ink/40"
-                      }`}
+                      className={cn(
+                        "rule-label inline-flex items-center gap-1",
+                        isDone ? "text-success-ink" : "text-muted-foreground",
+                      )}
                     >
-                      {isDone ? "✓ Fait" : `Étape ${String(i + 1).padStart(2, "0")}`}
+                      {isDone ? (
+                        <>
+                          <Check className="size-3" /> Fait
+                        </>
+                      ) : (
+                        `Étape ${String(i + 1).padStart(2, "0")}`
+                      )}
                     </p>
                     <p
-                      className={`mt-1 text-sm font-medium leading-snug ${
-                        isDone ? "text-ink" : "text-ink/70"
-                      }`}
+                      className={cn(
+                        "mt-1 text-sm font-medium leading-snug",
+                        isDone ? "text-foreground" : "text-muted-foreground",
+                      )}
                     >
                       {stripEmoji(etape.titre ?? "")}
                     </p>
                     {etape.obligatoire && (
-                      <span className="mt-1.5 inline-block px-1.5 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider bg-amber-fiscal/15 text-amber-fiscal">
+                      <Badge variant="warning" className="mt-1.5">
                         Obligatoire
-                      </span>
+                      </Badge>
                     )}
                   </div>
                 </div>
                 {!isLast && (
                   <div
                     aria-hidden
-                    className={`w-6 self-center h-0.5 shrink-0 ${isDone ? "bg-teal-dark" : "bg-border"}`}
+                    className={cn("h-0.5 w-6 shrink-0 self-center", isDone ? "bg-success" : "bg-border")}
                   />
                 )}
               </div>

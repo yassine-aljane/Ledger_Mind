@@ -1,8 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { usePlan } from "@/lib/plan";
-import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
+import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { ArrowRight, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 import {
   displayName,
   fetchMe,
@@ -28,8 +31,16 @@ export const Route = createFileRoute("/parametres")({
       { property: "og:description", content: "Votre profil, vos préférences et vos accès." },
     ],
   }),
-  component: ParametresPage,
+  component: ParametresRoute,
 });
+
+function ParametresRoute() {
+  return (
+    <PremiumGate kind="parametres">
+      <ParametresPage />
+    </PremiumGate>
+  );
+}
 
 function formatCa(diag: DiagnosticProfile | null, guidance: BranchAgentContext | undefined): string {
   if (diag?.ca_estime_annuel != null) {
@@ -41,10 +52,10 @@ function formatCa(diag: DiagnosticProfile | null, guidance: BranchAgentContext |
 }
 
 function ParametresPage() {
-  if (usePlan() === "free") return <PremiumPagePlaceholder kind="parametres" />;
   const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(getStoredUser());
   const [detail, setDetail] = useState<SessionDetail | null>(null);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     if (!isAuthed()) {
@@ -117,68 +128,79 @@ function ParametresPage() {
     <AppShell>
       <PageHeader eyebrow="Paramètres" title="Votre profil" />
 
-      <div className="grid lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-7 grid sm:grid-cols-2 gap-6">
+      <div className="grid items-start gap-8 lg:grid-cols-12">
+        <div className="grid gap-5 sm:grid-cols-2 lg:col-span-7">
           {fields.map((f) => (
-            <div key={f.l} className="bg-white border border-border rounded-2xl p-6 card-hover">
-              <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-3">
-                {f.l}
-              </p>
-              <p className={`${"mono" in f && f.mono ? "font-mono" : ""} text-lg font-medium`}>
-                {f.v}
-              </p>
+            <div
+              key={f.l}
+              className="card-hover animate-rise rounded-2xl border border-border bg-card p-5 shadow-soft"
+            >
+              <p className="rule-label mb-3 text-muted-foreground">{f.l}</p>
+              <p className={cn("text-base font-medium", "mono" in f && f.mono && "num")}>{f.v}</p>
             </div>
           ))}
+
+          <div className="animate-rise rounded-2xl border border-border bg-card p-5 shadow-soft sm:col-span-2">
+            <p className="rule-label mb-3 text-muted-foreground">Apparence</p>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Thème {theme === "dark" ? "sombre" : "clair"} — appliqué à tout l&apos;espace.
+              </p>
+              <div className="flex shrink-0 gap-1.5">
+                <Button
+                  variant={theme === "light" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setTheme("light")}
+                >
+                  <Sun /> Clair
+                </Button>
+                <Button
+                  variant={theme === "dark" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setTheme("dark")}
+                >
+                  <Moon /> Sombre
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="lg:col-span-5">
           {hasGuidance ? (
-            <div className="rounded-2xl border border-border bg-white p-8 space-y-6 animate-slide-up card-hover">
-              <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-                Synthèse guidance
-              </p>
+            <div className="card-hover animate-rise space-y-6 rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <p className="rule-label text-accent-ink">Synthèse guidance</p>
               <div>
-                <p className="text-xs uppercase tracking-widest text-ink/40">Régime</p>
-                <p className="mt-1 text-2xl font-extrabold tracking-tight">
-                  {regime ?? "À préciser"}
-                </p>
-                <p className="mt-3 text-sm text-ink/60 leading-relaxed">{regimeTexte}</p>
+                <p className="rule-label text-muted-foreground">Régime</p>
+                <p className="mt-2 text-2xl">{regime ?? "À préciser"}</p>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{regimeTexte}</p>
               </div>
               <dl className="space-y-3 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink/40">Activité</dt>
-                  <dd className="font-medium text-right">
-                    {diag?.activite ||
-                      detail?.profile.activity_types?.[0] ||
-                      "—"}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink/40">CA estimé</dt>
-                  <dd className="font-medium text-right">{formatCa(diag, guidance)}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink/40">Situation</dt>
-                  <dd className="font-medium text-right">
-                    {diag?.situation_actuelle || "Non immatriculé"}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink/40">Étapes</dt>
-                  <dd className="font-medium text-right">{etapesCount || "—"}</dd>
-                </div>
+                {[
+                  {
+                    dt: "Activité",
+                    dd: diag?.activite || detail?.profile.activity_types?.[0] || "—",
+                  },
+                  { dt: "CA estimé", dd: formatCa(diag, guidance), num: true },
+                  { dt: "Situation", dd: diag?.situation_actuelle || "Non immatriculé" },
+                  { dt: "Étapes", dd: String(etapesCount || "—"), num: true },
+                ].map((row) => (
+                  <div key={row.dt} className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">{row.dt}</dt>
+                    <dd className={cn("text-right font-medium", row.num && "num")}>{row.dd}</dd>
+                  </div>
+                ))}
               </dl>
-              <Link
-                to="/onboarding/diagnostic/resultat"
-                className="block w-full text-center px-6 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-              >
-                Ouvrir la feuille de route →
-              </Link>
+              <Button asChild className="w-full">
+                <Link to="/onboarding/diagnostic/resultat">
+                  Ouvrir la feuille de route <ArrowRight />
+                </Link>
+              </Button>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border p-8 text-sm text-ink/50 text-center">
-              Aucune synthèse guidance pour l&apos;instant. Complétez le diagnostic sans SIRET
-              pour l&apos;afficher ici.
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+              Aucune synthèse guidance pour l&apos;instant. Complétez le diagnostic sans SIRET pour
+              l&apos;afficher ici.
             </div>
           )}
         </div>

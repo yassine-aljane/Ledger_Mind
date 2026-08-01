@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { usePlan } from "@/lib/plan";
-import { PremiumPagePlaceholder } from "@/components/lm/PremiumPagePlaceholder";
+import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { Check, ChevronDown, Copy, Loader2, Mail, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { isAuthed } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import {
   generateReferralEmails,
   fetchReferralHistory,
@@ -18,11 +21,18 @@ export const Route = createFileRoute("/referral")({
       { name: "description", content: "Trouvez un expert-comptable et générez des emails de prise de contact." },
     ],
   }),
-  component: ReferralPage,
+  component: ReferralRoute,
 });
 
+function ReferralRoute() {
+  return (
+    <PremiumGate kind="referral">
+      <ReferralPage />
+    </PremiumGate>
+  );
+}
+
 function ReferralPage() {
-  if (usePlan() === "free") return <PremiumPagePlaceholder kind="referral" />;
   const [ville, setVille] = useState("");
   const [demande, setDemande] = useState(
     "Je suis auto-entrepreneur et je cherche un expert-comptable pour m'accompagner dans ma déclaration fiscale et mes obligations comptables.",
@@ -88,50 +98,59 @@ function ReferralPage() {
         <div className="lg:col-span-7 space-y-6">
           <form
             onSubmit={handleGenerate}
-            className="bg-white border border-border rounded-2xl p-8 space-y-5"
+            className="animate-rise space-y-5 rounded-2xl border border-border bg-card p-6 shadow-soft"
           >
             <div>
-              <label className="text-xs uppercase tracking-widest text-ink/50 font-semibold">
+              <label htmlFor="referral-ville" className="rule-label text-muted-foreground">
                 Ville
               </label>
               <input
+                id="referral-ville"
                 type="text"
                 value={ville}
                 onChange={(e) => setVille(e.target.value)}
                 placeholder="ex. Lyon, Marseille, Bordeaux…"
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border text-lg focus:outline-none focus:border-ink transition-colors duration-200"
+                className="mt-2 w-full border-b border-border bg-transparent py-2.5 text-base transition-colors duration-200 placeholder:text-muted-foreground/60 focus:border-ink focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-widest text-ink/50 font-semibold">
+              <label htmlFor="referral-demande" className="rule-label text-muted-foreground">
                 Votre demande
               </label>
               <textarea
+                id="referral-demande"
                 rows={3}
                 value={demande}
                 onChange={(e) => setDemande(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border text-base focus:outline-none focus:border-ink transition-colors duration-200 resize-none"
+                className="mt-2 w-full resize-none border-b border-border bg-transparent py-2.5 text-sm transition-colors duration-200 focus:border-ink focus:outline-none"
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading || !ville.trim()}
-              className="px-8 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
-            >
-              {loading ? "Recherche en cours…" : "Trouver & générer"}
-            </button>
+            <Button type="submit" size="lg" variant="accent" disabled={loading || !ville.trim()}>
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" /> Recherche en cours…
+                </>
+              ) : (
+                <>
+                  <Search /> Trouver &amp; générer
+                </>
+              )}
+            </Button>
           </form>
 
           {error && (
-            <div className="bg-coral/10 border border-coral/30 rounded-2xl p-6 text-sm text-coral font-medium">
+            <div
+              role="alert"
+              className="rounded-2xl border border-destructive/30 bg-destructive/8 p-5 text-sm font-medium text-destructive"
+            >
               {error}
             </div>
           )}
 
           {loading && (
-            <div className="bg-white border border-border rounded-2xl p-10 text-center space-y-3">
-              <div className="inline-block size-8 border-[3px] border-ink/20 border-t-teal-dark rounded-full animate-spin" />
-              <p className="text-ink/50 text-sm">
+            <div className="space-y-3 rounded-2xl border border-border bg-card p-10 text-center shadow-soft">
+              <Loader2 className="mx-auto size-6 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">
                 Recherche de cabinets et génération des emails… Cela peut prendre 30 à 60 secondes.
               </p>
             </div>
@@ -139,38 +158,39 @@ function ReferralPage() {
 
           {!loading && emails.length > 0 && (
             <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg">
                   {cabinetsCount} cabinet{cabinetsCount > 1 ? "s" : ""} trouvé
                   {cabinetsCount > 1 ? "s" : ""}
                 </h2>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-teal-dark">
+                <Badge variant="outline">
                   {emails.length} email{emails.length > 1 ? "s" : ""} généré
                   {emails.length > 1 ? "s" : ""}
-                </span>
+                </Badge>
               </div>
 
               {emails.map((em, i) => (
                 <div
                   key={i}
-                  className="bg-white border border-border rounded-2xl overflow-hidden card-hover"
+                  className="card-hover animate-rise overflow-hidden rounded-2xl border border-border bg-card shadow-soft"
                 >
                   <button
                     type="button"
                     onClick={() => setExpandedEmail(expandedEmail === i ? null : i)}
-                    className="w-full p-6 flex items-center justify-between gap-4 text-left hover:bg-background/50 transition-colors"
+                    aria-expanded={expandedEmail === i}
+                    className="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-secondary/40"
                   >
                     <div className="min-w-0">
-                      <p className="font-semibold truncate">{em.destinataire}</p>
-                      <p className="text-sm text-ink/50 truncate">
+                      <p className="truncate font-medium">{em.destinataire}</p>
+                      <p className="truncate text-sm text-muted-foreground">
                         {em.email ?? "Email non trouvé"} ·{" "}
                         <span
                           className={
                             em.statut === "ok"
-                              ? "text-teal-dark"
+                              ? "text-success-ink"
                               : em.statut === "email_introuvable"
-                                ? "text-amber-600"
-                                : "text-coral"
+                                ? "text-amber-fiscal"
+                                : "text-destructive"
                           }
                         >
                           {em.statut === "ok"
@@ -181,48 +201,46 @@ function ReferralPage() {
                         </span>
                       </p>
                     </div>
-                    <svg
-                      className={`size-5 text-ink/30 shrink-0 transition-transform ${expandedEmail === i ? "rotate-180" : ""}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronDown
+                      className={cn(
+                        "size-4 shrink-0 text-muted-foreground transition-transform",
+                        expandedEmail === i && "rotate-180",
+                      )}
+                    />
                   </button>
 
                   {expandedEmail === i && (
-                    <div className="border-t border-border p-6 space-y-4">
+                    <div className="animate-fade-in space-y-4 border-t border-border p-5">
                       <div>
-                        <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-1">
-                          Objet
-                        </p>
+                        <p className="rule-label mb-1.5 text-muted-foreground">Objet</p>
                         <p className="text-sm font-medium">{em.objet}</p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-widest text-ink/40 font-semibold mb-2">
-                          Corps
-                        </p>
-                        <pre className="whitespace-pre-wrap text-sm text-ink/80 bg-background rounded-xl p-4 font-sans leading-relaxed">
+                        <p className="rule-label mb-2 text-muted-foreground">Corps</p>
+                        <pre className="whitespace-pre-wrap rounded-xl bg-secondary/60 p-4 font-sans text-sm leading-relaxed text-foreground">
                           {em.corps}
                         </pre>
                       </div>
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(em.corps, i)}
-                          className="px-5 py-2.5 bg-ink text-background rounded-lg text-sm font-medium hover:bg-teal-dark transition-all duration-200 active:scale-[0.97]"
-                        >
-                          {copiedIdx === i ? "Copié !" : "Copier le texte"}
-                        </button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" onClick={() => copyToClipboard(em.corps, i)}>
+                          {copiedIdx === i ? (
+                            <>
+                              <Check /> Copié !
+                            </>
+                          ) : (
+                            <>
+                              <Copy /> Copier le texte
+                            </>
+                          )}
+                        </Button>
                         {em.email && (
-                          <a
-                            href={`mailto:${em.email}?subject=${encodeURIComponent(em.objet)}&body=${encodeURIComponent(em.corps)}`}
-                            className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-colors"
-                          >
-                            Ouvrir dans le client mail
-                          </a>
+                          <Button asChild variant="outline">
+                            <a
+                              href={`mailto:${em.email}?subject=${encodeURIComponent(em.objet)}&body=${encodeURIComponent(em.corps)}`}
+                            >
+                              <Mail /> Ouvrir dans le client mail
+                            </a>
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -233,12 +251,10 @@ function ReferralPage() {
           )}
         </div>
 
-        <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
-          <h3 className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-            Historique des recherches
-          </h3>
+        <div className="space-y-5 lg:sticky lg:top-24 lg:col-span-5">
+          <h2 className="rule-label text-accent-ink">Historique des recherches</h2>
           {history.length === 0 ? (
-            <div className="bg-white border border-border rounded-2xl p-6 text-center text-ink/40 text-sm">
+            <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               Aucune recherche effectuée.
             </div>
           ) : (
@@ -249,22 +265,18 @@ function ReferralPage() {
                 .map((h, i) => (
                   <div
                     key={i}
-                    className="bg-white border border-border rounded-2xl p-5 space-y-2 card-hover"
+                    className="card-hover space-y-2 rounded-2xl border border-border bg-card p-4 shadow-soft"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm">{h.ville}</span>
-                      <span
-                        className={`text-[10px] font-mono uppercase tracking-widest ${
-                          h.status === "termine" ? "text-teal-dark" : "text-coral"
-                        }`}
-                      >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium">{h.ville}</span>
+                      <Badge variant={h.status === "termine" ? "success" : "destructive"}>
                         {h.status === "termine"
                           ? `${h.cabinets_count} cabinet${h.cabinets_count > 1 ? "s" : ""}`
                           : "Échec"}
-                      </span>
+                      </Badge>
                     </div>
-                    <p className="text-xs text-ink/50 line-clamp-2">{h.demande}</p>
-                    <p className="text-[10px] text-ink/30 font-mono">
+                    <p className="line-clamp-2 text-xs text-muted-foreground">{h.demande}</p>
+                    <p className="num text-xs text-muted-foreground/70">
                       {new Date(h.created_at).toLocaleString("fr-FR", {
                         day: "numeric",
                         month: "short",

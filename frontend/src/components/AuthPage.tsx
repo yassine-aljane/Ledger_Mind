@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   fetchMe,
@@ -8,6 +9,8 @@ import {
   postAuthPath,
   registerAccount,
 } from "@/lib/auth";
+import { Wordmark } from "@/components/lm/Logo";
+import { cn } from "@/lib/utils";
 
 type Mode = "login" | "signup";
 
@@ -67,68 +70,70 @@ export function AuthPage() {
   const isLogin = mode === "login";
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      <aside className="relative md:w-[46%] bg-ink text-background overflow-hidden flex flex-col justify-between px-8 md:px-14 py-10 md:py-14">
-        <div aria-hidden className="absolute inset-0 grain-overlay opacity-[0.06]" />
-        <div aria-hidden className="absolute -top-24 -right-24 size-[420px] rounded-full bg-teal-dark/40 blur-3xl" />
-        <div aria-hidden className="absolute bottom-[-140px] left-[-80px] size-[360px] rounded-full bg-amber-fiscal/25 blur-3xl" />
+    <div className="flex min-h-screen flex-col md:flex-row">
+      <aside className="surface-ink relative flex flex-col justify-between overflow-hidden px-8 py-10 md:w-[46%] md:px-14 md:py-14">
+        <div aria-hidden className="surface-grain absolute inset-0 opacity-40" />
+        <div
+          aria-hidden
+          className="absolute -right-24 -top-24 size-[420px] rounded-full bg-success/20 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="absolute bottom-[-140px] left-[-80px] size-[360px] rounded-full bg-accent/20 blur-3xl"
+        />
 
-        <Link to="/" className="relative flex items-center gap-2 shrink-0 w-fit">
-          <div className="size-6 rounded-full bg-teal-light" />
-          <span className="font-semibold tracking-tight uppercase text-sm">LedgerMind</span>
+        <Link to="/" className="relative w-fit shrink-0" aria-label="LedgerMind, accueil">
+          <Wordmark onInk />
         </Link>
 
         <div className="relative my-12 max-w-md">
-          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-teal-light mb-4">
-            Espace membre
-          </p>
-          <blockquote className="text-2xl md:text-3xl font-extrabold tracking-tight text-balance leading-snug">
+          <p className="rule-label mb-4 text-accent">Espace membre</p>
+          <blockquote className="text-balance text-2xl leading-snug md:text-3xl">
             « LedgerMind a transformé ma gestion d&apos;auto-entrepreneur en{" "}
-            <span className="italic font-normal">un jeu d&apos;enfant.</span> »
+            <span className="font-normal italic text-accent">un jeu d&apos;enfant.</span> »
           </blockquote>
-          <p className="mt-6 text-sm text-background/60 font-medium">
-            Clara V. — Créatrice de contenu & Designer
+          <p className="mt-6 text-sm font-medium text-ink-foreground/60">
+            Clara V. — Créatrice de contenu &amp; Designer
           </p>
         </div>
 
-        <p className="relative text-[11px] uppercase tracking-widest text-background/40 font-mono">
-          © 2026 LedgerMind
-        </p>
+        <p className="rule-label relative text-ink-foreground/40">© 2026 LedgerMind</p>
       </aside>
 
-      <main className="flex-1 flex items-center justify-center px-6 py-10 md:py-16">
-        <section className="w-full max-w-md animate-slide-up">
-          <div className="flex items-center justify-between mb-8">
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
+      <main className="flex flex-1 items-center justify-center px-6 py-10 md:py-16">
+        <section className="animate-rise w-full max-w-md">
+          <div className="mb-8 flex items-center justify-between">
+            <p className="rule-label text-accent-ink">
               {isLogin ? "Connexion" : "Nouveau compte"}
             </p>
-            <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-ink/40">
+            <span className="rule-label text-muted-foreground">
               {isLogin ? "01 / 02" : "02 / 02"}
             </span>
           </div>
 
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tighter text-balance">
+          <h2 className="text-balance text-3xl md:text-4xl">
             {isLogin ? (
               <>
-                Ravi de vous <span className="italic font-normal">revoir.</span>
+                Ravi de vous <span className="font-normal italic">revoir.</span>
               </>
             ) : (
               <>
-                Rejoignez <span className="italic font-normal">LedgerMind.</span>
+                Rejoignez <span className="font-normal italic">LedgerMind.</span>
               </>
             )}
           </h2>
-          <p className="mt-3 text-ink/60 text-sm text-pretty">
+          <p className="mt-3 text-pretty text-sm text-muted-foreground">
             {isLogin
               ? "Saisissez vos identifiants pour accéder à votre espace."
               : "Créez votre compte pour commencer à automatiser vos obligations."}
           </p>
 
-          <div className="mt-8 relative grid grid-cols-2 p-1 bg-white border border-border rounded-full text-xs font-semibold">
+          <div className="relative mt-8 grid grid-cols-2 rounded-full border border-border bg-card p-1 text-xs font-medium">
             <div
-              className={`absolute inset-y-1 w-[calc(50%-4px)] bg-ink rounded-full transition-transform duration-300 ease-out ${
-                isLogin ? "translate-x-1" : "translate-x-[calc(100%+4px)]"
-              }`}
+              className={cn(
+                "absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-primary transition-transform duration-300 ease-out",
+                isLogin ? "translate-x-1" : "translate-x-[calc(100%+4px)]",
+              )}
             />
             <button
               type="button"
@@ -136,9 +141,10 @@ export function AuthPage() {
                 setMode("login");
                 setError(null);
               }}
-              className={`relative z-10 py-2.5 rounded-full transition-colors duration-200 ${
-                isLogin ? "text-background" : "text-ink/60"
-              }`}
+              className={cn(
+                "relative z-10 rounded-full py-2 transition-colors duration-200",
+                isLogin ? "text-primary-foreground" : "text-muted-foreground",
+              )}
             >
               Connexion
             </button>
@@ -148,9 +154,10 @@ export function AuthPage() {
                 setMode("signup");
                 setError(null);
               }}
-              className={`relative z-10 py-2.5 rounded-full transition-colors duration-200 ${
-                !isLogin ? "text-background" : "text-ink/60"
-              }`}
+              className={cn(
+                "relative z-10 rounded-full py-2 transition-colors duration-200",
+                !isLogin ? "text-primary-foreground" : "text-muted-foreground",
+              )}
             >
               Inscription
             </button>
@@ -187,7 +194,10 @@ export function AuthPage() {
             />
 
             {error && (
-              <div className="rounded-lg border border-amber-fiscal/40 bg-amber-fiscal/10 px-3 py-2 text-xs text-ink/80">
+              <div
+                role="alert"
+                className="rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive"
+              >
                 {error}
               </div>
             )}
@@ -195,47 +205,45 @@ export function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-4 bg-ink text-background rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 flex items-center justify-center gap-2"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
             >
               {loading ? (
                 <>
-                  <span className="size-2 rounded-full bg-background/70 animate-pulse" />
+                  <Loader2 className="size-3.5 animate-spin" />
                   <span>Un instant…</span>
                 </>
               ) : (
                 <>
                   {isLogin ? "Se connecter" : "Créer mon compte"}
-                  <span aria-hidden>→</span>
+                  <ArrowRight className="size-3.5" />
                 </>
               )}
             </button>
           </form>
 
           <div className="my-8 flex items-center gap-4">
-            <div className="flex-1 dotted-divider" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/40">
-              ou
-            </span>
-            <div className="flex-1 dotted-divider" />
+            <div className="dotted-divider flex-1" />
+            <span className="rule-label text-muted-foreground">ou</span>
+            <div className="dotted-divider flex-1" />
           </div>
 
           <button
             type="button"
             disabled
             title="Bientôt disponible"
-            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border bg-background text-sm font-medium opacity-50 cursor-not-allowed"
+            className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-border bg-card py-2.5 text-sm font-medium opacity-50"
           >
             <GoogleIcon />
             Continuer avec Google (bientôt)
           </button>
 
-          <p className="mt-10 text-xs text-ink/50 text-center leading-relaxed">
+          <p className="mt-10 text-center text-xs leading-relaxed text-muted-foreground">
             En continuant, vous acceptez nos{" "}
-            <a href="#" className="underline underline-offset-2 hover:text-ink transition-colors duration-200">
+            <a href="#" className="underline underline-offset-2 transition-colors hover:text-foreground">
               Conditions
             </a>{" "}
             et notre{" "}
-            <a href="#" className="underline underline-offset-2 hover:text-ink transition-colors duration-200">
+            <a href="#" className="underline underline-offset-2 transition-colors hover:text-foreground">
               Politique de confidentialité
             </a>
             .
@@ -258,16 +266,14 @@ function Field({
 } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
-      <div className="flex items-baseline justify-between mb-1.5">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink/60">
-          {label}
-        </span>
-        {hint && <span className="text-[11px] text-ink/40">{hint}</span>}
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <span className="rule-label text-muted-foreground">{label}</span>
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </div>
       <input
         {...rest}
         name={name}
-        className="w-full bg-transparent border-b border-ink/20 py-3 text-[15px] text-ink placeholder:text-ink/30 focus:outline-none focus:border-teal-dark transition-colors duration-200"
+        className="w-full border-b border-border bg-transparent py-2.5 text-sm text-foreground transition-colors duration-200 placeholder:text-muted-foreground/60 focus:border-ink focus:outline-none"
       />
     </label>
   );

@@ -6,7 +6,10 @@
  * supprimable. Ce qui manque encore pour produire la feuille de route est affiché explicitement.
  */
 
+import { Loader2, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { GuidanceProfile } from "@/lib/guidance-api";
 
 type FieldType = "text" | "num" | "bool";
@@ -55,7 +58,7 @@ function formatValue(spec: FieldSpec, value: unknown, devise?: string | null): s
 function DetectionToast({ text }: { text: string }) {
   return (
     <div className="absolute -top-3 right-0 z-20 animate-fade-in">
-      <div className="px-3 py-1.5 bg-ink text-background rounded-full text-[11px] font-mono shadow-lg whitespace-nowrap">
+      <div className="whitespace-nowrap rounded-full bg-ink px-3 py-1.5 font-mono text-xs text-ink-foreground shadow-lift">
         {text}
       </div>
     </div>
@@ -95,13 +98,11 @@ function EditPopover({
   return (
     <div
       ref={ref}
-      className="absolute z-30 top-full left-0 mt-2 w-64 p-4 bg-white border border-border rounded-2xl shadow-xl animate-slide-up"
+      className="animate-rise absolute left-0 top-full z-30 mt-2 w-64 rounded-2xl border border-border bg-card p-4 shadow-lift"
       role="dialog"
       aria-label={`Modifier ${spec.label}`}
     >
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-2">
-        {spec.label}
-      </p>
+      <p className="rule-label mb-2 text-muted-foreground">{spec.label}</p>
       {spec.type === "bool" ? (
         <div className="flex gap-2">
           {[
@@ -111,7 +112,7 @@ function EditPopover({
             <button
               key={String(label)}
               onClick={() => onSave(v as boolean)}
-              className="flex-1 px-3 py-2 border border-border rounded-full text-xs font-semibold hover:border-teal-dark hover:text-teal-dark transition-all duration-200 active:scale-[0.97]"
+              className="flex-1 rounded-full border border-border px-3 py-2 text-xs font-medium transition-all duration-200 hover:border-ink active:scale-[0.97]"
             >
               {label as string}
             </button>
@@ -125,17 +126,15 @@ function EditPopover({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && commit()}
-            className="flex-1 min-w-0 px-3 py-2 bg-background border border-border rounded-lg text-sm input-boxed focus:outline-none focus:border-teal-dark"
+            aria-label={spec.label}
+            className="input-boxed min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-ink focus:outline-none"
           />
-          <button
-            onClick={commit}
-            className="px-3 py-2 bg-ink text-background rounded-lg text-xs font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.95]"
-          >
+          <Button size="sm" onClick={commit}>
             OK
-          </button>
+          </Button>
         </div>
       )}
-      <p className="mt-3 text-[11px] text-ink/40 leading-snug">
+      <p className="mt-3 text-xs leading-snug text-muted-foreground">
         Cette information vient de la conversation. Corrigez-la si elle est inexacte.
       </p>
     </div>
@@ -191,18 +190,16 @@ export function StatusCard({
   const complete = manquantes.length === 0;
 
   return (
-    <aside className="relative bg-white border border-border rounded-2xl p-5 h-fit lg:sticky lg:top-6">
+    <aside className="relative h-fit rounded-2xl border border-border bg-card p-5 shadow-soft lg:sticky lg:top-24">
       {justDetected && <DetectionToast text={`${justDetected} · noté`} />}
 
-      <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-teal-dark">
-        Ma situation
-      </p>
-      <p className="mt-1 text-xs text-ink/50 leading-snug">
+      <p className="rule-label text-accent-ink">Ma situation</p>
+      <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
         Elle se construit toute seule au fil de la conversation.
       </p>
 
       {shown.length === 0 && (
-        <p className="mt-5 text-sm text-ink/40 leading-relaxed">
+        <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
           Dites-moi quelques mots sur votre activité — les informations apparaîtront ici, une à une.
         </p>
       )}
@@ -211,26 +208,26 @@ export function StatusCard({
         {shown.map((spec) => (
           <div
             key={String(spec.key)}
-            className={`relative group rounded-xl border px-3 py-2 animate-slide-up card-hover ${
+            className={cn(
+              "card-hover animate-rise group relative rounded-xl border px-3 py-2",
               spec.warn
-                ? "border-amber-fiscal/50 bg-amber-fiscal/10"
-                : "border-border bg-background"
-            } ${spec.sub ? "ml-4 border-l-2 border-l-teal-light" : ""}`}
+                ? "border-warning/50 bg-warning/12"
+                : "border-border bg-secondary/40",
+              spec.sub && "ml-4 border-l-2 border-l-success",
+            )}
           >
             <button
               onClick={() => onClear(String(spec.key))}
               title="Retirer cette information"
               aria-label={`Retirer ${spec.label}`}
-              className="absolute top-1.5 right-2 text-ink/25 hover:text-coral text-sm leading-none opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute right-2 top-2 text-muted-foreground/60 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
             >
-              ×
+              <X className="size-3" />
             </button>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40">
-              {spec.label}
-            </p>
+            <p className="rule-label text-muted-foreground">{spec.label}</p>
             <button
               onClick={() => setEditing(editing === spec.key ? null : String(spec.key))}
-              className="mt-0.5 text-sm font-medium text-ink text-left hover:text-teal-dark transition-colors"
+              className="mt-0.5 text-left text-sm font-medium transition-colors hover:text-accent-ink"
               title="Cliquer pour corriger"
             >
               {formatValue(spec, profil[spec.key], profil.devise)}
@@ -252,22 +249,32 @@ export function StatusCard({
       </div>
 
       {!complete ? (
-        <p className="mt-5 pt-4 border-t border-border text-xs text-ink/50 leading-relaxed">
+        <p className="mt-5 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
           Encore besoin de :{" "}
-          <span className="text-ink/80 font-medium">
+          <span className="font-medium text-foreground">
             {manquantes.map((m) => MISSING_LABELS[m] ?? m).join(", ")}
           </span>
           .
         </p>
       ) : (
         onGenerate && (
-          <button
+          <Button
             onClick={onGenerate}
             disabled={generating}
-            className="mt-5 w-full px-4 py-3 bg-ink text-background rounded-xl text-sm font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100"
+            variant="accent"
+            size="lg"
+            className="mt-5 w-full"
           >
-            {generating ? "Génération…" : "Générer ma feuille de route"}
-          </button>
+            {generating ? (
+              <>
+                <Loader2 className="animate-spin" /> Génération…
+              </>
+            ) : (
+              <>
+                <Sparkles /> Générer ma feuille de route
+              </>
+            )}
+          </Button>
         )
       )}
     </aside>
