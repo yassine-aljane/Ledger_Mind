@@ -1,5 +1,11 @@
 import os
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+# backend/.env — chemin absolu : les tests tournent depuis la racine du dépôt et
+# uvicorn depuis backend/, un chemin relatif ne serait trouvé que dans un seul cas.
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
 class Settings(BaseSettings):
@@ -35,7 +41,7 @@ class Settings(BaseSettings):
     auth_token_days: int = 14
 
     class Config:
-        env_file = ".env"
+        env_file = ENV_FILE
         extra = "ignore"
 
 
