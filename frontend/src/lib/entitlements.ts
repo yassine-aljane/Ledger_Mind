@@ -4,7 +4,6 @@ import {
   getStoredUser,
   hasCompletedOnboarding,
   isAuthed,
-  isSirenVerified,
   type AuthUser,
 } from "@/lib/auth";
 import { usePlan, type Plan } from "@/lib/plan";
@@ -59,13 +58,12 @@ const PUBLIC_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["education"]);
 /**
  * Premium requis, mais SANS attendre la fin du parcours.
  *
- * Le profil décrit le compte lui-même : identité, régime, préférences, accès. Un abonné dont
- * le parcours est encore en cours doit pouvoir le consulter et le corriger — c'est justement
- * là qu'il ira vérifier ce qu'il a saisi.
+ * La feuille de route (résultat branche B) reste consultable pendant / juste après le
+ * diagnostic — c'est le livrable du parcours, pas un outil indépendant.
  */
-const PREMIUM_SANS_PARCOURS: ReadonlySet<Feature> = new Set<Feature>(["profile", "roadmap"]);
+const PREMIUM_SANS_PARCOURS: ReadonlySet<Feature> = new Set<Feature>(["roadmap"]);
 
-/** Outils : Premium **et** parcours terminé. */
+/** Outils : Premium **et** parcours terminé (vérif + intake, ou diagnostic complet). */
 const TOOL_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
   "dashboard",
   "activite",
@@ -73,13 +71,14 @@ const TOOL_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
   "referral",
   "simulateur",
   "historique",
+  "profile",
 ]);
 
 export const LOCK_MESSAGES: Record<Exclude<LockReason, "none">, string> = {
   auth: "Connectez-vous pour accéder à cet espace.",
   premium: "Cette fonctionnalité fait partie de la formule Premium.",
   parcours: "Terminez votre parcours fiscal pour débloquer cet espace.",
-  deja_fait: "Votre parcours est déjà terminé.",
+  deja_fait: "Parcours terminé — votre profil fiscal est déjà en place.",
 };
 
 export type Entitlements = {
@@ -99,26 +98,21 @@ export type Entitlements = {
 };
 
 /**
- * Le parcours compte comme fait dès que le dossier est instruit — soit par la branche A
- * (SIREN vérifié), soit par la branche B (diagnostic et feuille de route). Le tableau de bord
- * sait déjà présenter le cas « branche B seule » en accès partiel, il n'a pas besoin d'être
- * fermé pour autant.
+ * Le parcours compte comme fait seulement quand le dossier est INSTRUIT jusqu'au bout :
+ * branche A = vérification SIREN **et** questions d'intake (catégorie fiscale / phase done) ;
+ * branche B = diagnostic + feuille de route.
+ *
+ * La seule vérification SIREN ne suffit plus : ouvrir capture / activité / dashboard à ce
+ * stade livrait des écrans vides et faisait perdre le fil du parcours.
  */
 export function isParcoursDone(user: AuthUser | null | undefined): boolean {
-  return isSirenVerified(user) || hasCompletedOnboarding(user);
+  return hasCompletedOnboarding(user);
 }
 
 /**
- * Le parcours est-il réellement ARRIVÉ À SON TERME ?
- *
- * À ne pas confondre avec `isParcoursDone`, qui ouvre les outils dès le SIREN vérifié.
- * La vérification du SIRET n'est que la PREMIÈRE étape de la branche A : viennent ensuite
- * le dépôt du KBIS, les questions de profil, puis la classification fiscale. Se fier à
- * `isParcoursDone` pour masquer l'entrée « Parcours fiscal » enfermait l'utilisateur au
- * milieu de son propre parcours, sans moyen d'y revenir.
- *
- * `hasCompletedOnboarding` regarde, lui, l'aboutissement : régime recommandé, feuille de
- * route, ou phase terminale.
+ * Alias explicite : le parcours est-il arrivé à son terme ?
+ * Même critère que `isParcoursDone` — conservé pour les appelants qui distinguent
+ * sémantiquement « outils débloqués » et « entrée Parcours à masquer ».
  */
 export function isParcoursAcheve(user: AuthUser | null | undefined): boolean {
   return hasCompletedOnboarding(user);
@@ -189,11 +183,16 @@ export function lockReasonFor(
 
 export function useEntitlements(): Entitlements {
   const plan = usePlan();
-  // Rendu serveur et premier rendu client : visiteur. L'état réel est relu après hydratation,
-  // comme pour le plan — d'où `loading`, que les écrans doivent respecter avant de rediriger.
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [authed, setAuthed] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Lecture synchrone du cache navigateur au montage : chaque page remonte AppShell, et si
+  // on repartait de « invité » le bouton « Se connecter » flashait en bas du rail avant
+  // que l'effet ne resynchronise. Côté SSR (pas de window), on reste sur l'état neutre.
+  const [user, setUser] = useState<AuthUser | null>(() =>
+    typeof window !== "undefined" ? getStoredUser() : null,
+  );
+  const [authed, setAuthed] = useState(() =>
+    typeof window !== "undefined" ? isAuthed() : false,
+  );
+  const [loading, setLoading] = useState(() => typeof window === "undefined");
 
   useEffect(() => {
     const sync = () => {

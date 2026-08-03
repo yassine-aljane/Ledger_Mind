@@ -28,6 +28,8 @@ const ROUTE_PAR_PHASE: Record<string, string> = {
   verification_registry_document: "/onboarding/verification",
   verification_document: "/onboarding/verification",
   profile_questions: "/onboarding/profil",
+  tax_classification: "/onboarding/profil",
+  compliance_check: "/onboarding/profil",
   diagnostic_questions: "/onboarding/diagnostic",
   diagnostic_roadmap: "/onboarding/diagnostic/resultat",
 };
@@ -35,21 +37,18 @@ const ROUTE_PAR_PHASE: Record<string, string> = {
 /**
  * Écran où reprendre ce parcours, ou `null` s'il n'y a rien à reprendre.
  *
- * Les phases terminales (`tax_classification`, `compliance_check`, `done`) renvoient
- * `null` : le dossier est instruit, ce n'est plus au parcours de s'en occuper.
+ * La phase `done` renvoie `null` : le dossier est instruit. Les autres phases connues
+ * (vérification, documents, profil, diagnostic) renvoient l'étape exacte.
  */
 export function routeDeReprise(detail: SessionDetail): string | null {
+  if (detail.phase === "done") return null;
   return ROUTE_PAR_PHASE[detail.phase] ?? null;
 }
 
 async function identifiantsCandidats(): Promise<string[]> {
   const ids: string[] = [];
-  try {
-    const local = getStoredSessionId();
-    if (local) ids.push(local);
-  } catch {
-    // Stockage indisponible (navigation privée) : on s'en remet au serveur.
-  }
+  // L'intake d'abord : c'est la branche « vérification + questions » que l'utilisateur
+  // doit pouvoir reprendre en priorité s'il a quitté le parcours au milieu.
   try {
     const ctx = await fetchAgentContext();
     for (const id of [ctx.intake?.last_session_id, ctx.guidance?.last_session_id]) {
@@ -57,6 +56,12 @@ async function identifiantsCandidats(): Promise<string[]> {
     }
   } catch {
     // Compte injoignable : on se contente de ce que le navigateur a gardé.
+  }
+  try {
+    const local = getStoredSessionId();
+    if (local && !ids.includes(local)) ids.push(local);
+  } catch {
+    // Stockage indisponible (navigation privée).
   }
   return ids;
 }
@@ -81,6 +86,9 @@ export async function repriseEnCours(
       continue; // session expirée ou supprimée : on tente la suivante
     }
     if (branche && detail.branch !== branche) continue;
+    // Ignorer les sessions déjà terminées : sinon on « reprend » un dossier clos et on
+    // rate une autre session encore en cours (ex. intake profil après une guidance done).
+    if (!routeDeReprise(detail)) continue;
     storeSessionId(sessionId);
     return { sessionId, detail };
   }

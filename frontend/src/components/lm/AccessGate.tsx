@@ -46,6 +46,10 @@ const PARCOURS_COPY: Partial<Record<Feature, { title: string; body: string }>> =
     title: "Parcours fiscal requis",
     body: "Facture, rapport et déclaration s'appuient sur votre régime : le parcours doit être terminé.",
   },
+  profile: {
+    title: "Parcours fiscal requis",
+    body: "Le profil et les paramètres s'ouvrent une fois la vérification et les questions d'intake terminées.",
+  },
 };
 
 function CarteCentree({ children }: { children: ReactNode }) {
@@ -108,7 +112,7 @@ function ParcoursDoneLock() {
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-success/15">
           <Check className="size-5 text-success-ink" />
         </div>
-        <p className="rule-label mt-5 text-muted-foreground">Étape déjà validée</p>
+        <p className="rule-label mt-5 text-muted-foreground">Parcours terminé</p>
         <h1 className="mt-3 text-2xl">Vous avez déjà terminé votre parcours fiscal</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Cette étape est verrouillée : votre profil fiscal est en place. Retrouvez votre synthèse
