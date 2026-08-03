@@ -173,7 +173,7 @@ function Landing() {
             </div>
             <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
               <ShieldCheck className="size-4 text-success-ink" />
-              Éducation ouverte sans compte · Premium pour agir
+              Assistant fiscal ouvert sans compte · Premium pour agir
             </p>
           </div>
 
@@ -220,7 +220,7 @@ function Landing() {
         <div className="mt-10 grid gap-5 lg:grid-cols-2">
           <Card className="animate-rise p-8">
             <Pastille>Sans compte</Pastille>
-            <h3 className="mt-5 text-2xl">Éducation fiscale complète</h3>
+            <h3 className="mt-5 text-2xl">Assistant fiscal complet</h3>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               Un assistant sérieux, nourri du BOFiP et de sources officielles. Micro-entreprise,
               TVA, seuils, charges, obligations déclaratives : demandez, il cite ses sources et
@@ -230,7 +230,7 @@ function Landing() {
               to="/education"
               className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-foreground underline decoration-accent underline-offset-4"
             >
-              Explorer l&apos;Éducation <ArrowRight className="size-4" />
+              Explorer l&apos;Assistant fiscal <ArrowRight className="size-4" />
             </Link>
           </Card>
 
@@ -267,23 +267,23 @@ function Landing() {
           {[
             {
               icon: BookOpen,
-              title: "Éducation",
+              title: "Assistant fiscal",
               text: "Réponses sourcées, fraîcheur des textes vérifiée, historique de conversation.",
             },
             {
               icon: Compass,
-              title: "Parcours",
+              title: "Mise en route",
               text: "Avec SIREN : vérification officielle. Sans SIREN : diagnostic en quelques minutes.",
             },
             {
               icon: Receipt,
-              title: "Capture",
+              title: "Justificatifs",
               text: "Factures et virements lus ligne à ligne, doublons et incohérences signalés.",
             },
             {
               icon: Users,
-              title: "Cabinets",
-              text: "Des emails personnalisés à des experts-comptables, générés depuis votre profil.",
+              title: "Expert-comptable",
+              text: "Des emails personnalisés à des cabinets, générés depuis votre profil.",
             },
           ].map((p) => (
             <Card

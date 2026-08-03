@@ -77,8 +77,8 @@ const TOOL_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
 export const LOCK_MESSAGES: Record<Exclude<LockReason, "none">, string> = {
   auth: "Connectez-vous pour accéder à cet espace.",
   premium: "Cette fonctionnalité fait partie de la formule Premium.",
-  parcours: "Terminez votre parcours fiscal pour débloquer cet espace.",
-  deja_fait: "Parcours terminé — votre profil fiscal est déjà en place.",
+  parcours: "Terminez votre mise en route pour débloquer cet espace.",
+  deja_fait: "Mise en route terminée — votre profil fiscal est déjà en place.",
 };
 
 export type Entitlements = {
