@@ -98,6 +98,49 @@ export function isPremium() {
   return getPlan() === "premium";
 }
 
+/* -------------------------------------------------------------------------- Premium en attente */
+
+const PENDING_KEY = "lm.plan.pending";
+
+/**
+ * Un visiteur peut demander Premium avant d'avoir un compte. Comme la formule est attachée à un
+ * identifiant, on ne peut pas l'activer tout de suite : on mémorise l'intention, on l'envoie
+ * s'authentifier, et la formule est posée sur SON compte au retour.
+ *
+ * Sans ce relais, l'activation atterrirait sur la clé anonyme et serait perdue à la connexion.
+ */
+export function markPremiumPending() {
+  try {
+    storage()?.setItem(PENDING_KEY, "1");
+  } catch {
+    /* stockage indisponible : l'utilisateur repassera par /premium après connexion */
+  }
+}
+
+export function hasPremiumPending(): boolean {
+  try {
+    return storage()?.getItem(PENDING_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * À appeler juste après une connexion réussie : si une activation était en attente, elle est
+ * posée sur le compte qui vient de se connecter. Retourne `true` si Premium a été activé.
+ */
+export function consumePremiumPending(): boolean {
+  const s = storage();
+  if (!s || !hasPremiumPending()) return false;
+  try {
+    s.removeItem(PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
+  setPlan("premium");
+  return true;
+}
+
 export function usePlan(): Plan {
   // Rendu serveur et premier rendu client partent de "free" : le stockage n'existe pas côté
   // serveur, et l'effet resynchronise juste après l'hydratation.

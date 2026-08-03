@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { AccessGate } from "@/components/lm/AccessGate";
 import {
   CalendarDays,
   Coins,
@@ -38,8 +39,16 @@ export const Route = createFileRoute("/onboarding/profil")({
       },
     ],
   }),
-  component: ProfilPage,
+  component: ProfilRoute,
 });
+
+function ProfilRoute() {
+  return (
+    <AccessGate feature="onboarding">
+      <ProfilPage />
+    </AccessGate>
+  );
+}
 
 function isIntakeComplete(profile: UserProfile): boolean {
   const questionsDone =

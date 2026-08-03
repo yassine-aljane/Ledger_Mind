@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { LogoutBubble } from "@/components/lm/AppShell";
 import { FiscalAssistant } from "@/components/lm/FiscalAssistant";
 import { GuidanceChat } from "@/components/lm/GuidanceChat";
@@ -46,7 +47,13 @@ function DiagnosticPage() {
     return <Outlet />;
   }
 
-  return <DiagnosticChat />;
+  // Seule l'étape de diagnostic est refermée une fois le parcours instruit ; la feuille de
+  // route, elle, passe par l'Outlet ci-dessus et porte sa propre barrière (feature "roadmap").
+  return (
+    <AccessGate feature="onboarding">
+      <DiagnosticChat />
+    </AccessGate>
+  );
 }
 
 function DiagnosticChat() {

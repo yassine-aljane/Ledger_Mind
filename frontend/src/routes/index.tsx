@@ -110,9 +110,6 @@ function Hero() {
       />
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
         <div className="animate-rise">
-          <Badge variant="accent">
-            <Sparkles /> Fiscalité des indépendants
-          </Badge>
           <h1 className="mt-6 text-balance text-4xl leading-[1.05] sm:text-5xl lg:text-6xl">
             L&apos;assistant fiscal qui{" "}
             <span className="font-normal italic">parle humain.</span>

@@ -19,12 +19,20 @@ import {
   Upload,
   UserCog,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { PremiumLock, type PremiumBullet } from "@/components/lm/PremiumLock";
-import { usePlan } from "@/lib/plan";
 
-type Kind = "dashboard" | "referral" | "capture" | "simulateur" | "historique" | "parametres" | "activite";
+/** Écrans disposant d'un aperçu de démonstration derrière le paywall. */
+export type PremiumKind =
+  | "dashboard"
+  | "referral"
+  | "capture"
+  | "simulateur"
+  | "historique"
+  | "parametres"
+  | "activite";
+
+type Kind = PremiumKind;
 
 const COPY: Record<
   Kind,
@@ -165,21 +173,6 @@ const COPY: Record<
     preview: <MockList rows={["Identité fiscale", "Régime & plafonds", "Connexions bancaires", "Accès expert-comptable"]} />,
   },
 };
-
-/**
- * Barrière Premium d'un écran entier.
- *
- * Le contrôle vit ICI, autour de la page, et non en tête de la page elle-même : sortir en
- * `return` avant les hooks de l'écran les rendrait conditionnels (ordre des hooks différent d'un
- * rendu à l'autre — bug React, signalé par `react-hooks/rules-of-hooks`). Avec cette barrière,
- * la page n'est tout simplement pas montée quand elle est verrouillée : ni hooks, ni requêtes,
- * ni redirection d'authentification déclenchés pour rien.
- */
-export function PremiumGate({ kind, children }: { kind: Kind; children: ReactNode }) {
-  const plan = usePlan();
-  if (plan === "free") return <PremiumPagePlaceholder kind={kind} />;
-  return <>{children}</>;
-}
 
 export function PremiumPagePlaceholder({ kind }: { kind: Kind }) {
   const c = COPY[kind];

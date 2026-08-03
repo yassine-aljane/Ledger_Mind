@@ -6,9 +6,11 @@ import {
   getStoredUser,
   isAuthed,
   loginAccount,
-  postAuthPath,
   registerAccount,
+  type AuthUser,
 } from "@/lib/auth";
+import { accessState, isParcoursDone, landingPathFor } from "@/lib/entitlements";
+import { consumePremiumPending, getPlan } from "@/lib/plan";
 import { Wordmark } from "@/components/lm/Logo";
 import { cn } from "@/lib/utils";
 
@@ -24,12 +26,12 @@ export function AuthPage() {
     if (!isAuthed()) return;
     const cached = getStoredUser();
     if (cached) {
-      navigate({ to: postAuthPath(cached), replace: true });
+      navigate({ to: destinationApres(cached), replace: true });
       return;
     }
     fetchMe()
-      .then((u) => navigate({ to: postAuthPath(u), replace: true }))
-      .catch(() => navigate({ to: "/onboarding", replace: true }));
+      .then((u) => navigate({ to: destinationApres(u), replace: true }))
+      .catch(() => navigate({ to: "/education", replace: true }));
   }, [navigate]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -59,12 +61,25 @@ export function AuthPage() {
         mode === "signup"
           ? await registerAccount({ email, password, name })
           : await loginAccount({ email, password });
-      navigate({ to: postAuthPath(res.user), replace: true });
+      navigate({ to: destinationApres(res.user), replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur d'authentification.");
     } finally {
       setLoading(false);
     }
+  }
+
+  /**
+   * Où envoyer l'utilisateur juste après authentification.
+   *
+   * Une activation Premium demandée alors qu'il était déconnecté est honorée ICI, avant de
+   * calculer la destination : la formule est attachée à un compte, elle ne pouvait donc pas être
+   * posée au moment du clic. L'ordre compte — activer après aurait envoyé vers /education un
+   * utilisateur qui vient pourtant de passer Premium.
+   */
+  function destinationApres(user: AuthUser): string {
+    consumePremiumPending();
+    return landingPathFor(accessState(true, getPlan(), isParcoursDone(user)));
   }
 
   const isLogin = mode === "login";

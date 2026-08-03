@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
 import { InfoTooltip, type InfoContent } from "@/components/lm/InfoTooltip";
@@ -20,8 +21,16 @@ export const Route = createFileRoute("/onboarding/verification")({
       { name: "description", content: "Vérification registre, test Kbis et archivage SIRENE." },
     ],
   }),
-  component: VerificationPage,
+  component: VerificationRoute,
 });
+
+function VerificationRoute() {
+  return (
+    <AccessGate feature="onboarding">
+      <VerificationPage />
+    </AccessGate>
+  );
+}
 
 type Tab = "manual" | "upload";
 

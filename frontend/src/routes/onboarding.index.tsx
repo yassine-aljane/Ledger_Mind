@@ -1,12 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import {
-  fetchMe,
-  getStoredUser,
-  hasCompletedOnboarding,
-  isAuthed,
-  postAuthPath,
-} from "@/lib/auth";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { LogoutBubble } from "@/components/lm/AppShell";
 
 export const Route = createFileRoute("/onboarding/")({
@@ -19,38 +12,18 @@ export const Route = createFileRoute("/onboarding/")({
       },
     ],
   }),
-  component: Gate,
+  component: OnboardingRoute,
 });
 
-function useSessionGuard() {
-  const navigate = useNavigate();
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    if (!isAuthed()) {
-      navigate({ to: "/auth", replace: true });
-      return;
-    }
-    const cached = getStoredUser();
-    if (hasCompletedOnboarding(cached)) {
-      navigate({ to: postAuthPath(cached), replace: true });
-      return;
-    }
-    fetchMe()
-      .then((u) => {
-        if (hasCompletedOnboarding(u)) {
-          navigate({ to: postAuthPath(u), replace: true });
-          return;
-        }
-        setReady(true);
-      })
-      .catch(() => setReady(true));
-  }, [navigate]);
-  return ready;
+function OnboardingRoute() {
+  return (
+    <AccessGate feature="onboarding">
+      <Gate />
+    </AccessGate>
+  );
 }
 
 function Gate() {
-  const ready = useSessionGuard();
-  if (!ready) return null;
   return (
     <div className="min-h-screen flex flex-col">
       <header className="px-6 h-16 flex items-center justify-between max-w-7xl mx-auto w-full">

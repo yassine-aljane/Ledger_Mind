@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { Markdown } from "@/components/lm/Markdown";
 import { fetchMe, isAuthed } from "@/lib/auth";
@@ -45,9 +45,9 @@ export const Route = createFileRoute("/activite")({
 
 function ActiviteRoute() {
   return (
-    <PremiumGate kind="activite">
+    <AccessGate feature="activite" premiumKind="activite">
       <ActivitePage />
-    </PremiumGate>
+    </AccessGate>
   );
 }
 

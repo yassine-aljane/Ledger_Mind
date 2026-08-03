@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { useEffect, useState } from "react";
 import { LogoutBubble } from "@/components/lm/AppShell";
 import { RoadmapStepper, type Roadmap } from "@/components/lm/RoadmapView";
@@ -30,8 +31,16 @@ export const Route = createFileRoute("/onboarding/diagnostic/resultat")({
       },
     ],
   }),
-  component: ResultatPage,
+  component: ResultatRoute,
 });
+
+function ResultatRoute() {
+  return (
+    <AccessGate feature="roadmap">
+      <ResultatPage />
+    </AccessGate>
+  );
+}
 
 type RoadmapEtape = {
   id?: string;

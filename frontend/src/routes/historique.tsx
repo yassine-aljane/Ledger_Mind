@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { Badge } from "@/components/ui/badge";
 
@@ -20,9 +20,9 @@ export const Route = createFileRoute("/historique")({
 
 function HistoriqueRoute() {
   return (
-    <PremiumGate kind="historique">
+    <AccessGate feature="historique" premiumKind="historique">
       <HistoriquePage />
-    </PremiumGate>
+    </AccessGate>
   );
 }
 

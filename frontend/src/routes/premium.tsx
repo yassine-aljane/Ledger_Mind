@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Check, Loader2, Minus, Sparkles } from "lucide-react";
+import { Check, Loader2, LogIn, Minus, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { setPlan, usePlan } from "@/lib/plan";
+import { accessState, landingPathFor, useEntitlements } from "@/lib/entitlements";
+import { markPremiumPending, setPlan, usePlan } from "@/lib/plan";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/premium")({
@@ -57,14 +58,28 @@ const TIERS = [
 function PremiumPage() {
   const navigate = useNavigate();
   const plan = usePlan();
+  const { authed, parcoursDone } = useEntitlements();
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Activation (démo, sans paiement).
+   *
+   * Deux cas. Connecté : la formule est posée sur le compte, et on l'envoie là où son nouvel
+   * état lui donne accès — l'onboarding s'il reste à faire, le tableau de bord sinon. Déconnecté :
+   * la formule est attachée à un identifiant, on ne peut donc pas l'activer tout de suite. On
+   * mémorise l'intention et on passe par l'authentification, qui l'honorera au retour.
+   */
   function activate() {
+    if (!authed) {
+      markPremiumPending();
+      navigate({ to: "/auth" });
+      return;
+    }
     setLoading(true);
     setTimeout(() => {
       setPlan("premium");
       setLoading(false);
-      navigate({ to: "/dashboard" });
+      navigate({ to: landingPathFor(accessState(true, "premium", parcoursDone)) });
     }, 700);
   }
 
@@ -178,9 +193,15 @@ function PremiumPage() {
                     <>
                       <Loader2 className="animate-spin" /> Activation…
                     </>
-                  ) : (
+                  ) : authed ? (
                     <>
                       <Sparkles /> Démarrer l&apos;essai — 14 jours
+                    </>
+                  ) : (
+                    // Sans compte, la formule n'a rien à quoi s'attacher : on annonce l'étape
+                    // intermédiaire plutôt que de promettre une activation immédiate.
+                    <>
+                      <LogIn /> Se connecter pour activer
                     </>
                   )}
                 </Button>

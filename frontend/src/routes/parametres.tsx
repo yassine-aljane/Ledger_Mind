@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { ArrowRight, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
@@ -36,9 +36,9 @@ export const Route = createFileRoute("/parametres")({
 
 function ParametresRoute() {
   return (
-    <PremiumGate kind="parametres">
+    <AccessGate feature="profile" premiumKind="parametres">
       <ParametresPage />
-    </PremiumGate>
+    </AccessGate>
   );
 }
 

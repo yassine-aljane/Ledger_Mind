@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { AccessGate } from "@/components/lm/AccessGate";
 import {
   ArrowLeftRight,
   CheckCircle2,
@@ -64,9 +64,9 @@ export const Route = createFileRoute("/capture")({
 
 function CaptureRoute() {
   return (
-    <PremiumGate kind="capture">
+    <AccessGate feature="capture" premiumKind="capture">
       <CapturePage />
-    </PremiumGate>
+    </AccessGate>
   );
 }
 

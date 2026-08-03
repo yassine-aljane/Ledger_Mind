@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Lock, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,8 +36,16 @@ export const Route = createFileRoute("/dashboard")({
       { property: "og:description", content: "Votre situation fiscale, en un coup d'œil." },
     ],
   }),
-  component: DashboardPage,
+  component: DashboardRoute,
 });
+
+function DashboardRoute() {
+  return (
+    <AccessGate feature="dashboard" premiumKind="dashboard">
+      <DashboardPage />
+    </AccessGate>
+  );
+}
 
 function profileToQualification(profile: UserProfile): Qualification {
   const isBnc = profile.tax_category === "BNC" || profile.tax_category === "mixed";

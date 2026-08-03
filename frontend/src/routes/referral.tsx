@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { Check, ChevronDown, Copy, Loader2, Mail, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
@@ -26,9 +26,9 @@ export const Route = createFileRoute("/referral")({
 
 function ReferralRoute() {
   return (
-    <PremiumGate kind="referral">
+    <AccessGate feature="referral" premiumKind="referral">
       <ReferralPage />
-    </PremiumGate>
+    </AccessGate>
   );
 }
 

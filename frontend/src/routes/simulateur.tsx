@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PremiumGate } from "@/components/lm/PremiumPagePlaceholder";
+import { AccessGate } from "@/components/lm/AccessGate";
 import { Play } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { Button } from "@/components/ui/button";
@@ -18,9 +18,9 @@ export const Route = createFileRoute("/simulateur")({
 
 function SimulateurRoute() {
   return (
-    <PremiumGate kind="simulateur">
+    <AccessGate feature="simulateur" premiumKind="simulateur">
       <SimulateurPage />
-    </PremiumGate>
+    </AccessGate>
   );
 }
 

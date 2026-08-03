@@ -11,6 +11,7 @@ import {
   Receipt,
   Sparkles,
   Sun,
+  Compass,
   Users,
   Wallet,
 } from "lucide-react";
@@ -18,11 +19,10 @@ import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import {
   displayShortName,
   getStoredUser,
-  isAuthed,
   logout,
   type AuthUser,
 } from "@/lib/auth";
-import { usePlan } from "@/lib/plan";
+import { useEntitlements, type Feature, type LockReason } from "@/lib/entitlements";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { CentreActionsButton } from "@/components/lm/CentreActions";
@@ -30,23 +30,30 @@ import { Wordmark } from "@/components/lm/Logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-// Dashboard et Éducation restent accessibles sans premium (guidance/pédagogue + le dashboard,
-// dont le contenu s'adapte lui-même selon la vérification SIREN — voir dashboard.tsx). Tout le
-// reste (expert-comptable, documents, simulateur, historique) est une fonctionnalité premium.
+// Un seul endroit décrit la navigation, et chaque entrée déclare la fonctionnalité dont elle
+// dépend : c'est `lib/entitlements` qui décide de son verrouillage, pas la barre elle-même.
 const nav = [
-  { to: "/dashboard", label: "Dashboard", icon: Gauge, premium: false },
-  { to: "/activite", label: "Activité", icon: Wallet, premium: true },
-  { to: "/referral", label: "Expert-Comptable", icon: Users, premium: true },
-  { to: "/capture", label: "Documents", icon: Receipt, premium: true },
-  { to: "/simulateur", label: "Simulateur", icon: FileStack, premium: true },
-  { to: "/historique", label: "Historique", icon: History, premium: true },
-  { to: "/education", label: "Éducation", icon: BookOpen, premium: false },
+  { to: "/education", label: "Éducation", icon: BookOpen, feature: "education" },
+  { to: "/onboarding", label: "Parcours", icon: Compass, feature: "onboarding" },
+  { to: "/dashboard", label: "Dashboard", icon: Gauge, feature: "dashboard" },
+  { to: "/activite", label: "Activité", icon: Wallet, feature: "activite" },
+  { to: "/referral", label: "Expert-Comptable", icon: Users, feature: "referral" },
+  { to: "/capture", label: "Documents", icon: Receipt, feature: "capture" },
+  { to: "/simulateur", label: "Simulateur", icon: FileStack, feature: "simulateur" },
+  { to: "/historique", label: "Historique", icon: History, feature: "historique" },
 ] as const satisfies readonly {
   to: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  premium: boolean;
+  feature: Feature;
 }[];
+
+const LOCK_TITLE: Record<Exclude<LockReason, "none">, string> = {
+  auth: "Connectez-vous pour y accéder",
+  premium: "Fonctionnalité Premium",
+  parcours: "À débloquer en terminant votre parcours",
+  deja_fait: "Parcours déjà terminé",
+};
 
 export function LogoutBubble() {
   const navigate = useNavigate();
@@ -83,29 +90,38 @@ export function ThemeToggle({ className }: { className?: string }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [user, setUser] = useState<AuthUser | null>(null);
-  const plan = usePlan();
+  const { state, plan, lockReason, landingPath } = useEntitlements();
 
   useEffect(() => {
     setUser(getStoredUser());
   }, [pathname]);
 
+  const authed = state !== "invite";
+
   return (
     <div className="min-h-screen">
       <nav className="fixed inset-x-0 top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-6">
-          <Link to="/dashboard" className="shrink-0" aria-label="LedgerMind, tableau de bord">
+          {/* Le logo ramène à l'écran auquel l'utilisateur a droit, pas systématiquement au
+              tableau de bord — qui est fermé tant que le parcours n'est pas terminé. */}
+          <Link to={landingPath} className="shrink-0" aria-label="LedgerMind, accueil">
             <Wordmark />
           </Link>
 
           <div className="hidden items-center gap-1 md:flex">
             {nav.map((item) => {
               const active = pathname.startsWith(item.to);
-              const locked = item.premium && plan === "free";
+              const motif = lockReason(item.feature);
+              const locked = motif !== "none";
+              // « Parcours terminé » n'est pas un verrou à afficher : l'entrée disparaît, elle
+              // n'a plus rien à proposer. Les autres motifs restent visibles, cadenassés — ils
+              // montrent ce que l'utilisateur gagnerait à débloquer.
+              if (motif === "deja_fait") return null;
               return (
                 <Link
                   key={item.to}
                   to={item.to}
-                  title={locked ? "Fonctionnalité Premium" : item.label}
+                  title={locked ? LOCK_TITLE[motif] : item.label}
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.62rem] font-medium transition-colors",
                     active
@@ -135,15 +151,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Sparkles /> Premium
               </Badge>
             )}
-            {isAuthed() && <CentreActionsButton />}
+            {authed && <CentreActionsButton />}
             <ThemeToggle />
-            <LogoutBubble />
+            {authed && <LogoutBubble />}
             <Link
-              to="/parametres"
+              to={authed ? "/parametres" : "/auth"}
               className="inline-flex h-8 max-w-40 items-center truncate rounded-full bg-primary px-3.5 text-[0.62rem] font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
               title={user ? displayShortName(user) : "Compte"}
             >
-              {isAuthed() ? displayShortName(user) : "Compte"}
+              {authed ? displayShortName(user) : "Se connecter"}
             </Link>
           </div>
         </div>
