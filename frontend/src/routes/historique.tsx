@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 export const Route = createFileRoute("/historique")({
   head: () => ({
     meta: [
-      { title: "Historique — LedgerMind" },
+      { title: "Transactions — LedgerMind" },
       { name: "description", content: "Toutes vos transactions qualifiées et leurs reçus fiscaux." },
       { property: "og:title", content: "Historique — LedgerMind" },
       {
@@ -37,7 +37,7 @@ function HistoriquePage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Historique"
+        eyebrow="Transactions"
         title={
           <>
             Vos transactions, <span className="italic font-normal">expliquées.</span>

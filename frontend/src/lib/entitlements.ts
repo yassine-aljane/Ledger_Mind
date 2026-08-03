@@ -53,12 +53,12 @@ const PUBLIC_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["education"]);
 /**
  * Premium requis, mais SANS attendre la fin du parcours.
  *
- * Le profil décrit le compte lui-même : identité, régime, préférences, accès. Un abonné dont
- * le parcours est encore en cours doit pouvoir le consulter et le corriger — c'est justement
- * là qu'il ira vérifier ce qu'il a saisi.
+ * La feuille de route (résultat branche B) reste consultable pendant / juste après le
+ * diagnostic — c'est le livrable du parcours, pas un outil indépendant.
  */
-const PREMIUM_SANS_PARCOURS: ReadonlySet<Feature> = new Set<Feature>(["profile", "roadmap"]);
-/** Outils : Premium **et** parcours terminé. */
+const PREMIUM_SANS_PARCOURS: ReadonlySet<Feature> = new Set<Feature>(["roadmap"]);
+
+/** Outils : Premium **et** parcours terminé (vérif + intake, ou diagnostic complet). */
 const TOOL_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
   "dashboard",
   "activite",
@@ -66,12 +66,13 @@ const TOOL_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
   "referral",
   "simulateur",
   "historique",
+  "profile",
 ]);
 export const LOCK_MESSAGES: Record<Exclude<LockReason, "none">, string> = {
   auth: "Connectez-vous pour accéder à cet espace.",
   premium: "Cette fonctionnalité fait partie de la formule Premium.",
-  parcours: "Terminez votre parcours fiscal pour débloquer cet espace.",
-  deja_fait: "Votre parcours est déjà terminé.",
+  parcours: "Terminez votre mise en route pour débloquer cet espace.",
+  deja_fait: "Mise en route terminée — votre profil fiscal est déjà en place.",
 };
 export type Entitlements = {
   user: AuthUser | null;
@@ -89,16 +90,23 @@ export type Entitlements = {
   canAccess: (feature: Feature) => boolean;
 };
 /**
- * Le parcours compte comme fait quand il a réellement PRODUIT quelque chose : un régime
- * recommandé, une feuille de route, ou une classification fiscale. Les deux branches y mènent —
- * A par la vérification SIREN puis les questions de profil, B par le diagnostic.
+ * Le parcours compte comme fait seulement quand le dossier est INSTRUIT jusqu'au bout :
+ * branche A = vérification SIREN **et** questions d'intake (catégorie fiscale / phase done) ;
+ * branche B = diagnostic + feuille de route.
  *
- * On ne s'appuie surtout PAS sur `isSirenVerified()` : celle-ci passe à vrai dès l'étape 1 de la
- * vérification, alors qu'il reste le document RCS/RNE, l'avis SIRENE et les questions de profil.
- * S'y fier fermait le parcours en plein milieu — l'entrée disparaissait du rail et l'utilisateur
- * se retrouvait devant « C'est déjà fait » sans avoir rien terminé.
+ * La seule vérification SIREN ne suffit plus : ouvrir capture / activité / dashboard à ce
+ * stade livrait des écrans vides et faisait perdre le fil du parcours.
  */
 export function isParcoursDone(user: AuthUser | null | undefined): boolean {
+  return hasCompletedOnboarding(user);
+}
+
+/**
+ * Alias explicite : le parcours est-il arrivé à son terme ?
+ * Même critère que `isParcoursDone` — conservé pour les appelants qui distinguent
+ * sémantiquement « outils débloqués » et « entrée Parcours à masquer ».
+ */
+export function isParcoursAcheve(user: AuthUser | null | undefined): boolean {
   return hasCompletedOnboarding(user);
 }
 export function accessState(authed: boolean, plan: Plan, parcoursDone: boolean): AccessState {
@@ -126,7 +134,17 @@ export function landingPathFor(state: AccessState): string {
       return "/dashboard";
   }
 }
-export function lockReasonFor(feature: Feature, state: AccessState): LockReason {
+
+export function lockReasonFor(
+  feature: Feature,
+  state: AccessState,
+  /**
+   * Le parcours est-il réellement achevé ? Par défaut `true` pour préserver le
+   * comportement des appelants qui ne s'en soucient pas ; seul l'aiguillage de
+   * l'entrée « Parcours fiscal » en dépend.
+   */
+  parcoursAcheve: boolean = true,
+): LockReason {
   if (PUBLIC_FEATURES.has(feature)) return "none";
   if (state === "invite") return "auth";
   if (state === "free") return "premium";
@@ -135,9 +153,11 @@ export function lockReasonFor(feature: Feature, state: AccessState): LockReason 
   // dossier instruit reviendrait à priver l'utilisateur de son propre diagnostic.
   if (PREMIUM_SANS_PARCOURS.has(feature)) return "none";
   if (feature === "onboarding") {
-    // Le parcours ne se refait pas : une fois instruit, on renvoie au tableau de bord plutôt
-    // que de laisser réécrire un diagnostic déjà validé.
-    return state === "premium_complet" ? "deja_fait" : "none";
+    // Le parcours ne se refait pas UNE FOIS ACHEVÉ : on renvoie alors au tableau de bord
+    // plutôt que de laisser réécrire un diagnostic déjà validé. Tant qu'il est en cours —
+    // SIRET vérifié mais KBIS, profil ou classification encore à faire — l'entrée doit
+    // rester ouverte, sinon l'utilisateur ne peut plus reprendre là où il s'est arrêté.
+    return state === "premium_complet" && parcoursAcheve ? "deja_fait" : "none";
   }
   if (TOOL_FEATURES.has(feature)) {
     return state === "premium_complet" ? "none" : "parcours";
@@ -146,11 +166,17 @@ export function lockReasonFor(feature: Feature, state: AccessState): LockReason 
 }
 export function useEntitlements(): Entitlements {
   const plan = usePlan();
-  // Rendu serveur et premier rendu client : visiteur. L'état réel est relu après hydratation,
-  // comme pour le plan — d'où `loading`, que les écrans doivent respecter avant de rediriger.
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [authed, setAuthed] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Lecture synchrone du cache navigateur au montage : chaque page remonte AppShell, et si
+  // on repartait de « invité » le bouton « Se connecter » flashait en bas du rail avant
+  // que l'effet ne resynchronise. Côté SSR (pas de window), on reste sur l'état neutre.
+  const [user, setUser] = useState<AuthUser | null>(() =>
+    typeof window !== "undefined" ? getStoredUser() : null,
+  );
+  const [authed, setAuthed] = useState(() =>
+    typeof window !== "undefined" ? isAuthed() : false,
+  );
+  const [loading, setLoading] = useState(() => typeof window === "undefined");
+
   useEffect(() => {
     const sync = () => {
       setUser(getStoredUser());
@@ -180,6 +206,7 @@ export function useEntitlements(): Entitlements {
     };
   }, []);
   const parcoursDone = isParcoursDone(user);
+  const parcoursAcheve = isParcoursAcheve(user);
   const state = accessState(authed, plan, parcoursDone);
   return {
     user,
@@ -190,7 +217,7 @@ export function useEntitlements(): Entitlements {
     state,
     loading,
     landingPath: landingPathFor(state),
-    lockReason: (feature) => lockReasonFor(feature, state),
-    canAccess: (feature) => lockReasonFor(feature, state) === "none",
+    lockReason: (feature) => lockReasonFor(feature, state, parcoursAcheve),
+    canAccess: (feature) => lockReasonFor(feature, state, parcoursAcheve) === "none",
   };
 }

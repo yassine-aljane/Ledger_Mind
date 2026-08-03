@@ -8,9 +8,9 @@ import { useEntitlements } from "@/lib/entitlements";
 export const Route = createFileRoute("/education")({
   head: () => ({
     meta: [
-      { title: "Éducation fiscale — LedgerMind" },
+      { title: "Assistant fiscal — LedgerMind" },
       { name: "description", content: "Des fiches courtes, en français simple, pour tout comprendre." },
-      { property: "og:title", content: "Éducation fiscale — LedgerMind" },
+      { property: "og:title", content: "Assistant fiscal — LedgerMind" },
       {
         property: "og:description",
         content: "Des fiches courtes, en français simple, pour tout comprendre.",
@@ -85,7 +85,7 @@ function EducationPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Éducation"
+        eyebrow="Assistant fiscal"
         title={
           <>
             Apprenez à votre rythme, <span className="italic font-normal">sans jargon.</span>

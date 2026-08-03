@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/simulateur")({
   head: () => ({
     meta: [
-      { title: "Simulateur — LedgerMind" },
+      { title: "Scénarios — LedgerMind" },
       { name: "description", content: "Simulez l'impact fiscal d'un contrat en langage naturel." },
-      { property: "og:title", content: "Simulateur — LedgerMind" },
+      { property: "og:title", content: "Scénarios — LedgerMind" },
       { property: "og:description", content: "Simulez l'impact fiscal d'un contrat en langage naturel." },
     ],
   }),
@@ -28,7 +28,7 @@ function SimulateurPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Simulateur"
+        eyebrow="Scénarios"
         title={
           <>
             Et si je signais <span className="italic font-normal">ce contrat ?</span>

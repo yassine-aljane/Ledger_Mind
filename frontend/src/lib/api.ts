@@ -349,11 +349,26 @@ export type ReferralEmail = {
   statut: string;
 };
 
+export type ReferralCabinet = {
+  nom_cabinet: string;
+  adresse?: string | null;
+  telephone?: string | null;
+  site_web?: string | null;
+  email?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+  distance_km?: number | null;
+  source: string;
+};
+
 export type ReferralResponse = {
   status: "termine" | "echec";
   error: string | null;
   emails: ReferralEmail[];
+  cabinets: ReferralCabinet[];
   cabinets_count: number;
+  ville_lat?: number | null;
+  ville_lon?: number | null;
 };
 
 export type ReferralHistoryEntry = {
@@ -363,6 +378,9 @@ export type ReferralHistoryEntry = {
   cabinets_count: number;
   emails: ReferralEmail[];
   created_at: string;
+  cabinets?: ReferralCabinet[];
+  ville_lat?: number | null;
+  ville_lon?: number | null;
 };
 
 export async function generateReferralEmails(

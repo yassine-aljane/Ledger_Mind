@@ -2,8 +2,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AccessGate } from "@/components/lm/AccessGate";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { CabinetsMap, CabinetContactLines, type CabinetMapPoint } from "@/components/lm/CabinetsMap";
 import { Markdown } from "@/components/lm/Markdown";
-import { fetchMe, isAuthed } from "@/lib/auth";
+import { fetchMe, getStoredUser, isAuthed, isSirenVerified } from "@/lib/auth";
 import {
   fetchMySessions,
   fetchSessionDetail,
@@ -33,7 +34,7 @@ import {
 export const Route = createFileRoute("/activite")({
   head: () => ({
     meta: [
-      { title: "Activité — LedgerMind" },
+      { title: "Facturation — LedgerMind" },
       {
         name: "description",
         content: "Facture, rapport d'activité, déclaration préparée et mise en relation expert-comptable.",
@@ -86,10 +87,22 @@ function ActivitePage() {
 
 /** L'espace facture/rapport/déclaration ne concerne que les profils SIREN vérifiés — la guidance
  * (« pas encore immatriculé ») reste sur ses propres écrans, inchangés. */
+function profileFromUser(user: ReturnType<typeof getStoredUser>) {
+  const raw = user?.agent_context?.intake?.profile;
+  if (!raw || typeof raw !== "object") return null;
+  return raw as SessionDetail["profile"];
+}
+
 function ActiviteGate() {
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<SessionDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedUser = typeof window !== "undefined" ? getStoredUser() : null;
+  const [profile, setProfile] = useState<SessionDetail["profile"] | null>(() =>
+    profileFromUser(cachedUser),
+  );
+  // Cache-first : si le compte local dit déjà « SIREN vérifié », on affiche tout de suite —
+  // plus de waterfall fetchMe → session/detail qui bloquait l'écran plusieurs secondes.
+  const [loading, setLoading] = useState(() => !isSirenVerified(cachedUser));
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthed()) {
@@ -97,56 +110,90 @@ function ActiviteGate() {
       return;
     }
     let cancelled = false;
+
     (async () => {
       try {
+        // Affichage immédiat depuis le cache, puis refresh réseau en arrière-plan.
+        const local = getStoredUser();
+        if (isSirenVerified(local)) {
+          const localProfile = profileFromUser(local);
+          if (localProfile && !cancelled) {
+            setProfile(localProfile);
+            setLoading(false);
+          }
+        }
+
         const me = await fetchMe();
         if (cancelled) return;
-        let sessionId = getStoredSessionId();
-        if (!sessionId) {
-          sessionId =
-            me.agent_context.guidance.last_session_id ||
-            me.agent_context.intake.last_session_id ||
-            null;
-        }
+
+        let sessionId =
+          getStoredSessionId() ||
+          me.agent_context.intake.last_session_id ||
+          me.agent_context.guidance.last_session_id ||
+          null;
         if (!sessionId) {
           const sessions = await fetchMySessions();
           sessionId = sessions[0]?.session_id ?? null;
         }
-        if (!sessionId) {
-          if (!cancelled) setLoading(false);
-          return;
+
+        if (sessionId) {
+          storeSessionId(sessionId);
+          const d = await fetchSessionDetail(sessionId);
+          if (!cancelled) setProfile(d.profile);
+        } else if (!cancelled) {
+          setProfile(profileFromUser(me));
         }
-        storeSessionId(sessionId);
-        const d = await fetchSessionDetail(sessionId);
-        if (!cancelled) {
-          setDetail(d);
-          setLoading(false);
-        }
-      } catch {
         if (!cancelled) setLoading(false);
+      } catch (err) {
+        if (!cancelled) {
+          // Si le cache suffisait déjà, on garde l'écran utile ; sinon on montre l'erreur.
+          if (isSirenVerified(getStoredUser()) && profileFromUser(getStoredUser())) {
+            setLoading(false);
+          } else {
+            setLoadError(err instanceof Error ? err.message : "Impossible de charger votre dossier.");
+            setLoading(false);
+          }
+        }
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, [navigate]);
 
-  const profile = detail?.profile ?? null;
-  const isSirenVerified = profile?.verification_status === "verified";
+  const isVerified = isSirenVerified(getStoredUser()) || profile?.verification_status === "verified";
 
   if (loading) {
     return (
       <AppShell>
-        <PageHeader eyebrow="Activité" title="Chargement…" />
+        <PageHeader eyebrow="Facturation" title="Chargement…" />
       </AppShell>
     );
   }
 
-  if (!isSirenVerified) {
+  if (loadError) {
+    return (
+      <AppShell>
+        <PageHeader eyebrow="Facturation" title="Connexion impossible" description={loadError} />
+        <div className="bg-card border border-border rounded-2xl p-8 text-center">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground"
+          >
+            Réessayer
+          </button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!isVerified || !profile) {
     return (
       <AppShell>
         <PageHeader
-          eyebrow="Activité"
+          eyebrow="Facturation"
           title={
             <>
               Réservé aux profils <span className="italic font-normal">immatriculés.</span>
@@ -183,7 +230,7 @@ function ActiviteJourney({ profile }: { profile: NonNullable<SessionDetail["prof
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Activité"
+        eyebrow="Facturation"
         title={
           <>
             De la facture <span className="italic font-normal">à la déclaration.</span>
@@ -775,12 +822,14 @@ function EtapeExpertComptable({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultat, setResultat] = useState<RechercheExpertsComptables | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!ville.trim()) return;
     setLoading(true);
     setError(null);
+    setSelectedId(null);
     try {
       setResultat(await rechercherExpertsComptables(ville.trim()));
     } catch (err) {
@@ -789,6 +838,24 @@ function EtapeExpertComptable({
       setLoading(false);
     }
   }
+
+  const mapPoints: CabinetMapPoint[] = (resultat?.cabinets ?? [])
+    .map((c, i) => {
+      if (c.lat == null || c.lon == null) return null;
+      return {
+        id: `${c.nom_cabinet}-${i}`,
+        nom_cabinet: c.nom_cabinet,
+        adresse: c.adresse,
+        telephone: c.telephone,
+        site_web: c.site_web,
+        email: c.email,
+        lat: c.lat,
+        lon: c.lon,
+        distance_km: c.distance_km,
+        source: c.source,
+      };
+    })
+    .filter((p): p is CabinetMapPoint => p != null);
 
   return (
     <div className="space-y-6">
@@ -841,25 +908,45 @@ function EtapeExpertComptable({
               Aucun cabinet trouvé près de « {resultat.ville_recherchee} ». Consultez l'annuaire officiel.
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 gap-4">
-              {resultat.cabinets.map((c, i) => (
-                <div key={i} className="bg-card border border-border rounded-2xl p-6 space-y-2 card-hover">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold">{c.nom_cabinet}</p>
-                    {c.distance_km != null && (
-                      <span className="num text-xs text-muted-foreground">{c.distance_km} km</span>
-                    )}
-                  </div>
-                  {c.adresse && <p className="text-sm text-muted-foreground">{c.adresse}</p>}
-                  {c.telephone && <p className="text-sm text-muted-foreground">{c.telephone}</p>}
-                  {c.site_web && (
-                    <a href={c.site_web} target="_blank" rel="noreferrer" className="text-sm text-teal-dark hover:underline">
-                      {c.site_web}
-                    </a>
-                  )}
-                  <p className="rule-label text-muted-foreground/70">Source : {c.source}</p>
-                </div>
-              ))}
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              <div className="lg:col-span-5 lg:sticky lg:top-24">
+                <CabinetsMap
+                  cabinets={mapPoints}
+                  center={
+                    resultat.ville_lat != null && resultat.ville_lon != null
+                      ? { lat: resultat.ville_lat, lon: resultat.ville_lon }
+                      : null
+                  }
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              </div>
+              <div className="lg:col-span-7 grid sm:grid-cols-2 gap-4">
+                {resultat.cabinets.map((c, i) => {
+                  const id = `${c.nom_cabinet}-${i}`;
+                  const selected = selectedId === id;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setSelectedId(id)}
+                      className={`bg-card border rounded-2xl p-6 space-y-3 card-hover text-left transition-colors ${
+                        selected ? "border-primary ring-2 ring-primary/20" : "border-border"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold">{c.nom_cabinet}</p>
+                        {c.distance_km != null && (
+                          <span className="num text-xs text-muted-foreground shrink-0">{c.distance_km} km</span>
+                        )}
+                      </div>
+                      {c.adresse && <p className="text-sm text-muted-foreground">{c.adresse}</p>}
+                      <CabinetContactLines email={c.email} site_web={c.site_web} telephone={c.telephone} />
+                      <p className="rule-label text-muted-foreground/70">Source : {c.source}</p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

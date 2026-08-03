@@ -29,11 +29,26 @@ class ReferralEmailResult(BaseModel):
     statut: str
 
 
+class ReferralCabinet(BaseModel):
+    nom_cabinet: str
+    adresse: str | None = None
+    telephone: str | None = None
+    site_web: str | None = None
+    email: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    distance_km: float | None = None
+    source: str
+
+
 class ReferralResponse(BaseModel):
     status: str
     error: str | None = None
     emails: list[ReferralEmailResult] = []
+    cabinets: list[ReferralCabinet] = []
     cabinets_count: int = 0
+    ville_lat: float | None = None
+    ville_lon: float | None = None
 
 
 class ReferralHistoryEntry(BaseModel):
@@ -43,6 +58,10 @@ class ReferralHistoryEntry(BaseModel):
     cabinets_count: int
     emails: list[ReferralEmailResult]
     created_at: str
+    # Présents sur les nouvelles recherches ; absents sur l'historique ancien.
+    cabinets: list[ReferralCabinet] = []
+    ville_lat: float | None = None
+    ville_lon: float | None = None
 
 
 def _run_referral_agent(
@@ -65,6 +84,8 @@ def _run_referral_agent(
         },
         "comptables": [],
         "emails_generes": [],
+        "ville_lat": None,
+        "ville_lon": None,
         "error": None,
         "status": "en_cours",
     }
@@ -116,12 +137,30 @@ async def generate(
         for e in result.get("emails_generes", [])
     ]
 
+    cabinets = [
+        ReferralCabinet(
+            nom_cabinet=c["nom_cabinet"],
+            adresse=c.get("adresse"),
+            telephone=c.get("telephone"),
+            site_web=c.get("site_web"),
+            email=c.get("email"),
+            lat=c.get("lat"),
+            lon=c.get("lon"),
+            distance_km=c.get("distance_km"),
+            source=c.get("source") or "overpass",
+        )
+        for c in result.get("comptables", [])
+    ]
+
     entry = {
         "ville": payload.ville,
         "demande": payload.demande,
         "status": "termine",
-        "cabinets_count": len(result.get("comptables", [])),
+        "cabinets_count": len(cabinets),
         "emails": [e.model_dump() for e in emails],
+        "cabinets": [c.model_dump() for c in cabinets],
+        "ville_lat": result.get("ville_lat"),
+        "ville_lon": result.get("ville_lon"),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await asyncio.to_thread(
@@ -134,7 +173,10 @@ async def generate(
     return ReferralResponse(
         status="termine",
         emails=emails,
-        cabinets_count=len(result.get("comptables", [])),
+        cabinets=cabinets,
+        cabinets_count=len(cabinets),
+        ville_lat=result.get("ville_lat"),
+        ville_lon=result.get("ville_lon"),
     )
 
 

@@ -65,14 +65,14 @@ const COPY: Record<
   }
 > = {
   dashboard: {
-    eyebrow: "Dashboard",
+    eyebrow: "Ma situation",
     title: (
       <>
         Votre situation, <span className="italic font-normal">à jour.</span>
       </>
     ),
     description: "Reçu fiscal, provisions, pipeline — tout votre cabinet dans une page.",
-    lockTitle: "Votre tableau de bord fiscal",
+    lockTitle: "Ma situation fiscale",
     pitch:
       "Un reçu fiscal signature, vos provisions calculées au trimestre, un pipeline vivant de votre conformité. Le pilotage complet, sans tableur.",
     bullets: [
@@ -83,14 +83,14 @@ const COPY: Record<
     preview: <MockDashboard />,
   },
   referral: {
-    eyebrow: "Expert-Comptable",
+    eyebrow: "Expert-comptable",
     title: (
       <>
         Le bon expert, <span className="italic font-normal">déjà contacté.</span>
       </>
     ),
     description: "On trouve le cabinet, on rédige l'email, vous validez.",
-    lockTitle: "Mise en relation experts-comptables",
+    lockTitle: "Mise en relation expert-comptable",
     pitch:
       "Recherche géolocalisée, scoring de compatibilité, emails d'introduction personnalisés générés pour vous. Zéro cold-email à écrire.",
     bullets: [
@@ -101,14 +101,14 @@ const COPY: Record<
     preview: <MockList rows={["Cabinet Aurore — Paris 11e", "Fiducie Nord — Lille", "Cabinet Riviera — Nice"]} />,
   },
   capture: {
-    eyebrow: "Documents",
+    eyebrow: "Justificatifs",
     title: (
       <>
         Vos factures, <span className="italic font-normal">qualifiées seules.</span>
       </>
     ),
     description: "Déposez. LedgerMind lit, extrait, classe, provisionne.",
-    lockTitle: "Capture & OCR de justificatifs",
+    lockTitle: "Justificatifs et OCR",
     pitch:
       "OCR bancaire, extraction TVA, classification par nature comptable, contrôle de déductibilité — chaque document devient un reçu fiscal.",
     bullets: [
@@ -119,14 +119,14 @@ const COPY: Record<
     preview: <MockGrid />,
   },
   simulateur: {
-    eyebrow: "Simulateur",
+    eyebrow: "Scénarios",
     title: (
       <>
         Et si je signais <span className="italic font-normal">ce contrat ?</span>
       </>
     ),
     description: "Décrivez la situation, on montre l'impact fiscal ligne par ligne.",
-    lockTitle: "Simulateur en langage naturel",
+    lockTitle: "Scénarios fiscaux",
     pitch:
       "Décrivez un contrat en français simple. LedgerMind calcule TVA, retenue à la source, cotisations, net à provisionner. Décidez en 30 secondes.",
     bullets: [
@@ -137,14 +137,14 @@ const COPY: Record<
     preview: <MockCalc />,
   },
   historique: {
-    eyebrow: "Historique",
+    eyebrow: "Transactions",
     title: (
       <>
         Toutes vos opérations, <span className="italic font-normal">indexées.</span>
       </>
     ),
     description: "Reçus fiscaux, filtres, exports comptables.",
-    lockTitle: "Historique fiscal complet",
+    lockTitle: "Transactions et historique",
     pitch:
       "Chaque transaction devient un reçu fiscal cherchable. Filtres par régime, client, période. Export FEC en un clic pour votre expert-comptable.",
     bullets: [
@@ -155,14 +155,14 @@ const COPY: Record<
     preview: <MockTable />,
   },
   activite: {
-    eyebrow: "Activité",
+    eyebrow: "Facturation",
     title: (
       <>
         De la facture <span className="italic font-normal">à la déclaration.</span>
       </>
     ),
     description: "Facturez, consolidez, préparez votre déclaration, faites-la valider.",
-    lockTitle: "Parcours activité complet",
+    lockTitle: "Facturation et déclaration",
     pitch:
       "Émettez vos factures avec les mentions légales sourcées, obtenez un rapport de période avec vos chiffres clés, préparez votre déclaration ligne par ligne, puis faites-la vérifier par un expert-comptable proche.",
     bullets: [
@@ -173,14 +173,14 @@ const COPY: Record<
     preview: <MockList rows={["1. Facture", "2. Rapport de période", "3. Déclaration préparée", "4. Expert-comptable"]} />,
   },
   parametres: {
-    eyebrow: "Paramètres",
+    eyebrow: "Mon compte",
     title: (
       <>
         Votre profil, <span className="italic font-normal">votre régime.</span>
       </>
     ),
     description: "Identité fiscale, préférences, accès, exports.",
-    lockTitle: "Profil fiscal avancé",
+    lockTitle: "Mon compte",
     pitch:
       "Gestion multi-activités, préférences de calcul, accès expert-comptable, connexions bancaires — tout votre paramétrage fin.",
     bullets: [

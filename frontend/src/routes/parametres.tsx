@@ -25,7 +25,7 @@ import {
 export const Route = createFileRoute("/parametres")({
   head: () => ({
     meta: [
-      { title: "Paramètres — LedgerMind" },
+      { title: "Mon compte — LedgerMind" },
       { name: "description", content: "Votre profil, vos préférences et vos accès." },
       { property: "og:title", content: "Paramètres — LedgerMind" },
       { property: "og:description", content: "Votre profil, vos préférences et vos accès." },
@@ -126,7 +126,7 @@ function ParametresPage() {
 
   return (
     <AppShell>
-      <PageHeader eyebrow="Paramètres" title="Votre profil" />
+      <PageHeader eyebrow="Mon compte" title="Votre profil" />
 
       <div className="grid items-start gap-8 lg:grid-cols-12">
         <div className="grid gap-5 sm:grid-cols-2 lg:col-span-7">

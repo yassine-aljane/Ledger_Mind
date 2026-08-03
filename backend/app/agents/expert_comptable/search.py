@@ -49,28 +49,35 @@ def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 def _depuis_overpass(resultats: list[dict], lat: float, lon: float) -> list[CabinetComptable]:
     cabinets = []
     for r in resultats:
+        el_lat = r.get("lat")
+        el_lon = r.get("lon")
         distance = None
-        if r.get("lat") is not None and r.get("lon") is not None:
-            distance = _distance_km(lat, lon, r["lat"], r["lon"])
+        if el_lat is not None and el_lon is not None:
+            distance = _distance_km(lat, lon, el_lat, el_lon)
         cabinets.append(CabinetComptable(
             nom_cabinet=r.get("nom_cabinet") or "Cabinet non nommé",
             adresse=r.get("adresse"), telephone=r.get("telephone"),
             site_web=r.get("site_web"), email=r.get("email"),
-            distance_km=distance, source=_SOURCE_OSM,
+            distance_km=distance, lat=el_lat, lon=el_lon, source=_SOURCE_OSM,
         ))
     return cabinets
 
 
-def _depuis_entreprise_api(resultats: list[dict]) -> list[CabinetComptable]:
-    return [
-        CabinetComptable(
+def _depuis_entreprise_api(resultats: list[dict], lat: float, lon: float) -> list[CabinetComptable]:
+    cabinets = []
+    for r in resultats:
+        el_lat = r.get("lat")
+        el_lon = r.get("lon")
+        distance = None
+        if el_lat is not None and el_lon is not None:
+            distance = _distance_km(lat, lon, el_lat, el_lon)
+        cabinets.append(CabinetComptable(
             nom_cabinet=r.get("nom_cabinet") or "Cabinet non nommé",
             adresse=r.get("adresse"), telephone=r.get("telephone"),
             site_web=r.get("site_web"), email=r.get("email"),
-            distance_km=None, source=_SOURCE_ENTREPRISES,
-        )
-        for r in resultats
-    ]
+            distance_km=distance, lat=el_lat, lon=el_lon, source=_SOURCE_ENTREPRISES,
+        ))
+    return cabinets
 
 
 def _dedupe(cabinets: list[CabinetComptable]) -> list[CabinetComptable]:
@@ -111,7 +118,7 @@ def rechercher(ville: str) -> RechercheExpertsComptables:
     try:
         bruts_api = search_entreprise_api(ville, geo.get("code_postal"))
         if bruts_api:
-            cabinets.extend(_depuis_entreprise_api(bruts_api))
+            cabinets.extend(_depuis_entreprise_api(bruts_api, geo["lat"], geo["lon"]))
             sources_utilisees.append(_SOURCE_ENTREPRISES)
     except RuntimeError:
         pass
@@ -121,6 +128,8 @@ def rechercher(ville: str) -> RechercheExpertsComptables:
 
     return RechercheExpertsComptables(
         ville_recherchee=ville,
+        ville_lat=geo["lat"],
+        ville_lon=geo["lon"],
         cabinets=cabinets,
         sources=sources_utilisees,
         annuaire_officiel_url=ANNUAIRE_OFFICIEL_URL,
