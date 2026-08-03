@@ -18,9 +18,28 @@ from app.api import (
 
 app = FastAPI(title="LedgerMind Backend")
 
+
+def _cors_origins() -> list[str]:
+    """Parse FRONTEND_ORIGIN (comma-separated) and mirror localhost ↔ 127.0.0.1."""
+    origins: set[str] = set()
+    for raw in settings.frontend_origin.split(","):
+        origin = raw.strip().rstrip("/")
+        if not origin:
+            continue
+        origins.add(origin)
+        if "://localhost" in origin:
+            origins.add(origin.replace("://localhost", "://127.0.0.1", 1))
+        elif "://127.0.0.1" in origin:
+            origins.add(origin.replace("://127.0.0.1", "://localhost", 1))
+    return sorted(origins)
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
+    allow_origins=_cors_origins(),
+    # Vite may bind :3001/:5173/… when :3000 is taken; browsers also treat
+    # localhost and 127.0.0.1 as different origins.
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_methods=["*"],
     allow_headers=["*"],
 )
