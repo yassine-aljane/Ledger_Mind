@@ -267,8 +267,16 @@ def start_scheduler():
         logger.warning("APScheduler absent : veille non planifiée (installez apscheduler).")
         return None
 
+    async def cycle_complet():
+        """Corpus RAG + contrôle des seuils, PUIS alimentation du catalogue personnalisé."""
+        await run_veille()
+        from app.veille.agent import run_cycle
+
+        await run_cycle()
+
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(run_veille, "cron", hour=settings.veille_cron_hour, id="veille_quotidienne")
+    scheduler.add_job(cycle_complet, "cron", hour=settings.veille_cron_hour,
+                      id="veille_quotidienne")
     scheduler.start()
     logger.info("Veille planifiée tous les jours à %sh", settings.veille_cron_hour)
     return scheduler

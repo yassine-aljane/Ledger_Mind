@@ -26,18 +26,23 @@ import {
   type CaptureInvoiceItem,
   type CaptureVirementItem,
 } from "@/lib/api";
+import {
+  fetchFilVeille,
+  majPreferencesVeille,
+  marquerToutVeilleLu,
+  type Nouveaute,
+  type PreferencesVeille,
+} from "@/lib/veille-api";
 import { usePlan } from "@/lib/plan";
 import { cn } from "@/lib/utils";
 import {
   fetchAgenda,
   fetchHistorique,
-  fetchVeille,
   marquerPaye,
   mettreAJourParametres,
   type AgendaResponse,
   type Echeance,
   type HistoriqueItem,
-  type VeilleNouveaute,
 } from "@/lib/echeancier-api";
 
 type Vue = "agenda" | "veille" | "historique";
@@ -629,44 +634,100 @@ function VueHistorique({ onRetour }: { onRetour: () => void }) {
   );
 }
 
-function VeilleCard({ n }: { n: VeilleNouveaute }) {
+const IMPACT_VEILLE: Record<
+  Nouveaute["impact"],
+  { label: string; variante: "destructive" | "warning" | "outline" }
+> = {
+  action_obligatoire: { label: "Action obligatoire", variante: "destructive" },
+  action_recommandee: { label: "Action recommandée", variante: "warning" },
+  information: { label: "Information", variante: "outline" },
+};
+
+/** 1 = texte opposable, 2 = source administrative. La presse seule ne peut pas publier ici. */
+const AUTORITE_LABEL: Record<number, string> = {
+  1: "Texte opposable",
+  2: "Source officielle",
+  3: "Presse spécialisée",
+};
+
+function VeilleCard({ n }: { n: Nouveaute }) {
+  const impact = IMPACT_VEILLE[n.impact] ?? IMPACT_VEILLE.information;
+  const source = n.sources[0];
   return (
-    <div className="card-hover animate-rise space-y-2 rounded-2xl border border-border bg-card p-5 shadow-soft">
+    <div className="card-hover animate-rise space-y-3 rounded-2xl border border-border bg-card p-5 shadow-soft">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <Badge variant={impact.variante}>{impact.label}</Badge>
+        <div className="flex items-center gap-2">
+          {n.echeance && (
+            <span className="num text-xs text-muted-foreground">
+              Avant le {new Date(`${n.echeance}T00:00:00`).toLocaleDateString("fr-FR")}
+            </span>
+          )}
+          {!n.lue && n.notifiee && <span className="size-1.5 rounded-full bg-accent" />}
+        </div>
+      </div>
+
       <p className="text-sm font-medium">{n.titre}</p>
       {n.resume && <p className="text-sm leading-relaxed text-muted-foreground">{n.resume}</p>}
-      {n.impact && (
-        <p className="rounded-lg border border-success/25 bg-success/8 px-3 py-2 text-xs text-success-ink">
-          {n.impact}
+
+      {/* Pourquoi CETTE personne la voit : sans cette phrase, une veille personnalisée est
+          indiscernable d'une lettre d'information générique. */}
+      {n.pourquoi_vous && (
+        <p className="rounded-lg border border-info/25 bg-info/8 px-3 py-2 text-xs text-info-ink">
+          {n.pourquoi_vous}
         </p>
       )}
-      <div className="flex items-center justify-between gap-3 pt-1">
-        <span className="rule-label text-muted-foreground">{n.source}</span>
-        <a
-          href={n.url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-        >
-          Voir la source <ExternalLink className="size-3" />
-        </a>
+
+      {n.perime && (
+        <p className="rounded-lg border border-warning/40 bg-warning/12 px-3 py-2 text-xs text-warning-ink">
+          Publication ancienne — vérifiez qu'elle est toujours applicable.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        <span className="rule-label text-muted-foreground">
+          {source ? `${source.libelle} · ${AUTORITE_LABEL[source.autorite] ?? ""}` : ""}
+        </span>
+        {source && (
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            Voir la source <ExternalLink className="size-3" />
+          </a>
+        )}
       </div>
     </div>
   );
 }
 
 function VueVeille() {
-  const [data, setData] = useState<{ date: string | null; nouveautes: VeilleNouveaute[] } | null>(
-    null,
-  );
+  const [nouveautes, setNouveautes] = useState<Nouveaute[]>([]);
+  const [prefs, setPrefs] = useState<PreferencesVeille | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchVeille()
-      .then(setData)
+  function charger() {
+    setLoading(true);
+    fetchFilVeille()
+      .then((fil) => {
+        setNouveautes(fil.nouveautes);
+        setPrefs(fil.preferences);
+        setErreur(null);
+      })
       .catch((e) => setErreur(e instanceof Error ? e.message : "Erreur de chargement."))
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(charger, []);
+
+  async function basculer(champ: Partial<PreferencesVeille>) {
+    const maj = await majPreferencesVeille(champ);
+    setPrefs(maj);
+    charger();
+  }
 
   if (loading) return <EtatChargement>Chargement de la veille…</EtatChargement>;
 
@@ -678,25 +739,57 @@ function VueVeille() {
     );
   }
 
-  if (!data || data.nouveautes.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm leading-relaxed text-muted-foreground">
-        Aucune nouveauté réglementaire pour votre activité pour l&apos;instant — vous ne verrez ici
-        que les actualités qui ont une réelle valeur pour votre situation.
-      </div>
-    );
-  }
+  const nonLues = nouveautes.filter((n) => n.notifiee && !n.lue).length;
 
   return (
     <div className="space-y-4">
-      {data.date && (
-        <p className="rule-label text-muted-foreground">
-          Dernière vérification : {new Date(data.date).toLocaleDateString("fr-FR")}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-soft">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant={prefs?.mode === "obligatoire_seulement" ? "default" : "outline"}
+            onClick={() =>
+              basculer({
+                mode: prefs?.mode === "obligatoire_seulement" ? "tout" : "obligatoire_seulement",
+              })
+            }
+          >
+            {prefs?.mode === "obligatoire_seulement" ? "Obligations seules" : "Tout suivre"}
+          </Button>
+          <Button
+            size="sm"
+            variant={prefs?.active ? "outline" : "default"}
+            onClick={() => basculer({ active: !prefs?.active })}
+          >
+            {prefs?.active ? "Suspendre la veille" : "Réactiver la veille"}
+          </Button>
+        </div>
+        {nonLues > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              await marquerToutVeilleLu();
+              charger();
+            }}
+          >
+            <Check /> Tout marquer comme lu ({nonLues})
+          </Button>
+        )}
+      </div>
+
+      {nouveautes.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm leading-relaxed text-muted-foreground">
+          Aucune nouveauté réglementaire pour votre situation pour l&apos;instant — vous ne verrez
+          ici que ce qui change réellement quelque chose pour vous.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {nouveautes.map((n) => (
+            <VeilleCard key={n.id} n={n} />
+          ))}
+        </div>
       )}
-      {data.nouveautes.map((n, i) => (
-        <VeilleCard key={`${n.url}-${i}`} n={n} />
-      ))}
     </div>
   );
 }

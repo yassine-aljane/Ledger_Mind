@@ -7,6 +7,7 @@ from app.api import (
     capture,
     declaration,
     echeancier,
+    veille,
     expert_comptable,
     facture,
     guidance,
@@ -39,6 +40,7 @@ app.include_router(rapport.router)
 app.include_router(declaration.router)
 app.include_router(expert_comptable.router)
 app.include_router(echeancier.router)
+app.include_router(veille.router)
 
 
 _scheduler = None
