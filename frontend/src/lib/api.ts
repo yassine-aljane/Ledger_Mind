@@ -541,6 +541,14 @@ export type CaptureDocumentDetail = {
   incoherences?: string[] | null;
   ocr_text?: string | null;
   detected_language?: string | null;
+  /** "imprime" | "manuscrit" | "mixte" — mode d'écriture constaté à la lecture. */
+  writing_mode?: string | null;
+  /** Champs dont la lecture était douteuse et qui ont été soumis à confirmation. */
+  uncertain_fields?: string[] | null;
+  /** Champs corrigés à la main : leur valeur ne vient plus de la machine. */
+  corrected_fields?: string[] | null;
+  /** Champs que l'utilisateur peut corriger pour ce type de document. */
+  editable_fields?: string[];
   invoice?: CaptureInvoice | null;
   expense_category?: string | null;
   paid?: boolean | null;
@@ -627,6 +635,33 @@ export async function fetchCaptureDocument(documentId: string): Promise<CaptureD
   const response = await fetch(
     `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}`,
     { headers: authHeaders() },
+  );
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export type CaptureUpdateResult = {
+  document: CaptureDocumentDetail;
+  corrected: string[];
+  /** true : synthèse rejouée · false : elle aurait dû l'être mais a échoué · null : inutile. */
+  resynthese: boolean | null;
+};
+
+/**
+ * Corrige des champs extraits. L'utilisateur fait autorité : la valeur saisie
+ * remplace celle lue par la machine, et les calculs qui en dépendent suivent.
+ */
+export async function updateCaptureDocument(
+  documentId: string,
+  updates: Record<string, string>,
+): Promise<CaptureUpdateResult> {
+  const response = await fetch(
+    `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ updates }),
+    },
   );
   if (!response.ok) throw new Error(await parseError(response));
   return response.json();

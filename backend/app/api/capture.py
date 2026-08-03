@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 
 from app.agents.capture.app import nodes
 from app.agents.capture.app.schemas import (
@@ -296,15 +297,8 @@ async def list_invoices(user: UserPublic = Depends(get_current_user)):
     return out
 
 
-@router.get("/documents/{document_id}", response_model=DocumentDetail)
-async def document_detail(document_id: str, user: UserPublic = Depends(get_current_user)):
-    """Vue complète d'un document déjà traité (facture ou virement)."""
-    runtime = get_runtime()
-    deps = runtime["deps"]
-    d = await asyncio.to_thread(deps.db.get_document_by_id, user.id, document_id)
-    if not d:
-        raise HTTPException(status_code=404, detail="Document introuvable.")
-
+def _build_document_detail(d: dict[str, Any], document_id: str) -> DocumentDetail:
+    """Met un document stocké à la forme de la fiche exposée par l'API."""
     # Virements et contrats portent `document_type`; les factures d'avant ce
     # champ n'en ont pas — la présence de leur bloc métier fait alors foi.
     dtype = d.get("document_type")
@@ -320,6 +314,10 @@ async def document_detail(document_id: str, user: UserPublic = Depends(get_curre
         "incoherences": d.get("incoherences"),
         "ocr_text": d.get("ocr_text"),
         "detected_language": d.get("detected_language"),
+        "writing_mode": d.get("writing_mode"),
+        "uncertain_fields": d.get("uncertain_fields"),
+        "corrected_fields": d.get("corrected_fields"),
+        "editable_fields": nodes.champs_editables(dtype),
     }
     if dtype == "virement":
         return DocumentDetail(
@@ -341,6 +339,64 @@ async def document_detail(document_id: str, user: UserPublic = Depends(get_curre
         payment_date=d.get("payment_date"),
         payment_days_until=nodes.days_until(d.get("payment_date")),
         **common,
+    )
+
+
+@router.get("/documents/{document_id}", response_model=DocumentDetail)
+async def document_detail(document_id: str, user: UserPublic = Depends(get_current_user)):
+    """Vue complète d'un document déjà traité (facture, virement ou contrat)."""
+    runtime = get_runtime()
+    deps = runtime["deps"]
+    d = await asyncio.to_thread(deps.db.get_document_by_id, user.id, document_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+    return _build_document_detail(d, document_id)
+
+
+class CaptureUpdateBody(BaseModel):
+    """Corrections humaines : un champ métier -> sa nouvelle valeur (texte brut)."""
+
+    updates: dict[str, Any] = Field(min_length=1)
+
+
+class CaptureUpdateResponse(BaseModel):
+    document: DocumentDetail
+    corrected: list[str]
+    # True si la synthèse a été rejouée, False si elle aurait dû l'être mais a
+    # échoué, None si la correction ne le justifiait pas.
+    resynthese: bool | None = None
+
+
+@router.patch("/documents/{document_id}", response_model=CaptureUpdateResponse)
+async def update_document(
+    document_id: str,
+    body: CaptureUpdateBody,
+    user: UserPublic = Depends(get_current_user),
+):
+    """Corrige des champs extraits. L'utilisateur fait autorité sur la machine."""
+    runtime = get_runtime()
+    deps = runtime["deps"]
+    try:
+        doc = await asyncio.to_thread(
+            nodes.update_document_fields, deps, user.id, document_id, body.updates
+        )
+    except nodes.DocumentIntrouvable:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+    except DuplicateKeyError:
+        # La correction rendrait cette pièce identique à une autre déjà
+        # enregistrée : l'index de déduplication s'y oppose.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Cette correction rendrait le document identique à une pièce déjà "
+                "enregistrée. Vérifiez qu'il ne s'agit pas d'un doublon."
+            ),
+        )
+
+    return CaptureUpdateResponse(
+        document=_build_document_detail(doc, document_id),
+        corrected=doc.get("corrected_now") or [],
+        resynthese=doc.get("resynthese"),
     )
 
 

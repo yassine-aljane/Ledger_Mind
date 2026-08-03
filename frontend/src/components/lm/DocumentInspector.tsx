@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   CalendarClock,
+  Check,
   CheckCircle2,
   CircleDashed,
   Download,
@@ -9,9 +10,13 @@ import {
   FileWarning,
   Loader2,
   MessageSquare,
+  Pencil,
+  PencilLine,
+  PenLine,
   ScanLine,
   ShieldCheck,
   Users,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +27,7 @@ import {
   fetchCaptureDocument,
   fetchCaptureDocumentFile,
   formatMoney,
+  updateCaptureDocument,
   type CaptureDocumentDetail,
 } from "@/lib/api";
 
@@ -31,7 +37,16 @@ type Props = {
   onChat?: (label: string) => void;
 };
 
-type Row = { label: string; value: React.ReactNode; empty: boolean; alert?: boolean };
+type Row = {
+  label: string;
+  value: React.ReactNode;
+  empty: boolean;
+  alert?: boolean;
+  /** Clé du modèle métier : sa présence rend la ligne corrigeable. */
+  field?: string;
+  /** Valeur courante en texte brut, pour pré-remplir le champ d'édition. */
+  raw?: string;
+};
 
 /** `—` grisé pour un champ absent : l'extraction n'invente rien (FR-08). */
 function Empty() {
@@ -70,8 +85,27 @@ function money(
   };
 }
 
-function row(label: string, v: { node: React.ReactNode; empty: boolean }, alert = false): Row {
-  return { label, value: v.node, empty: v.empty, alert };
+/**
+ * Une ligne de la fiche. `field` désigne la clé du modèle : la fournir rend la
+ * ligne corrigeable. `raw` est ce qui pré-remplit le champ d'édition — on part
+ * de la valeur telle qu'elle est stockée, pas de son rendu (une date affichée
+ * `12/02/2026` se corrige mieux depuis sa forme d'origine).
+ */
+function row(
+  label: string,
+  field: string | null,
+  v: { node: React.ReactNode; empty: boolean },
+  opts: { alert?: boolean; raw?: unknown } = {},
+): Row {
+  const brut = opts.raw;
+  return {
+    label,
+    value: v.node,
+    empty: v.empty,
+    alert: opts.alert ?? false,
+    field: field ?? undefined,
+    raw: brut === null || brut === undefined ? "" : String(brut),
+  };
 }
 
 /** Amorce de mise en garde que le commentaire isole souvent en fin de texte. */
@@ -206,14 +240,79 @@ function StatePill({
   );
 }
 
+/** Saisie en ligne d'une correction, avec validation au clavier. */
+function FieldEditor({
+  initial,
+  saving,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  saving: boolean;
+  onSave: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        autoFocus
+        value={value}
+        disabled={saving}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSave(value);
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder="Laisser vide pour effacer"
+        className="min-w-0 flex-1 rounded-md border border-ink/40 bg-card px-2 py-1 text-sm focus:border-ink focus:outline-none"
+      />
+      <button
+        type="button"
+        onClick={() => onSave(value)}
+        disabled={saving}
+        title="Enregistrer"
+        aria-label="Enregistrer la correction"
+        className="grid size-7 shrink-0 place-items-center rounded-md border border-success/40 text-success-ink transition-colors hover:bg-success/10 disabled:opacity-50"
+      >
+        {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={saving}
+        title="Annuler"
+        aria-label="Annuler la correction"
+        className="grid size-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function Section({
   title,
   rows,
   hideEmpty,
+  editable,
+  corrected,
+  editing,
+  saving,
+  onEdit,
+  onSave,
+  onCancel,
 }: {
   title: string;
   rows: Row[];
   hideEmpty: boolean;
+  editable: Set<string>;
+  corrected: Set<string>;
+  editing: string | null;
+  saving: boolean;
+  onEdit: (field: string) => void;
+  onSave: (field: string, value: string) => void;
+  onCancel: () => void;
 }) {
   const visible = hideEmpty ? rows.filter((r) => !r.empty) : rows;
   if (visible.length === 0) return null;
@@ -221,17 +320,53 @@ function Section({
     <section className="space-y-2">
       <h4 className="rule-label text-accent-ink">{title}</h4>
       <dl className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60">
-        {visible.map((r) => (
-          <div
-            key={r.label}
-            className="grid grid-cols-[minmax(0,10rem)_1fr] gap-3 px-3 py-2 text-sm odd:bg-secondary/30"
-          >
-            <dt className="text-muted-foreground">{r.label}</dt>
-            <dd className={cn("min-w-0 break-words font-medium", r.alert && "text-destructive")}>
-              {r.value}
-            </dd>
-          </div>
-        ))}
+        {visible.map((r) => {
+          const modifiable = Boolean(r.field && editable.has(r.field));
+          const enEdition = Boolean(r.field && editing === r.field);
+          return (
+            <div
+              key={r.label}
+              className="group grid grid-cols-[minmax(0,10rem)_1fr] gap-3 px-3 py-2 text-sm odd:bg-secondary/30"
+            >
+              <dt className="flex items-start gap-1.5 text-muted-foreground">
+                <span className="min-w-0">{r.label}</span>
+                {r.field && corrected.has(r.field) && (
+                  <PencilLine
+                    className="mt-0.5 size-3 shrink-0 text-accent-ink"
+                    aria-label="Corrigé manuellement"
+                  />
+                )}
+              </dt>
+              <dd className={cn("min-w-0 break-words font-medium", r.alert && "text-destructive")}>
+                {enEdition ? (
+                  <FieldEditor
+                    initial={r.raw ?? ""}
+                    saving={saving}
+                    onSave={(v) => onSave(r.field!, v)}
+                    onCancel={onCancel}
+                  />
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="min-w-0">{r.value}</span>
+                    {modifiable && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(r.field!)}
+                        title={`Modifier « ${r.label} »`}
+                        aria-label={`Modifier ${r.label}`}
+                        // Visible au survol et au clavier ; toujours visible sur
+                        // écran tactile, où il n'y a pas de survol.
+                        className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-secondary hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-60"
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </dd>
+            </div>
+          );
+        })}
       </dl>
     </section>
   );
@@ -350,6 +485,31 @@ export function DocumentInspector({ documentId, onChat }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hideEmpty, setHideEmpty] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function saveField(field: string, value: string) {
+    setSaving(true);
+    setEditError(null);
+    setNotice(null);
+    try {
+      const res = await updateCaptureDocument(documentId, { [field]: value });
+      setDetail(res.document);
+      setEditing(null);
+      // Le sort de la synthèse doit se dire : l'utilisateur vient de changer
+      // une donnée dont elle parlait.
+      if (res.resynthese === true) setNotice("Champ corrigé — synthèse régénérée.");
+      else if (res.resynthese === false)
+        setNotice("Champ corrigé, mais la synthèse n'a pas pu être régénérée.");
+      else setNotice("Champ corrigé.");
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Correction impossible.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -433,45 +593,69 @@ export function DocumentInspector({ documentId, onChat }: Props) {
     return Math.round((fin.getTime() - aujourdhui.getTime()) / 86_400_000);
   })();
   const synthese = detail.analysis ? splitAnalysis(detail.analysis) : null;
+  const editables = new Set(detail.editable_fields ?? []);
+  const corriges = new Set(detail.corrected_fields ?? []);
 
   const sections: { title: string; rows: Row[] }[] = isContrat
     ? [
         {
           title: "Contrat",
           rows: [
-            row("Nature", {
-              node: ct?.contract_type ? (
-                <span className="capitalize">{ct.contract_type}</span>
-              ) : (
-                <Empty />
-              ),
-              empty: !ct?.contract_type,
+            row(
+              "Nature",
+              "contract_type",
+              {
+                node: ct?.contract_type ? (
+                  <span className="capitalize">{ct.contract_type}</span>
+                ) : (
+                  <Empty />
+                ),
+                empty: !ct?.contract_type,
+              },
+              { raw: ct?.contract_type },
+            ),
+            row("Intitulé", "title", text(ct?.title), { raw: ct?.title }),
+            row("Référence", "reference", text(ct?.reference), { raw: ct?.reference }),
+            row("Signé le", "signature_date", text(frDate(ct?.signature_date)), {
+              raw: ct?.signature_date,
             }),
-            row("Intitulé", text(ct?.title)),
-            row("Référence", text(ct?.reference)),
-            row("Signé le", text(frDate(ct?.signature_date))),
-            row("Prise d'effet", text(frDate(ct?.start_date))),
+            row("Prise d'effet", "start_date", text(frDate(ct?.start_date)), {
+              raw: ct?.start_date,
+            }),
             row(
               "Échéance",
+              "end_date",
               text(ct?.is_open_ended ? "Durée indéterminée" : frDate(ct?.end_date)),
+              { raw: ct?.end_date },
             ),
             row(
               "Durée",
+              "duration_months",
               text(ct?.duration_months != null ? `${ct.duration_months} mois` : null),
+              { raw: ct?.duration_months },
             ),
           ],
         },
         {
           title: "Conditions",
           rows: [
-            row("Contrepartie", money(ct?.amount, ct?.currency, ct?.amount_eur)),
-            row("Versement", text(ct?.payment_schedule)),
+            row("Contrepartie", "amount", money(ct?.amount, ct?.currency, ct?.amount_eur), {
+              raw: ct?.amount,
+            }),
+            row("Devise", "currency", text(ct?.currency), { raw: ct?.currency }),
+            row("Versement", "payment_schedule", text(ct?.payment_schedule), {
+              raw: ct?.payment_schedule,
+            }),
             row(
               "Préavis",
+              "notice_period_days",
               text(ct?.notice_period_days != null ? `${ct.notice_period_days} jours` : null),
+              { raw: ct?.notice_period_days },
             ),
-            row("Reconduction", text(ct?.renewal)),
-            row("Droit applicable", text(ct?.jurisdiction)),
+            row("Reconduction", "renewal", text(ct?.renewal), { raw: ct?.renewal }),
+            row("Droit applicable", "jurisdiction", text(ct?.jurisdiction), {
+              raw: ct?.jurisdiction,
+            }),
           ],
         },
       ]
@@ -480,19 +664,30 @@ export function DocumentInspector({ documentId, onChat }: Props) {
         {
           title: "Opération",
           rows: [
-            row("Référence", text(tr?.transfer_reference)),
-            row("Date d'exécution", text(frDate(tr?.execution_date))),
-            row("Date de valeur", text(frDate(tr?.value_date))),
-            row("Type", text(tr?.transfer_type)),
-            row("Motif", text(tr?.motif)),
+            row("Montant", "amount", money(tr?.amount, tr?.currency, tr?.amount_eur), {
+              raw: tr?.amount,
+            }),
+            row("Devise", "currency", text(tr?.currency), { raw: tr?.currency }),
+            row("Référence", "transfer_reference", text(tr?.transfer_reference), {
+              raw: tr?.transfer_reference,
+            }),
+            row("Date d'exécution", "execution_date", text(frDate(tr?.execution_date)), {
+              raw: tr?.execution_date,
+            }),
+            row("Date de valeur", "value_date", text(frDate(tr?.value_date)), {
+              raw: tr?.value_date,
+            }),
+            row("Type", "transfer_type", text(tr?.transfer_type), { raw: tr?.transfer_type }),
+            row("Motif", "motif", text(tr?.motif), { raw: tr?.motif }),
           ],
         },
         {
           title: "Comptes",
           rows: [
-            row("Émetteur", text(tr?.sender_name)),
+            row("Émetteur", "sender_name", text(tr?.sender_name), { raw: tr?.sender_name }),
             row(
               "IBAN émetteur",
+              "sender_iban",
               {
                 node: tr?.sender_iban ? (
                   <span className="num text-xs break-all">{tr.sender_iban}</span>
@@ -501,11 +696,14 @@ export function DocumentInspector({ documentId, onChat }: Props) {
                 ),
                 empty: !tr?.sender_iban,
               },
-              flagged(tr?.sender_iban),
+              { alert: flagged(tr?.sender_iban), raw: tr?.sender_iban },
             ),
-            row("Bénéficiaire", text(tr?.beneficiary_name)),
+            row("Bénéficiaire", "beneficiary_name", text(tr?.beneficiary_name), {
+              raw: tr?.beneficiary_name,
+            }),
             row(
               "IBAN bénéficiaire",
+              "beneficiary_iban",
               {
                 node: tr?.beneficiary_iban ? (
                   <span className="num text-xs break-all">{tr.beneficiary_iban}</span>
@@ -514,10 +712,12 @@ export function DocumentInspector({ documentId, onChat }: Props) {
                 ),
                 empty: !tr?.beneficiary_iban,
               },
-              flagged(tr?.beneficiary_iban),
+              { alert: flagged(tr?.beneficiary_iban), raw: tr?.beneficiary_iban },
             ),
-            row("BIC", text(tr?.beneficiary_bic)),
-            row("Banque", text(tr?.bank_name)),
+            row("BIC", "beneficiary_bic", text(tr?.beneficiary_bic), {
+              raw: tr?.beneficiary_bic,
+            }),
+            row("Banque", "bank_name", text(tr?.bank_name), { raw: tr?.bank_name }),
           ],
         },
       ]
@@ -525,20 +725,51 @@ export function DocumentInspector({ documentId, onChat }: Props) {
         {
           title: "Identité",
           rows: [
-            row("Émetteur", text(inv?.issuer_name)),
-            row("Matricule fiscal", text(inv?.issuer_tax_id)),
-            row("Client", text(inv?.client_name)),
-            row("N° de facture", text(inv?.invoice_number)),
-            row("Date d'émission", text(frDate(inv?.issue_date))),
+            row("Émetteur", "issuer_name", text(inv?.issuer_name), { raw: inv?.issuer_name }),
+            row("Matricule fiscal", "issuer_tax_id", text(inv?.issuer_tax_id), {
+              raw: inv?.issuer_tax_id,
+            }),
+            row("Client", "client_name", text(inv?.client_name), { raw: inv?.client_name }),
+            row("N° de facture", "invoice_number", text(inv?.invoice_number), {
+              raw: inv?.invoice_number,
+            }),
+            row("Date d'émission", "issue_date", text(frDate(inv?.issue_date)), {
+              raw: inv?.issue_date,
+            }),
+          ],
+        },
+        {
+          // Les montants sont repris ici, sous le bandeau qui les met en avant :
+          // c'est la ligne du tableau qui se corrige, pas le chiffre de tête.
+          title: "Montants",
+          rows: [
+            row("Sous-total HT", "subtotal_ht", money(inv?.subtotal_ht, inv?.currency), {
+              raw: inv?.subtotal_ht,
+            }),
+            row("TVA", "vat_amount", money(inv?.vat_amount, inv?.currency), {
+              raw: inv?.vat_amount,
+            }),
+            row("Total TTC", "total_ttc", money(inv?.total_ttc, inv?.currency, inv?.amount_eur), {
+              raw: inv?.total_ttc,
+            }),
+            row("Devise", "currency", text(inv?.currency), { raw: inv?.currency }),
           ],
         },
         {
           title: "Règlement",
           rows: [
-            row("Échéance", text(echeance)),
+            row(
+              "Statut",
+              "paid",
+              text(inv?.paid === true ? "Réglée" : inv?.paid === false ? "Non réglée" : null),
+              { raw: inv?.paid == null ? "" : inv.paid ? "oui" : "non" },
+            ),
+            row("Échéance", "due_date", text(echeance), { raw: inv?.due_date }),
             row(
               "Délai accordé",
+              "payment_terms_days",
               text(inv?.payment_terms_days != null ? `${inv.payment_terms_days} jours` : null),
+              { raw: inv?.payment_terms_days },
             ),
             // Le taux et sa provenance sont portés par le bandeau chiffré, au
             // contact du montant qu'ils convertissent — pas répétés ici.
@@ -578,6 +809,32 @@ export function DocumentInspector({ documentId, onChat }: Props) {
                 </span>
               )}
             </p>
+          )}
+
+          {/* Une pièce manuscrite se signale : ses valeurs viennent d'une
+              transcription, pas d'un fichier structuré. */}
+          {(detail.writing_mode === "manuscrit" || detail.writing_mode === "mixte") && (
+            <div className="flex items-start gap-2 rounded-xl border border-border bg-secondary/50 px-3.5 py-3">
+              <PenLine className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 space-y-1 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">
+                  {detail.writing_mode === "manuscrit"
+                    ? "Document manuscrit"
+                    : "Document imprimé, champs remplis à la main"}
+                </p>
+                <p>
+                  {detail.uncertain_fields && detail.uncertain_fields.length > 0 ? (
+                    <>
+                      Lecture douteuse sur {detail.uncertain_fields.length} champ
+                      {detail.uncertain_fields.length > 1 ? "s" : ""} — soumis à votre
+                      confirmation lors de l'analyse.
+                    </>
+                  ) : (
+                    "Les valeurs proviennent d'une transcription : une relecture reste prudente."
+                  )}
+                </p>
+              </div>
+            </div>
           )}
         </div>
 
@@ -781,8 +1038,39 @@ export function DocumentInspector({ documentId, onChat }: Props) {
             </section>
           )}
 
+          {editError && (
+            <p
+              role="alert"
+              className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
+              {editError}
+            </p>
+          )}
+          {notice && !editError && (
+            <p className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success-ink">
+              <Check className="size-3.5 shrink-0" />
+              {notice}
+            </p>
+          )}
+
           {sections.map((s) => (
-            <Section key={s.title} title={s.title} rows={s.rows} hideEmpty={hideEmpty} />
+            <Section
+              key={s.title}
+              title={s.title}
+              rows={s.rows}
+              hideEmpty={hideEmpty}
+              editable={editables}
+              corrected={corriges}
+              editing={editing}
+              saving={saving}
+              onEdit={(f) => {
+                setEditing(f);
+                setEditError(null);
+                setNotice(null);
+              }}
+              onSave={saveField}
+              onCancel={() => setEditing(null)}
+            />
           ))}
 
           {isContrat && ct?.obligations && ct.obligations.length > 0 && (

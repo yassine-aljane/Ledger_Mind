@@ -263,7 +263,9 @@ def test_virement_non_eur_amount_is_converted_via_fx(monkeypatch):
     """Virement en devise étrangère -> converti en EUR via le taux (mocké, sans réseau)."""
     import app.fx as fx
 
-    monkeypatch.setattr(fx, "get_eur_rate", lambda db, currency, on_date: 0.9)
+    # `get_eur_rate` renvoie (taux, provenance) : la source retenue est tracée
+    # avec le taux, les deux sources consultées ne se valant pas.
+    monkeypatch.setattr(fx, "get_eur_rate", lambda db, currency, on_date: (0.9, fx.SOURCE_ECB))
 
     db = make_db()
     vir = {
@@ -282,13 +284,15 @@ def test_virement_non_eur_amount_is_converted_via_fx(monkeypatch):
     assert saved["transfer"]["amount_eur"] == 900.0
     assert saved["transfer"]["exchange_rate"] == 0.9
     assert saved["transfer"]["rate_date"] == "2026-03-01"
+    assert saved["transfer"]["rate_source"] == fx.SOURCE_ECB
 
 
 def test_fx_rate_lookup_failure_never_blocks_pipeline(monkeypatch):
     """Devise inconnue / API injoignable -> amount_eur reste None, pas d'erreur levée."""
     import app.fx as fx
 
-    monkeypatch.setattr(fx, "get_eur_rate", lambda db, currency, on_date: None)
+    # Aucune des deux sources ne résout la devise : ni taux, ni provenance.
+    monkeypatch.setattr(fx, "get_eur_rate", lambda db, currency, on_date: (None, None))
 
     db = make_db()
     mistral = FakeMistral(invoice=copy.deepcopy(COMPLETE_INVOICE))
@@ -300,6 +304,7 @@ def test_fx_rate_lookup_failure_never_blocks_pipeline(monkeypatch):
     assert values["status"] == "completed"
     assert values["invoice"]["amount_eur"] is None
     assert values["invoice"]["rate_date"] is None
+    assert values["invoice"]["rate_source"] is None
 
 
 def test_no_rag_anywhere_in_codebase():

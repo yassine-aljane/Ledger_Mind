@@ -46,6 +46,27 @@ VIREMENT_MANDATORY_FIELDS: List[str] = [
     "execution_date",
 ]
 
+# Natures de contrat reconnues (FR-10 pour les contrats). Toute autre valeur est
+# ramenée à "autre" : mieux vaut une pièce classée grossièrement qu'un type inventé.
+CONTRACT_TYPES: List[str] = [
+    "travail",
+    "prestation",
+    "partenariat",
+    "sponsoring",
+    "bail",
+    "confidentialité",
+    "autre",
+]
+
+# Champs obligatoires d'un contrat (déclenchent le HITL). Volontairement réduits
+# à l'identité minimale d'un engagement : de quoi s'agit-il, et depuis quand.
+# Le reste (montant, préavis, juridiction) est fréquemment absent d'un contrat
+# parfaitement valide et ne doit pas bloquer le traitement.
+CONTRAT_MANDATORY_FIELDS: List[str] = [
+    "contract_type",
+    "start_date",
+]
+
 # Nombre maximum de tours de questions pour éviter une boucle infinie.
 MAX_MISSING_FIELD_ROUNDS = 12
 

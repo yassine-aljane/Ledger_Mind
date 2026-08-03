@@ -560,7 +560,13 @@ function CapturePage() {
               className="animate-rise space-y-4 rounded-2xl border border-warning/40 bg-warning/8 p-5"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="warning">Information requise</Badge>
+                {/* Confirmer une lecture douteuse et combler un trou ne
+                    demandent pas le même geste : le libellé le dit. */}
+                <Badge variant="warning">
+                  {asking.pending.type === "champ_a_confirmer"
+                    ? "Lecture à confirmer"
+                    : "Information requise"}
+                </Badge>
                 <span className="truncate text-xs text-muted-foreground">{asking.name}</span>
               </div>
               <p className="text-sm font-medium">{asking.pending.question}</p>
