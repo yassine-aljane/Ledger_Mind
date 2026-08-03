@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AccessGate } from "@/components/lm/AccessGate";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { Markdown } from "@/components/lm/Markdown";
-import { fetchMe, isAuthed } from "@/lib/auth";
+import { fetchMe, getStoredUser, isAuthed, isSirenVerified } from "@/lib/auth";
 import {
   fetchMySessions,
   fetchSessionDetail,
@@ -86,10 +86,22 @@ function ActivitePage() {
 
 /** L'espace facture/rapport/déclaration ne concerne que les profils SIREN vérifiés — la guidance
  * (« pas encore immatriculé ») reste sur ses propres écrans, inchangés. */
+function profileFromUser(user: ReturnType<typeof getStoredUser>) {
+  const raw = user?.agent_context?.intake?.profile;
+  if (!raw || typeof raw !== "object") return null;
+  return raw as SessionDetail["profile"];
+}
+
 function ActiviteGate() {
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<SessionDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedUser = typeof window !== "undefined" ? getStoredUser() : null;
+  const [profile, setProfile] = useState<SessionDetail["profile"] | null>(() =>
+    profileFromUser(cachedUser),
+  );
+  // Cache-first : si le compte local dit déjà « SIREN vérifié », on affiche tout de suite —
+  // plus de waterfall fetchMe → session/detail qui bloquait l'écran plusieurs secondes.
+  const [loading, setLoading] = useState(() => !isSirenVerified(cachedUser));
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthed()) {
@@ -97,42 +109,59 @@ function ActiviteGate() {
       return;
     }
     let cancelled = false;
+
     (async () => {
       try {
+        // Affichage immédiat depuis le cache, puis refresh réseau en arrière-plan.
+        const local = getStoredUser();
+        if (isSirenVerified(local)) {
+          const localProfile = profileFromUser(local);
+          if (localProfile && !cancelled) {
+            setProfile(localProfile);
+            setLoading(false);
+          }
+        }
+
         const me = await fetchMe();
         if (cancelled) return;
-        let sessionId = getStoredSessionId();
-        if (!sessionId) {
-          sessionId =
-            me.agent_context.guidance.last_session_id ||
-            me.agent_context.intake.last_session_id ||
-            null;
-        }
+
+        let sessionId =
+          getStoredSessionId() ||
+          me.agent_context.intake.last_session_id ||
+          me.agent_context.guidance.last_session_id ||
+          null;
         if (!sessionId) {
           const sessions = await fetchMySessions();
           sessionId = sessions[0]?.session_id ?? null;
         }
-        if (!sessionId) {
-          if (!cancelled) setLoading(false);
-          return;
+
+        if (sessionId) {
+          storeSessionId(sessionId);
+          const d = await fetchSessionDetail(sessionId);
+          if (!cancelled) setProfile(d.profile);
+        } else if (!cancelled) {
+          setProfile(profileFromUser(me));
         }
-        storeSessionId(sessionId);
-        const d = await fetchSessionDetail(sessionId);
-        if (!cancelled) {
-          setDetail(d);
-          setLoading(false);
-        }
-      } catch {
         if (!cancelled) setLoading(false);
+      } catch (err) {
+        if (!cancelled) {
+          // Si le cache suffisait déjà, on garde l'écran utile ; sinon on montre l'erreur.
+          if (isSirenVerified(getStoredUser()) && profileFromUser(getStoredUser())) {
+            setLoading(false);
+          } else {
+            setLoadError(err instanceof Error ? err.message : "Impossible de charger votre dossier.");
+            setLoading(false);
+          }
+        }
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, [navigate]);
 
-  const profile = detail?.profile ?? null;
-  const isSirenVerified = profile?.verification_status === "verified";
+  const isVerified = isSirenVerified(getStoredUser()) || profile?.verification_status === "verified";
 
   if (loading) {
     return (
@@ -142,7 +171,24 @@ function ActiviteGate() {
     );
   }
 
-  if (!isSirenVerified) {
+  if (loadError) {
+    return (
+      <AppShell>
+        <PageHeader eyebrow="Activité" title="Connexion impossible" description={loadError} />
+        <div className="bg-card border border-border rounded-2xl p-8 text-center">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground"
+          >
+            Réessayer
+          </button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!isVerified || !profile) {
     return (
       <AppShell>
         <PageHeader

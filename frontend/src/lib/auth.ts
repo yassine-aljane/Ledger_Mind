@@ -156,8 +156,11 @@ export function isSirenVerified(user: AuthUser | null | undefined): boolean {
 export function postAuthPath(
   user: AuthUser | null | undefined,
 ): "/dashboard" | "/onboarding" | "/onboarding/diagnostic/resultat" {
-  if (isSirenVerified(user)) return "/dashboard";
+  // Branche A terminée (vérif + intake) → tableau de bord.
+  if (isSirenVerified(user) && hasCompletedOnboarding(user)) return "/dashboard";
+  // Branche B terminée (diagnostic) → feuille de route ; le SIREN reste à faire plus tard.
   if (hasCompletedOnboarding(user)) return "/onboarding/diagnostic/resultat";
+  // Parcours en cours : /onboarding reprend à la dernière étape (voir repriseEnCours).
   return "/onboarding";
 }
 

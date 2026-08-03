@@ -142,9 +142,11 @@ export function consumePremiumPending(): boolean {
 }
 
 export function usePlan(): Plan {
-  // Rendu serveur et premier rendu client partent de "free" : le stockage n'existe pas côté
-  // serveur, et l'effet resynchronise juste après l'hydratation.
-  const [plan, setState] = useState<Plan>("free");
+  // Cache synchronie au montage client : sinon « free » flash avant l'effet, et l'encart
+  // bas de rail peut afficher un faux CTA. SSR reste sur free (pas de localStorage).
+  const [plan, setState] = useState<Plan>(() =>
+    typeof window !== "undefined" ? getPlan() : "free",
+  );
   useEffect(() => {
     const sync = () => setState(getPlan());
     sync();

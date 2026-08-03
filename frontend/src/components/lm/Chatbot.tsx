@@ -22,7 +22,6 @@ import {
   type UserProfile,
 } from "@/lib/api";
 import {
-  isSpeaking,
   listenOnce,
   recognitionSupported,
   speak,
@@ -142,24 +141,22 @@ export function Chatbot({
     setInterim("");
   };
 
-  /** Lit la question à voix haute (les deux modes lisent) ; en mode vocal, écoute la réponse
-   * juste après — jamais l'inverse, pour ne pas laisser le micro capter la voix de l'assistant.
-   * En mode vocal, le texte de la question se révèle progressivement, calé sur la voix
-   * (`onboundary`) plutôt qu'affiché d'un bloc — en mode texte, rien ne change (texte entier
-   * immédiat, comme avant).
+  /** Mode vocal uniquement : lit la question à voix haute, puis écoute la réponse — jamais
+   * l'inverse, pour ne pas laisser le micro capter la voix de l'assistant. Le texte se révèle
+   * progressivement (`onboundary`). Mode texte : affichage silencieux, pas de TTS.
    *
    * Si l'orchestrateur reformule EXACTEMENT la même question (réponse précédente non comprise),
-   * on ne la relit pas une seconde fois à l'identique — mais on relance quand même l'écoute en
-   * mode vocal : sans ce cas, le micro restait inactif après une réponse mal comprise, donnant
-   * l'impression que l'assistant "ignore" l'utilisateur au lieu de laisser reparler. */
+   * on ne la relit pas une seconde fois à l'identique — mais on relance quand même l'écoute :
+   * sans ce cas, le micro restait inactif après une réponse mal comprise. */
   const speakQuestion = (text: string) => {
+    if (modeRef.current !== "vocal") return;
     if (lastSpokenRef.current === text || !speechSupported()) {
-      if (modeRef.current === "vocal") startListening();
+      startListening();
       return;
     }
     lastSpokenRef.current = text;
     setSpeaking(true);
-    setRevealedLength(modeRef.current === "vocal" ? 0 : null);
+    setRevealedLength(0);
     speak(
       text,
       () => {
@@ -190,11 +187,19 @@ export function Chatbot({
 
   const switchMode = (next: Mode) => {
     setMode(next);
-    modeRef.current = next; // synchrone : startListening() ci-dessous ne doit pas lire l'ancien mode
-    if (next === "vocal" && orchestratorMessage && !isSpeaking() && !listening) {
-      startListening();
+    modeRef.current = next; // synchrone : startListening() / speakQuestion() ne doivent pas lire l'ancien mode
+    if (next === "texte") {
+      stopSpeaking();
+      setSpeaking(false);
+      setRevealedLength(null);
+      stopListening();
+      return;
     }
-    if (next === "texte") stopListening();
+    // Passage en vocal : relire la question courante (si présente), puis écouter.
+    if (orchestratorMessage && !thinking) {
+      lastSpokenRef.current = null;
+      speakQuestion(orchestratorMessage);
+    }
   };
 
   useEffect(() => {
@@ -423,10 +428,8 @@ export function Chatbot({
           </p>
         </div>
 
-        {/* Assistant vocal : complément optionnel, jamais un prérequis — masqué si le navigateur
-            ne supporte pas la reconnaissance vocale (dégradation propre, texte reste la voie
-            principale). La lecture à voix haute des questions (TTS), elle, fonctionne dans les
-            deux modes tant que le navigateur la supporte. */}
+        {/* Assistant vocal : complément optionnel — masqué si le navigateur ne supporte pas la
+            reconnaissance vocale. Mode Texte = silencieux ; mode Vocal = TTS + écoute auto. */}
         {canVoiceMode && (
           <div className="inline-flex shrink-0 rounded-full border border-border bg-card p-1 text-xs font-medium">
             {(
@@ -479,21 +482,10 @@ export function Chatbot({
         </div>
       )}
 
-      {/* États vocaux compacts : lecture en cours (mode texte), écoute avec transcription en
-          direct, et réponse captée en attente d'envoi. Chacun reste distinct — jamais fondu
-          dans un état « chargement » générique. */}
-      {(mode === "texte" && speaking) || listening || voiceNotice || pendingVoiceAnswer ? (
+      {/* États vocaux compacts : écoute avec transcription en direct, et réponse captée en
+          attente d'envoi. Chacun reste distinct — jamais fondu dans un état « chargement ». */}
+      {listening || voiceNotice || pendingVoiceAnswer ? (
         <div className="animate-fade-in flex flex-wrap items-center gap-2 text-xs">
-          {mode === "texte" && speaking && (
-            <button
-              type="button"
-              onClick={stopSpeaking}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-primary transition-colors duration-200 hover:bg-primary/20"
-            >
-              <Volume2 className="size-3" /> Lecture en cours…
-              <span className="underline">arrêter</span>
-            </button>
-          )}
           {listening && (
             <button
               type="button"

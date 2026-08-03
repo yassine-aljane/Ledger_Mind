@@ -45,7 +45,10 @@ function Gate() {
     let annule = false;
     void (async () => {
       try {
-        const reprise = await repriseEnCours();
+        // Intake d'abord (vérif + profil), puis guidance — pour reprendre exactement
+        // l'étape en cours plutôt que le choix « avez-vous un SIREN ? ».
+        const reprise =
+          (await repriseEnCours("intake")) ?? (await repriseEnCours("guidance"));
         if (annule) return;
         const cible = reprise ? routeDeReprise(reprise.detail) : null;
         if (cible) {

@@ -49,7 +49,7 @@ const LOCK_TITLE: Record<Exclude<LockReason, "none">, string> = {
   auth: "Connectez-vous pour y accéder",
   premium: "Fonctionnalité Premium",
   parcours: "À débloquer en terminant votre parcours",
-  deja_fait: "Parcours déjà terminé",
+  deja_fait: "Parcours terminé",
 };
 
 export function LogoutBubble() {
@@ -100,19 +100,23 @@ function NavLink({
   motif: LockReason;
 }) {
   const locked = motif !== "none";
+  const label = motif === "deja_fait" ? "Parcours terminé" : item.label;
   return (
     <Link
       to={item.to}
       title={locked ? LOCK_TITLE[motif] : item.label}
+      aria-disabled={locked || undefined}
       className={cn(
         "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
         active
           ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+          : locked
+            ? "text-muted-foreground/80 hover:bg-secondary hover:text-muted-foreground"
+            : "text-muted-foreground hover:bg-secondary hover:text-foreground",
       )}
     >
       <item.icon className="size-4 shrink-0" />
-      <span className="flex-1 truncate">{item.label}</span>
+      <span className="flex-1 truncate">{label}</span>
       {locked && <Lock className="size-3 shrink-0 opacity-70" />}
     </Link>
   );
@@ -120,7 +124,13 @@ function NavLink({
 
 /** Encart bas de rail : ce que vaut la formule actuelle, et le geste qui suit. */
 function CarteFormule() {
-  const { state } = useEntitlements();
+  const { state, loading } = useEntitlements();
+
+  // Pendant le montage / hydratation : rien — sinon un faux « Se connecter » apparaît puis
+  // disparaît à chaque changement de page (AppShell remonte, état un instant « invite »).
+  if (loading) return null;
+  // Déjà Premium avec parcours fini : pas d'encart.
+  if (state === "premium_complet") return null;
 
   if (state === "free") {
     return (
@@ -190,13 +200,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const entrees = NAV.map((item) => ({
     item,
     // Avant hydratation, l'état est celui d'un visiteur : masquer les verrous plutôt
-    // que d'en afficher de faux, sinon une entrée apparaît puis disparaît à chaque
-    // navigation.
+    // que d'en afficher de faux. L'entrée « Parcours fiscal » reste TOUJOURS listée —
+    // une fois terminée elle passe en `deja_fait` (verrouillée, libellé « Parcours terminé »),
+    // elle ne disparaît plus (sinon elle flashait à chaque navigation).
     motif: loading ? ("none" as LockReason) : lockReason(item.feature),
     active: pathname === item.to || pathname.startsWith(`${item.to}/`),
-  }))
-    // « Parcours terminé » n'est pas un verrou à montrer : l'entrée n'a plus rien à proposer.
-    .filter(({ motif }) => motif !== "deja_fait");
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -268,6 +277,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               key={item.to}
               to={item.to}
+              title={motif !== "none" ? LOCK_TITLE[motif] : item.label}
               className={cn(
                 "flex flex-1 shrink-0 flex-col items-center gap-1 px-3 py-2.5 text-[0.5rem] font-medium",
                 active ? "text-foreground" : "text-muted-foreground",
@@ -279,7 +289,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Lock className="absolute -right-2 -top-1 size-2.5 text-accent" />
                 )}
               </span>
-              {item.label}
+              {motif === "deja_fait" ? "Parcours terminé" : item.label}
             </Link>
           ))}
         </div>
