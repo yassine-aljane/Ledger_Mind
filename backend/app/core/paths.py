@@ -16,5 +16,8 @@ REPO_ROOT = BACKEND_DIR.parent
 DATA_DIR = REPO_ROOT / "data"
 
 SEUILS_YAML = DATA_DIR / "seuils.yaml"
+# Barème IR, quotient familial, décote, CFP, ACRE — complète seuils.yaml sans
+# rien y dupliquer (voir l'en-tête des deux fichiers).
+IMPOT_REVENU_YAML = DATA_DIR / "impot_revenu.yaml"
 SOURCES_YAML = DATA_DIR / "sources.yaml"
 REGIMES_DIR = DATA_DIR / "regimes"

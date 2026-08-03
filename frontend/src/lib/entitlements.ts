@@ -108,6 +108,22 @@ export function isParcoursDone(user: AuthUser | null | undefined): boolean {
   return isSirenVerified(user) || hasCompletedOnboarding(user);
 }
 
+/**
+ * Le parcours est-il réellement ARRIVÉ À SON TERME ?
+ *
+ * À ne pas confondre avec `isParcoursDone`, qui ouvre les outils dès le SIREN vérifié.
+ * La vérification du SIRET n'est que la PREMIÈRE étape de la branche A : viennent ensuite
+ * le dépôt du KBIS, les questions de profil, puis la classification fiscale. Se fier à
+ * `isParcoursDone` pour masquer l'entrée « Parcours fiscal » enfermait l'utilisateur au
+ * milieu de son propre parcours, sans moyen d'y revenir.
+ *
+ * `hasCompletedOnboarding` regarde, lui, l'aboutissement : régime recommandé, feuille de
+ * route, ou phase terminale.
+ */
+export function isParcoursAcheve(user: AuthUser | null | undefined): boolean {
+  return hasCompletedOnboarding(user);
+}
+
 export function accessState(authed: boolean, plan: Plan, parcoursDone: boolean): AccessState {
   if (!authed) return "invite";
   if (plan !== "premium") return "free";
@@ -135,7 +151,16 @@ export function landingPathFor(state: AccessState): string {
   }
 }
 
-export function lockReasonFor(feature: Feature, state: AccessState): LockReason {
+export function lockReasonFor(
+  feature: Feature,
+  state: AccessState,
+  /**
+   * Le parcours est-il réellement achevé ? Par défaut `true` pour préserver le
+   * comportement des appelants qui ne s'en soucient pas ; seul l'aiguillage de
+   * l'entrée « Parcours fiscal » en dépend.
+   */
+  parcoursAcheve: boolean = true,
+): LockReason {
   if (PUBLIC_FEATURES.has(feature)) return "none";
 
   if (state === "invite") return "auth";
@@ -148,9 +173,11 @@ export function lockReasonFor(feature: Feature, state: AccessState): LockReason 
   if (PREMIUM_SANS_PARCOURS.has(feature)) return "none";
 
   if (feature === "onboarding") {
-    // Le parcours ne se refait pas : une fois instruit, on renvoie au tableau de bord plutôt
-    // que de laisser réécrire un diagnostic déjà validé.
-    return state === "premium_complet" ? "deja_fait" : "none";
+    // Le parcours ne se refait pas UNE FOIS ACHEVÉ : on renvoie alors au tableau de bord
+    // plutôt que de laisser réécrire un diagnostic déjà validé. Tant qu'il est en cours —
+    // SIRET vérifié mais KBIS, profil ou classification encore à faire — l'entrée doit
+    // rester ouverte, sinon l'utilisateur ne peut plus reprendre là où il s'est arrêté.
+    return state === "premium_complet" && parcoursAcheve ? "deja_fait" : "none";
   }
 
   if (TOOL_FEATURES.has(feature)) {
@@ -200,6 +227,7 @@ export function useEntitlements(): Entitlements {
   }, []);
 
   const parcoursDone = isParcoursDone(user);
+  const parcoursAcheve = isParcoursAcheve(user);
   const state = accessState(authed, plan, parcoursDone);
 
   return {
@@ -211,7 +239,7 @@ export function useEntitlements(): Entitlements {
     state,
     loading,
     landingPath: landingPathFor(state),
-    lockReason: (feature) => lockReasonFor(feature, state),
-    canAccess: (feature) => lockReasonFor(feature, state) === "none",
+    lockReason: (feature) => lockReasonFor(feature, state, parcoursAcheve),
+    canAccess: (feature) => lockReasonFor(feature, state, parcoursAcheve) === "none",
   };
 }
