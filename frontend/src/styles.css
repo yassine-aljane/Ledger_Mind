@@ -472,6 +472,42 @@
   animation: lm-stagger-in 0.35s var(--ease-out-expo) both;
 }
 
+/* Landing — bandeau défilant + curseur machine à écrire */
+@keyframes lm-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@utility animate-marquee {
+  animation: lm-marquee 38s linear infinite;
+}
+
+@keyframes lm-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility animate-caret {
+  animation: lm-caret 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .animate-caret {
+    animation: none !important;
+  }
+}
+
 @utility suggestion-chip {
   position: relative;
   color: var(--color-marine);
