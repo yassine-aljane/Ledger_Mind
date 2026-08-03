@@ -23,32 +23,32 @@ import { markPremiumPending } from "@/lib/plan";
 /** Le message doit nommer l'outil concerné : « parcours requis » seul n'apprend rien. */
 const PARCOURS_COPY: Partial<Record<Feature, { title: string; body: string }>> = {
   dashboard: {
-    title: "Terminez le parcours fiscal",
-    body: "Répondez aux questions du parcours (vérification SIRET ou diagnostic) avant d'accéder au tableau de bord.",
+    title: "Terminez la mise en route",
+    body: "Répondez aux questions (vérification SIRET ou diagnostic) avant d'accéder à Ma situation.",
   },
   capture: {
-    title: "Parcours fiscal requis",
-    body: "La capture de factures se débloque une fois la vérification et les questions de profil terminées.",
+    title: "Mise en route requise",
+    body: "Les justificatifs se débloquent une fois la vérification et les questions de profil terminées.",
   },
   referral: {
-    title: "Parcours fiscal requis",
-    body: "La mise en relation avec des cabinets est disponible après avoir complété votre parcours fiscal.",
+    title: "Mise en route requise",
+    body: "La mise en relation avec un expert-comptable est disponible après avoir complété votre mise en route.",
   },
   historique: {
-    title: "Parcours fiscal requis",
-    body: "L'historique complet se débloque après la fin du parcours fiscal.",
+    title: "Mise en route requise",
+    body: "Les transactions se débloquent après la fin de la mise en route.",
   },
   simulateur: {
-    title: "Parcours fiscal requis",
-    body: "Le simulateur se débloque une fois votre profil fiscal construit via le parcours.",
+    title: "Mise en route requise",
+    body: "Les scénarios fiscaux se débloquent une fois votre profil fiscal construit.",
   },
   activite: {
-    title: "Parcours fiscal requis",
-    body: "Facture, rapport et déclaration s'appuient sur votre régime : le parcours doit être terminé.",
+    title: "Mise en route requise",
+    body: "Facture, rapport et déclaration s'appuient sur votre régime : la mise en route doit être terminée.",
   },
   profile: {
-    title: "Parcours fiscal requis",
-    body: "Le profil et les paramètres s'ouvrent une fois la vérification et les questions d'intake terminées.",
+    title: "Mise en route requise",
+    body: "Mon compte s'ouvre une fois la vérification et les questions d'intake terminées.",
   },
 };
 
@@ -72,7 +72,7 @@ function BlocChargement({ label }: { label: string }) {
 /** Premium acquis, mais le questionnaire du parcours n'est pas terminé. */
 function ParcoursLock({ feature }: { feature: Feature }) {
   const copy = PARCOURS_COPY[feature] ?? {
-    title: "Terminez le parcours fiscal",
+    title: "Terminez la mise en route",
     body: "Complétez la vérification (ou le diagnostic) et répondez aux questions avant d'utiliser cet outil.",
   };
 
@@ -82,21 +82,21 @@ function ParcoursLock({ feature }: { feature: Feature }) {
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent/15">
           <Compass className="size-5 text-accent-ink" />
         </div>
-        <p className="rule-label mt-5 text-accent-ink">Premium · parcours en cours</p>
+        <p className="rule-label mt-5 text-accent-ink">Premium · mise en route</p>
         <h1 className="mt-3 text-2xl">{copy.title}</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{copy.body}</p>
         {/* Dire explicitement que l'abonnement est actif : sans ça, un écran fermé juste après
             avoir payé se lit comme un problème de paiement. */}
         <p className="mt-2 text-xs text-muted-foreground">
-          Votre abonnement Premium est actif — il reste à compléter le questionnaire du parcours
-          fiscal.
+          Votre abonnement Premium est actif — il reste à compléter le questionnaire de mise en
+          route.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button asChild variant="accent">
-            <Link to="/onboarding">Continuer le parcours fiscal</Link>
+            <Link to="/onboarding">Continuer la mise en route</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to="/education">Éducation</Link>
+            <Link to="/education">Assistant fiscal</Link>
           </Button>
         </div>
       </CarteCentree>
@@ -112,18 +112,18 @@ function ParcoursDoneLock() {
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-success/15">
           <Check className="size-5 text-success-ink" />
         </div>
-        <p className="rule-label mt-5 text-muted-foreground">Parcours terminé</p>
-        <h1 className="mt-3 text-2xl">Vous avez déjà terminé votre parcours fiscal</h1>
+        <p className="rule-label mt-5 text-muted-foreground">Mise en route terminée</p>
+        <h1 className="mt-3 text-2xl">Vous avez déjà terminé votre mise en route</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Cette étape est verrouillée : votre profil fiscal est en place. Retrouvez votre synthèse
-          et vos prochaines actions sur le tableau de bord.
+          et vos prochaines actions dans Ma situation.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button asChild variant="accent">
-            <Link to="/dashboard">Aller au tableau de bord</Link>
+            <Link to="/dashboard">Aller à Ma situation</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to="/education">Éducation</Link>
+            <Link to="/education">Assistant fiscal</Link>
           </Button>
         </div>
       </CarteCentree>
@@ -131,7 +131,7 @@ function ParcoursDoneLock() {
   );
 }
 
-/** Visiteur : il faut d'abord un compte — l'Éducation, elle, reste ouverte. */
+/** Visiteur : il faut d'abord un compte — l'Assistant fiscal, lui, reste ouvert. */
 function AuthLock({ premiumAttendu }: { premiumAttendu: boolean }) {
   return (
     <AppShell>
@@ -139,12 +139,12 @@ function AuthLock({ premiumAttendu }: { premiumAttendu: boolean }) {
         <h1 className="text-2xl">Connectez-vous pour continuer</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           {premiumAttendu
-            ? "Cette fonctionnalité fait partie de Premium. L'Éducation fiscale reste ouverte sans compte."
-            : "Cet espace s'appuie sur votre dossier. L'Éducation fiscale reste ouverte sans compte."}
+            ? "Cette fonctionnalité fait partie de Premium. L'Assistant fiscal reste ouvert sans compte."
+            : "Cet espace s'appuie sur votre dossier. L'Assistant fiscal reste ouvert sans compte."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button asChild variant="outline">
-            <Link to="/education">Aller à l&apos;Éducation</Link>
+            <Link to="/education">Aller à l&apos;Assistant fiscal</Link>
           </Button>
           {/* On mémorise l'intention Premium : la formule est attachée à un compte, elle sera
               posée au retour d'authentification plutôt que perdue en route. */}

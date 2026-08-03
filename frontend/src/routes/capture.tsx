@@ -53,7 +53,7 @@ import {
 export const Route = createFileRoute("/capture")({
   head: () => ({
     meta: [
-      { title: "Documents — LedgerMind" },
+      { title: "Justificatifs — LedgerMind" },
       { name: "description", content: "Déposez vos factures, relevés et justificatifs." },
       { property: "og:title", content: "Documents — LedgerMind" },
       { property: "og:description", content: "Déposez vos factures, relevés et justificatifs." },
@@ -383,7 +383,7 @@ function CapturePage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Documents"
+        eyebrow="Justificatifs"
         title={
           <>
             Déposez, on <span className="italic font-normal">s'occupe du reste.</span>

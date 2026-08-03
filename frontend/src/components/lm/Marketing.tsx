@@ -36,7 +36,7 @@ export function SiteHeader() {
 
         <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
           <Link to="/education" className="transition-colors hover:text-foreground">
-            Éducation
+            Assistant fiscal
           </Link>
           {plan === "free" && (
             <Link to="/premium" className="transition-colors hover:text-foreground">
@@ -44,7 +44,7 @@ export function SiteHeader() {
             </Link>
           )}
           <Link to={authed ? postAuthPath(user) : "/onboarding"} className="transition-colors hover:text-foreground">
-            Parcours fiscal
+            Mise en route
           </Link>
         </nav>
 
@@ -85,7 +85,7 @@ export function SiteFooter() {
         </div>
         <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <Link to="/education" className="hover:text-foreground">
-            Éducation
+            Assistant fiscal
           </Link>
           {plan === "free" && (
             <Link to="/premium" className="hover:text-foreground">

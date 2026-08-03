@@ -184,11 +184,15 @@ export type CabinetComptable = {
   site_web?: string | null;
   email?: string | null;
   distance_km?: number | null;
+  lat?: number | null;
+  lon?: number | null;
   source: string;
 };
 
 export type RechercheExpertsComptables = {
   ville_recherchee: string;
+  ville_lat?: number | null;
+  ville_lon?: number | null;
   cabinets: CabinetComptable[];
   sources: string[];
   annuaire_officiel_url: string;

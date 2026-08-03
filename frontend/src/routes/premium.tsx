@@ -15,12 +15,12 @@ export const Route = createFileRoute("/premium")({
       {
         name: "description",
         content:
-          "Free : l'Éducation fiscale sourcée. Premium : parcours d'immatriculation, feuille de route, capture de factures et mise en relation avec des cabinets.",
+          "Free : Assistant fiscal sourcé. Premium : mise en route, feuille de route, justificatifs et expert-comptable.",
       },
       { property: "og:title", content: "Offre Premium — LedgerMind" },
       {
         property: "og:description",
-        content: "Passez de comprendre à agir : feuille de route, factures, cabinets.",
+        content: "Passez de comprendre à agir : feuille de route, justificatifs, expert-comptable.",
       },
     ],
   }),
@@ -30,15 +30,15 @@ export const Route = createFileRoute("/premium")({
 /** [libellé, inclus au gratuit, inclus au Premium] */
 const ROWS: Array<[string, boolean, boolean]> = [
   ["Questions fiscales illimitées, réponses sourcées BOFiP", true, true],
-  ["Agent pédagogique complet — sans inscription", true, true],
+  ["Assistant fiscal complet — sans inscription", true, true],
   ["Alertes de fraîcheur et textes périmés signalés", true, true],
   ["Historique sauvegardé (avec compte)", false, true],
   ["Diagnostic sans SIREN en quelques minutes", false, true],
   ["Vérification SIRET officielle et immatriculation guidée", false, true],
   ["Feuille de route personnalisée (étapes, seuils, échéances)", false, true],
-  ["Analyse de factures et virements + détection de doublons", false, true],
-  ["Emails prêts à envoyer à des cabinets comptables", false, true],
-  ["Tableau de bord et historique complet", false, true],
+  ["Justificatifs : factures et virements + détection de doublons", false, true],
+  ["Emails prêts à envoyer à un expert-comptable", false, true],
+  ["Ma situation et transactions complètes", false, true],
 ];
 
 function Card({ className, children }: { className?: string; children: ReactNode }) {
@@ -117,14 +117,14 @@ function Pricing() {
             <span className="text-safran italic">Agir change tout.</span>
           </h1>
           <p className="mt-5 text-muted-foreground">
-            L&apos;Éducation est ouverte à tous, sans compte. Premium débloque le parcours
-            d&apos;action.
+            L&apos;Assistant fiscal est ouvert à tous, sans compte. Premium débloque la mise en
+            route et les outils d&apos;action.
           </p>
         </div>
 
         <div className="mt-12 grid gap-5 lg:grid-cols-2">
           <Card className="animate-rise flex flex-col p-8">
-            <Pastille>Éducation</Pastille>
+            <Pastille>Assistant fiscal</Pastille>
             <p className="num mt-6 text-5xl">0 €</p>
             <p className="mt-2 text-sm text-muted-foreground">Sans compte, sans carte bancaire.</p>
             <ul className="mt-7 flex-1 space-y-3 text-sm">
@@ -135,7 +135,7 @@ function Pricing() {
               ))}
             </ul>
             <Button asChild variant="outline" className="mt-8 w-full">
-              <Link to="/education">Utiliser l&apos;Éducation</Link>
+              <Link to="/education">Ouvrir l&apos;Assistant fiscal</Link>
             </Button>
           </Card>
 
@@ -173,8 +173,8 @@ function Pricing() {
                 >
                   <Link to={premiumHome}>
                     {parcoursDone
-                      ? "Votre abonnement est actif — Tableau de bord"
-                      : "Votre abonnement est actif — Continuer le parcours"}
+                      ? "Votre abonnement est actif — Ma situation"
+                      : "Votre abonnement est actif — Continuer la mise en route"}
                   </Link>
                 </Button>
               ) : (
