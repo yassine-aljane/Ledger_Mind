@@ -1,9 +1,14 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Loader2, ScanLine, Upload } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AccessGate } from "@/components/lm/AccessGate";
-import { useState } from "react";
-import { LogoutBubble } from "@/components/lm/AppShell";
+import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { InfoTooltip, type InfoContent } from "@/components/lm/InfoTooltip";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
+  detailAsTurn,
+  fetchSessionDetail,
   ocrExtractSiret,
   startOrchestrator,
   orchestratorTurn,
@@ -31,8 +36,6 @@ function VerificationRoute() {
     </AccessGate>
   );
 }
-
-type Tab = "manual" | "upload";
 
 // Contenu vérifié à la source (jamais improvisé) — voir les URLs officielles citées.
 const AIDE_JUSTIFICATIF: InfoContent = {
@@ -97,11 +100,91 @@ function verificationReady(profile: UserProfile): boolean {
   return true;
 }
 
+/* ----------------------------------- Briques d'affichage ---------------------------------- */
+
+function Card({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border border-border bg-card text-card-foreground shadow-soft",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** En-tête d'étape : numéro en pastille, puis intitulé. */
+function StepLabel({ step, children }: { step: number; children: ReactNode }) {
+  return (
+    <p className="mb-4 flex items-center gap-2.5">
+      <span className="num grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+        {step}
+      </span>
+      <span className="rule-label text-accent-ink">{children}</span>
+    </p>
+  );
+}
+
+/** Zone de dépôt de fichier, réutilisée par les trois documents demandés. */
+function UploadCard({
+  title,
+  description,
+  ctaLabel,
+  busy,
+  error,
+  aide,
+  onFile,
+}: {
+  title: string;
+  description: ReactNode;
+  ctaLabel: string;
+  busy: boolean;
+  error?: string | null;
+  aide?: InfoContent;
+  onFile: (file: File) => void;
+}) {
+  return (
+    <Card className="relative p-6">
+      {/* L'icône d'aide reste HORS du <label> : un clic dessus ne doit jamais déclencher le
+          sélecteur de fichier, qui occupe toute la zone pointillée. */}
+      {aide && (
+        <div className="absolute right-4 top-4 z-10">
+          <InfoTooltip content={aide} label={title} />
+        </div>
+      )}
+      <h3 className="text-base font-medium">{title}</h3>
+      <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</div>
+      <label className="mt-4 block cursor-pointer rounded-xl border border-dashed border-border p-6 text-center transition-all duration-200 hover:border-accent hover:bg-accent/5">
+        <input
+          type="file"
+          accept="application/pdf,image/*"
+          className="sr-only"
+          disabled={busy}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onFile(f);
+          }}
+        />
+        <span className="inline-flex items-center gap-2 text-sm font-medium">
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {busy ? "Analyse en cours…" : ctaLabel}
+        </span>
+      </label>
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+    </Card>
+  );
+}
+
 function VerificationPage() {
-  const [tab, setTab] = useState<Tab>("manual");
   const [siret, setSiret] = useState("");
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Reprise d'une vérification interrompue : tant qu'on n'a pas interrogé le serveur, on ne sait
+  // pas s'il faut afficher le formulaire vide ou l'étape en cours. Montrer le formulaire d'abord
+  // ferait clignoter un écran de saisie devant quelqu'un qui a déjà tout renseigné.
+  const [booting, setBooting] = useState(true);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [registryUploadError, setRegistryUploadError] = useState<string | null>(null);
   const [sireneUploadError, setSireneUploadError] = useState<string | null>(null);
@@ -123,6 +206,58 @@ function VerificationPage() {
       return orchestratorResult?.session_id ?? activeTurn?.session_id ?? null;
     }
   })();
+
+  /**
+   * Au montage, on reprend là où l'utilisateur s'était arrêté.
+   *
+   * La session d'intake est déjà mémorisée localement et vit côté serveur : il suffit de
+   * redemander son détail. Si elle a dépassé la vérification, on saute directement aux questions
+   * de profil plutôt que de réafficher une étape déjà franchie. Une session devenue invalide
+   * (expirée, supprimée) est simplement ignorée — on retombe sur le formulaire vierge.
+   */
+  useEffect(() => {
+    let annule = false;
+    const sid = (() => {
+      try {
+        return getStoredSessionId();
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!sid) {
+      setBooting(false);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const detail = await fetchSessionDetail(sid);
+        if (annule) return;
+        if (detail.branch !== "intake") return;
+        if (detail.phase === "profile_questions") {
+          navigate({ to: "/onboarding/profil", replace: true });
+          return;
+        }
+        if (
+          detail.phase === "verification" ||
+          detail.phase === "verification_registry_document" ||
+          detail.phase === "verification_document"
+        ) {
+          setOrchestratorResult(detailAsTurn(detail));
+        }
+      } catch {
+        // Session introuvable ou expirée : on repart du formulaire, sans message d'erreur —
+        // l'utilisateur n'a rien fait de mal.
+      } finally {
+        if (!annule) setBooting(false);
+      }
+    })();
+
+    return () => {
+      annule = true;
+    };
+  }, [navigate]);
 
   const runVerify = async (value: string) => {
     setLoading(true);
@@ -199,7 +334,6 @@ function VerificationPage() {
       const extracted = await ocrExtractSiret(file);
       setSiret(extracted);
       setTouched(true);
-      setTab("manual");
     } catch (error) {
       setOcrError(error instanceof Error ? error.message : "Erreur lors de l'extraction.");
     } finally {
@@ -218,276 +352,274 @@ function VerificationPage() {
     !profile.sirene_document_uploaded;
 
   const showContinueToProfil = profile && verificationReady(profile);
+  const hasResult = Boolean(orchestratorResult && profile);
+
+  const identite: { label: string; valeur: string; mono?: boolean }[] = profile
+    ? [
+        { label: "SIREN", valeur: profile.siren ? formatSiren(profile.siren) : "—", mono: true },
+        {
+          label: "SIRET",
+          valeur: profile.siret ? formatSiret(profile.siret) : profile.siren ? "(siège)" : "—",
+          mono: true,
+        },
+        { label: "Dénomination", valeur: profile.denomination ?? "—" },
+        { label: "Forme juridique", valeur: profile.legal_form ?? "—" },
+        { label: "Code NAF (statistique)", valeur: profile.ape_code ?? "—" },
+        { label: "Micro-éligible", valeur: profile.micro_eligible ? "Oui (EI)" : "—" },
+      ]
+    : [];
+
+  if (booting) {
+    return (
+      <AppShell>
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
+          <Loader2 className="size-5 animate-spin text-primary" />
+          <p className="rule-label text-muted-foreground">Reprise de votre vérification…</p>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
-    <div className="min-h-screen px-6 py-16 max-w-3xl mx-auto animate-slide-up">
-      <div className="flex items-center justify-between gap-4">
-        <Link to="/onboarding" className="text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-ink transition-colors duration-200">
-          ← Retour
-        </Link>
-        <LogoutBubble />
-      </div>
+    <AppShell>
+      <PageHeader
+        eyebrow="Étape 1 · Parcours avec SIREN"
+        title="Vérifions votre établissement"
+        description="Trois étapes : identité registre, document RCS/RNE si requis, puis avis SIRENE."
+      />
 
-      <div className="mt-8 mb-12">
-        <p className="rule-label text-teal-dark mb-4">
-          Étape 02 · Vérification
-        </p>
-        <h1 className="text-4xl md:text-5xl font-medium text-balance">
-          Vérifions votre <span className="italic font-normal">SIREN / SIRET</span>.
-        </h1>
-        <p className="mt-4 text-muted-foreground text-lg text-pretty max-w-xl">
-          Identité registre, vérification RCS/RNE et archivage de votre avis SIRENE.
-        </p>
-      </div>
-
-      {!orchestratorResult && (
-        <>
-          <div className="flex gap-1 p-1 bg-card border border-border rounded-full w-fit mb-8">
-            <button
-              onClick={() => setTab("manual")}
-              className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
-                tab === "manual" ? "bg-ink text-ink-foreground" : "text-muted-foreground hover:text-ink"
-              }`}
-            >
-              Saisie manuelle
-            </button>
-            <button
-              onClick={() => setTab("upload")}
-              className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
-                tab === "upload" ? "bg-ink text-ink-foreground" : "text-muted-foreground hover:text-ink"
-              }`}
-            >
-              Uploader un document
-            </button>
-          </div>
-
-          {tab === "manual" && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setTouched(true);
-                if (isValid) runVerify(digits);
-              }}
-              className="bg-card border border-border rounded-2xl p-8 space-y-6"
-            >
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Numéro SIREN / SIRET
-                </label>
-                <input
-                  value={siret}
-                  onChange={(e) => {
-                    setSiret(e.target.value);
-                    if (!touched && e.target.value.replace(/\D/g, "").length > 0) setTouched(true);
-                  }}
-                  onBlur={() => setTouched(true)}
-                  placeholder="832 174 902 00019"
-                  maxLength={19}
-                  inputMode="numeric"
-                  className="w-full mt-3 px-0 py-3 bg-transparent border-b-2 border-border font-mono text-2xl focus:outline-none focus:border-teal-dark transition-colors duration-200"
-                />
-                {showError && (
-                  <p className="text-xs text-destructive mt-2">SIREN (9) ou SIRET (14 chiffres) requis.</p>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !isValid}
-                className="w-full px-8 py-4 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
-              >
-                {loading ? "Vérification…" : "Étape 1 — Vérifier mon numéro"}
-              </button>
-            </form>
-          )}
-
-          {tab === "upload" && (
-            <div className="relative">
-              {/* L'icône d'aide reste HORS du <label> : un clic dessus ne doit jamais déclencher
-                  le sélecteur de fichier associé au champ, qui occupe toute la zone pointillée. */}
-              <div className="absolute top-3 right-3 z-10">
-                <InfoTooltip content={AIDE_JUSTIFICATIF} label="justificatif accepté" />
-              </div>
-              <label className="block bg-card border-2 border-dashed border-border hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200 rounded-2xl p-16 text-center cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="sr-only"
-                  disabled={loading}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                  }}
-                />
-                <p className="font-semibold">{loading ? "Extraction…" : "Déposez votre justificatif"}</p>
-                {ocrError && <p className="text-sm text-destructive mt-2">{ocrError}</p>}
-              </label>
-            </div>
-          )}
-        </>
-      )}
-
-      {orchestratorResult && profile && (
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          <section className="bg-card border border-border rounded-2xl p-8">
-            <p className="rule-label text-teal-dark mb-4">
-              Étape 1 · Identité registre
-            </p>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <dt className="text-xs uppercase text-muted-foreground">SIREN</dt>
-                <dd className="font-semibold font-mono">
-                  {profile.siren ? formatSiren(profile.siren) : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-muted-foreground">SIRET</dt>
-                <dd className="font-semibold font-mono">
-                  {profile.siret ? formatSiret(profile.siret) : profile.siren ? "(siège)" : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-muted-foreground">Dénomination</dt>
-                <dd className="font-semibold">{profile.denomination ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-muted-foreground">Forme juridique</dt>
-                <dd className="font-semibold">{profile.legal_form ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-muted-foreground">Code NAF (statistique)</dt>
-                <dd className="font-semibold">{profile.ape_code ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-muted-foreground">Micro-éligible</dt>
-                <dd className="font-semibold">{profile.micro_eligible ? "Oui (EI)" : "—"}</dd>
-              </div>
-              {profile.registry_tax_base && !profile.registry_document_required && (
-                <div className="col-span-2">
-                  <dt className="text-xs uppercase text-muted-foreground">Base fiscale registre</dt>
-                  <dd className="font-semibold text-teal-dark">{profile.registry_tax_base}</dd>
-                </div>
-              )}
-            </dl>
-            <p className="mt-4 text-sm text-muted-foreground">{orchestratorResult.message}</p>
-          </section>
-
-          {profile.verification_status === "verified" && (
-            <section className="bg-card border border-border rounded-2xl p-8">
-              <p className="rule-label text-teal-dark mb-4">
-                Étape 2 · Vérification RCS / RNE
-              </p>
-              {profile.registry_document_uploaded ? (
-                <p className="text-sm">
-                  {profile.registry_document_type === "kbis"
-                    ? "✓ Kbis détecté — inscription RCS confirmée → BIC"
-                    : "✓ Extrait RNE détecté — inscription RNE seule → BNC"}
-                </p>
-              ) : profile.registry_document_required ? (
-                <>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Déposez votre Kbis (greffe / RCS)
-                    <InfoTooltip content={AIDE_KBIS} label="extrait Kbis" />{" "}
-                    ou votre extrait RNE (INPI)
-                    <InfoTooltip content={AIDE_RNE} label="extrait RNE" />. Nous vérifions
-                    automatiquement le type de document et le SIREN.
-                  </p>
-                  <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200">
-                    <input
-                      type="file"
-                      accept="application/pdf,image/*"
-                      className="sr-only"
-                      disabled={loading}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleRegistryUpload(f);
-                      }}
-                    />
-                    <span className="text-sm font-semibold">
-                      {loading ? "Analyse…" : "Déposer Kbis ou extrait RNE (PDF)"}
-                    </span>
+          {!hasResult && (
+            <Card className="animate-rise p-6">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setTouched(true);
+                  if (isValid) runVerify(digits);
+                }}
+                className="space-y-5"
+              >
+                <div>
+                  <label htmlFor="siret" className="rule-label text-muted-foreground">
+                    Numéro SIREN / SIRET
                   </label>
-                  {registryUploadError && (
-                    <p className="text-xs text-destructive mt-2">{registryUploadError}</p>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Société commerciale détectée — inscription RCS confirmée → BIC (pas de document
-                  requis).
-                </p>
-              )}
-            </section>
-          )}
-
-          {profile.verification_status === "verified" && !showRegistryDocStep && (
-            <section className="bg-card border border-border rounded-2xl p-8">
-              <p className="rule-label text-teal-dark mb-4 inline-flex items-center gap-1.5">
-                Étape 3 · Avis de situation SIRENE
-                <InfoTooltip content={AIDE_AVIS_SIRENE} label="avis de situation SIRENE" />
-              </p>
-              {profile.sirene_document_uploaded ? (
-                <div className="text-sm space-y-1">
-                  <p>✓ Document archivé</p>
-                  {profile.sirene_document_activity_label && (
-                    <p className="text-muted-foreground">Activité : {profile.sirene_document_activity_label}</p>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Téléchargez votre avis sur{" "}
-                    <a
-                      href="https://avis-situation-sirene.insee.fr/"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline text-teal-dark"
-                    >
-                      avis-situation-sirene.insee.fr
-                    </a>{" "}
-                    puis déposez-le ici.
+                  <input
+                    id="siret"
+                    value={siret}
+                    onChange={(e) => {
+                      setSiret(e.target.value);
+                      if (!touched && e.target.value.replace(/\D/g, "").length > 0) setTouched(true);
+                    }}
+                    onBlur={() => setTouched(true)}
+                    placeholder="832 174 902 00019"
+                    maxLength={19}
+                    inputMode="numeric"
+                    className="num mt-3 w-full border-b-2 border-border bg-transparent py-3 text-2xl tracking-wider transition-colors duration-200 focus:border-ink focus:outline-none"
+                  />
+                  <p
+                    className={cn(
+                      "mt-2 text-xs",
+                      showError ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {showError
+                      ? "SIREN (9) ou SIRET (14 chiffres) requis."
+                      : "9 chiffres (SIREN) ou 14 chiffres (SIRET), sans espaces."}
                   </p>
-                  <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-teal-dark hover:bg-teal-dark/5 transition-all duration-200">
-                    <input
-                      type="file"
-                      accept="application/pdf,image/*"
-                      className="sr-only"
-                      disabled={loading}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleSireneUpload(f);
-                      }}
-                    />
-                    <span className="text-sm font-semibold">
-                      {loading ? "Archivage…" : "Déposer l'avis SIRENE (PDF)"}
-                    </span>
-                  </label>
-                  {sireneUploadError && <p className="text-xs text-destructive mt-2">{sireneUploadError}</p>}
-                  {turnError && <p className="text-xs text-destructive mt-2">{turnError}</p>}
-                </>
+                </div>
+                <Button type="submit" variant="accent" disabled={loading || !isValid}>
+                  {loading ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+                  {loading ? "Vérification…" : "Lancer la vérification"}
+                </Button>
+              </form>
+            </Card>
+          )}
+
+          {hasResult && profile && (
+            <>
+              <Card className="animate-rise p-6">
+                <StepLabel step={1}>Identité registre</StepLabel>
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  {identite.map((champ) => (
+                    <div key={champ.label}>
+                      <dt className="rule-label text-muted-foreground">{champ.label}</dt>
+                      <dd className={cn("mt-1 font-medium", champ.mono && "num")}>{champ.valeur}</dd>
+                    </div>
+                  ))}
+                  {profile.registry_tax_base && !profile.registry_document_required && (
+                    <div className="sm:col-span-2">
+                      <dt className="rule-label text-muted-foreground">Base fiscale registre</dt>
+                      <dd className="mt-1 font-medium text-success-ink">
+                        {profile.registry_tax_base}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  {orchestratorResult?.message}
+                </p>
+              </Card>
+
+              {profile.verification_status === "verified" && (
+                <Card className="animate-rise p-6">
+                  <StepLabel step={2}>Vérification RCS / RNE</StepLabel>
+                  {profile.registry_document_uploaded ? (
+                    <p className="text-sm">
+                      {profile.registry_document_type === "kbis"
+                        ? "✓ Kbis détecté — inscription RCS confirmée → BIC"
+                        : "✓ Extrait RNE détecté — inscription RNE seule → BNC"}
+                    </p>
+                  ) : profile.registry_document_required ? (
+                    <>
+                      <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                        Déposez votre Kbis (greffe / RCS)
+                        <InfoTooltip content={AIDE_KBIS} label="extrait Kbis" />{" "}
+                        ou votre extrait RNE (INPI)
+                        <InfoTooltip content={AIDE_RNE} label="extrait RNE" />. Nous vérifions
+                        automatiquement le type de document et le SIREN.
+                      </p>
+                      <label className="block cursor-pointer rounded-xl border border-dashed border-border p-6 text-center transition-all duration-200 hover:border-accent hover:bg-accent/5">
+                        <input
+                          type="file"
+                          accept="application/pdf,image/*"
+                          className="sr-only"
+                          disabled={loading}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleRegistryUpload(f);
+                          }}
+                        />
+                        <span className="inline-flex items-center gap-2 text-sm font-medium">
+                          {loading ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Upload className="size-4" />
+                          )}
+                          {loading ? "Analyse…" : "Déposer Kbis ou extrait RNE (PDF)"}
+                        </span>
+                      </label>
+                      {registryUploadError && (
+                        <p className="mt-2 text-xs text-destructive">{registryUploadError}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Société commerciale détectée — inscription RCS confirmée → BIC (pas de
+                      document requis).
+                    </p>
+                  )}
+                </Card>
               )}
-            </section>
-          )}
 
-          {profile.verification_status === "verified" && !showRegistryDocStep && !showSireneUploadStep && (
-            <button
-              onClick={() => advanceVerification()}
-              disabled={loading || !showContinueToProfil}
-              className="w-full px-8 py-4 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
-            >
-              {loading ? "Chargement…" : "Continuer vers mon profil →"}
-            </button>
-          )}
+              {profile.verification_status === "verified" && !showRegistryDocStep && (
+                <Card className="animate-rise p-6">
+                  <StepLabel step={3}>
+                    Avis de situation SIRENE
+                    <InfoTooltip content={AIDE_AVIS_SIRENE} label="avis de situation SIRENE" />
+                  </StepLabel>
+                  {profile.sirene_document_uploaded ? (
+                    <div className="space-y-1 text-sm">
+                      <p>✓ Document archivé</p>
+                      {profile.sirene_document_activity_label && (
+                        <p className="text-muted-foreground">
+                          Activité : {profile.sirene_document_activity_label}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                        Téléchargez votre avis sur{" "}
+                        <a
+                          href="https://avis-situation-sirene.insee.fr/"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary underline underline-offset-2"
+                        >
+                          avis-situation-sirene.insee.fr
+                        </a>{" "}
+                        puis déposez-le ici.
+                      </p>
+                      <label className="block cursor-pointer rounded-xl border border-dashed border-border p-6 text-center transition-all duration-200 hover:border-accent hover:bg-accent/5">
+                        <input
+                          type="file"
+                          accept="application/pdf,image/*"
+                          className="sr-only"
+                          disabled={loading}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleSireneUpload(f);
+                          }}
+                        />
+                        <span className="inline-flex items-center gap-2 text-sm font-medium">
+                          {loading ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Upload className="size-4" />
+                          )}
+                          {loading ? "Archivage…" : "Déposer l'avis SIRENE (PDF)"}
+                        </span>
+                      </label>
+                      {sireneUploadError && (
+                        <p className="mt-2 text-xs text-destructive">{sireneUploadError}</p>
+                      )}
+                      {turnError && <p className="mt-2 text-xs text-destructive">{turnError}</p>}
+                    </>
+                  )}
+                </Card>
+              )}
 
-          {profile.verification_status !== "verified" && (
-            <button
-              onClick={() => setOrchestratorResult(null)}
-              className="w-full px-8 py-4 bg-ink text-ink-foreground rounded-xl font-semibold hover:bg-teal-dark transition-all duration-200 active:scale-[0.98]"
-            >
-              Réessayer
-            </button>
+              {profile.verification_status === "verified" &&
+                !showRegistryDocStep &&
+                !showSireneUploadStep && (
+                  <Button
+                    size="lg"
+                    variant="accent"
+                    className="w-full"
+                    onClick={() => advanceVerification()}
+                    disabled={loading || !showContinueToProfil}
+                  >
+                    {loading ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+                    {loading ? "Chargement…" : "Continuer vers mon profil"}
+                  </Button>
+                )}
+
+              {profile.verification_status !== "verified" && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setOrchestratorResult(null)}
+                >
+                  Réessayer
+                </Button>
+              )}
+            </>
           )}
         </div>
-      )}
-    </div>
+
+        <aside className="space-y-4">
+          {!hasResult && (
+            <UploadCard
+              title="Lire mon SIRET automatiquement"
+              description="Photo ou PDF de votre avis de situation : l'OCR remplit le champ pour vous."
+              ctaLabel="Analyser un document"
+              busy={loading}
+              error={ocrError}
+              aide={AIDE_JUSTIFICATIF}
+              onFile={handleFile}
+            />
+          )}
+          <Card className="p-5">
+            <ScanLine className="size-5 text-accent" />
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Chaque étape affiche une confirmation une fois validée. En cas d&apos;échec, le
+              résultat et un bouton « Réessayer » s&apos;affichent sous le formulaire.
+            </p>
+          </Card>
+        </aside>
+      </div>
+    </AppShell>
   );
 }

@@ -56,8 +56,14 @@ export type LockReason = "none" | "auth" | "premium" | "parcours" | "deja_fait";
 /** Ouvert à tous, même sans compte : c'est la porte d'entrée du produit. */
 const PUBLIC_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["education"]);
 
-/** Demande un compte, mais pas la formule Premium. */
-const AUTHED_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["profile"]);
+/**
+ * Premium requis, mais SANS attendre la fin du parcours.
+ *
+ * Le profil décrit le compte lui-même : identité, régime, préférences, accès. Un abonné dont
+ * le parcours est encore en cours doit pouvoir le consulter et le corriger — c'est justement
+ * là qu'il ira vérifier ce qu'il a saisi.
+ */
+const PREMIUM_SANS_PARCOURS: ReadonlySet<Feature> = new Set<Feature>(["profile", "roadmap"]);
 
 /** Outils : Premium **et** parcours terminé. */
 const TOOL_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
@@ -134,14 +140,12 @@ export function lockReasonFor(feature: Feature, state: AccessState): LockReason 
 
   if (state === "invite") return "auth";
 
-  if (AUTHED_FEATURES.has(feature)) return "none";
-
   if (state === "free") return "premium";
 
   // À partir d'ici : connecté ET Premium. Reste à savoir où en est le parcours.
   // La feuille de route est le RÉSULTAT du parcours, pas le parcours : la fermer une fois le
   // dossier instruit reviendrait à priver l'utilisateur de son propre diagnostic.
-  if (feature === "roadmap") return "none";
+  if (PREMIUM_SANS_PARCOURS.has(feature)) return "none";
 
   if (feature === "onboarding") {
     // Le parcours ne se refait pas : une fois instruit, on renvoie au tableau de bord plutôt

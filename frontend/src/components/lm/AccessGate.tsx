@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Compass, LogIn, Sparkles, CircleCheckBig } from "lucide-react";
+import { Check, Compass, Loader2, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
-import { AppShell, PageHeader } from "@/components/lm/AppShell";
+import { AppShell } from "@/components/lm/AppShell";
 import { PremiumPagePlaceholder, type PremiumKind } from "@/components/lm/PremiumPagePlaceholder";
 import { Button } from "@/components/ui/button";
 import { useEntitlements, type Feature } from "@/lib/entitlements";
+import { markPremiumPending } from "@/lib/plan";
 
 /**
  * Barrière d'accès d'un écran entier.
@@ -13,11 +14,147 @@ import { useEntitlements, type Feature } from "@/lib/entitlements";
  * `return` avant les hooks de l'écran les rendrait conditionnels (ordre des hooks variable d'un
  * rendu à l'autre — bug React, signalé par `react-hooks/rules-of-hooks`). Avec cette barrière,
  * la page n'est pas montée quand elle est fermée : ni hooks, ni requêtes, ni redirection
- * d'authentification déclenchés pour rien.
+ * déclenchés pour rien.
  *
  * Chaque motif de fermeture a son écran, parce qu'ils appellent des gestes différents :
  * se connecter, s'abonner, finir son parcours, ou constater qu'il est déjà fini.
  */
+
+/** Le message doit nommer l'outil concerné : « parcours requis » seul n'apprend rien. */
+const PARCOURS_COPY: Partial<Record<Feature, { title: string; body: string }>> = {
+  dashboard: {
+    title: "Terminez le parcours fiscal",
+    body: "Répondez aux questions du parcours (vérification SIRET ou diagnostic) avant d'accéder au tableau de bord.",
+  },
+  capture: {
+    title: "Parcours fiscal requis",
+    body: "La capture de factures se débloque une fois la vérification et les questions de profil terminées.",
+  },
+  referral: {
+    title: "Parcours fiscal requis",
+    body: "La mise en relation avec des cabinets est disponible après avoir complété votre parcours fiscal.",
+  },
+  historique: {
+    title: "Parcours fiscal requis",
+    body: "L'historique complet se débloque après la fin du parcours fiscal.",
+  },
+  simulateur: {
+    title: "Parcours fiscal requis",
+    body: "Le simulateur se débloque une fois votre profil fiscal construit via le parcours.",
+  },
+  activite: {
+    title: "Parcours fiscal requis",
+    body: "Facture, rapport et déclaration s'appuient sur votre régime : le parcours doit être terminé.",
+  },
+};
+
+function CarteCentree({ children }: { children: ReactNode }) {
+  return (
+    <div className="animate-rise mx-auto max-w-lg rounded-3xl border border-border bg-card p-8 text-center shadow-soft">
+      {children}
+    </div>
+  );
+}
+
+function BlocChargement({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
+      <Loader2 className="size-5 animate-spin text-primary" />
+      <p className="rule-label text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+/** Premium acquis, mais le questionnaire du parcours n'est pas terminé. */
+function ParcoursLock({ feature }: { feature: Feature }) {
+  const copy = PARCOURS_COPY[feature] ?? {
+    title: "Terminez le parcours fiscal",
+    body: "Complétez la vérification (ou le diagnostic) et répondez aux questions avant d'utiliser cet outil.",
+  };
+
+  return (
+    <AppShell>
+      <CarteCentree>
+        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent/15">
+          <Compass className="size-5 text-accent-ink" />
+        </div>
+        <p className="rule-label mt-5 text-accent-ink">Premium · parcours en cours</p>
+        <h1 className="mt-3 text-2xl">{copy.title}</h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{copy.body}</p>
+        {/* Dire explicitement que l'abonnement est actif : sans ça, un écran fermé juste après
+            avoir payé se lit comme un problème de paiement. */}
+        <p className="mt-2 text-xs text-muted-foreground">
+          Votre abonnement Premium est actif — il reste à compléter le questionnaire du parcours
+          fiscal.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button asChild variant="accent">
+            <Link to="/onboarding">Continuer le parcours fiscal</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/education">Éducation</Link>
+          </Button>
+        </div>
+      </CarteCentree>
+    </AppShell>
+  );
+}
+
+/** Premium dont le parcours est déjà terminé : l'étape ne se refait pas. */
+function ParcoursDoneLock() {
+  return (
+    <AppShell>
+      <CarteCentree>
+        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-success/15">
+          <Check className="size-5 text-success-ink" />
+        </div>
+        <p className="rule-label mt-5 text-muted-foreground">Étape déjà validée</p>
+        <h1 className="mt-3 text-2xl">Vous avez déjà terminé votre parcours fiscal</h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          Cette étape est verrouillée : votre profil fiscal est en place. Retrouvez votre synthèse
+          et vos prochaines actions sur le tableau de bord.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button asChild variant="accent">
+            <Link to="/dashboard">Aller au tableau de bord</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/education">Éducation</Link>
+          </Button>
+        </div>
+      </CarteCentree>
+    </AppShell>
+  );
+}
+
+/** Visiteur : il faut d'abord un compte — l'Éducation, elle, reste ouverte. */
+function AuthLock({ premiumAttendu }: { premiumAttendu: boolean }) {
+  return (
+    <AppShell>
+      <CarteCentree>
+        <h1 className="text-2xl">Connectez-vous pour continuer</h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          {premiumAttendu
+            ? "Cette fonctionnalité fait partie de Premium. L'Éducation fiscale reste ouverte sans compte."
+            : "Cet espace s'appuie sur votre dossier. L'Éducation fiscale reste ouverte sans compte."}
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button asChild variant="outline">
+            <Link to="/education">Aller à l&apos;Éducation</Link>
+          </Button>
+          {/* On mémorise l'intention Premium : la formule est attachée à un compte, elle sera
+              posée au retour d'authentification plutôt que perdue en route. */}
+          <Button asChild variant="accent">
+            <Link to="/auth" onClick={() => premiumAttendu && markPremiumPending()}>
+              Se connecter
+            </Link>
+          </Button>
+        </div>
+      </CarteCentree>
+    </AppShell>
+  );
+}
+
 export function AccessGate({
   feature,
   premiumKind,
@@ -32,172 +169,63 @@ export function AccessGate({
 
   // Avant hydratation, l'état réel est inconnu : afficher un refus ici ferait clignoter un
   // écran de blocage devant un utilisateur qui a pourtant les droits.
-  if (loading) return <EcranAttente />;
+  if (loading) {
+    return (
+      <AppShell>
+        <BlocChargement label="Vérification de votre accès…" />
+      </AppShell>
+    );
+  }
 
   switch (lockReason(feature)) {
     case "auth":
-      return <EcranConnexion />;
+      return <AuthLock premiumAttendu={Boolean(premiumKind)} />;
     case "premium":
-      return premiumKind ? <PremiumPagePlaceholder kind={premiumKind} /> : <EcranPremium />;
+      return premiumKind ? <PremiumPagePlaceholder kind={premiumKind} /> : <AuthLock premiumAttendu />;
     case "parcours":
-      return <EcranParcoursIncomplet />;
+      return <ParcoursLock feature={feature} />;
     case "deja_fait":
-      return <EcranParcoursTermine />;
+      return <ParcoursDoneLock />;
     default:
       return <>{children}</>;
   }
 }
 
-function EcranAttente() {
+/* ------------------------------- Bandeaux d'incitation ------------------------------- */
+
+/** Palier gratuit uniquement : proposer Premium au fil d'un écran auquel il a accès. */
+export function UpsellStrip({ text, cta = "Passer Premium" }: { text: string; cta?: string }) {
+  const { isPremium, loading } = useEntitlements();
+  if (loading || isPremium) return null;
   return (
-    <AppShell>
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="rule-label text-muted-foreground">Chargement…</p>
-      </div>
-    </AppShell>
+    <div className="flex flex-col gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm">{text}</p>
+      <Button asChild variant="accent" size="sm" className="shrink-0">
+        <Link to="/premium">
+          <Sparkles /> {cta}
+        </Link>
+      </Button>
+    </div>
   );
 }
 
-/** Coquille commune aux écrans de blocage : même composition, message et geste différents. */
-function EcranBloque({
-  eyebrow,
-  titre,
-  accroche,
-  texte,
-  icone,
-  action,
+/**
+ * Premium dont le parcours reste à finir : surtout PAS d'incitation à s'abonner — il l'est
+ * déjà. Le seul geste utile est de reprendre là où il s'est arrêté.
+ */
+export function ParcoursStrip({
+  text = "Terminez la vérification et les questions du parcours fiscal pour débloquer tous les outils.",
 }: {
-  eyebrow: string;
-  titre: ReactNode;
-  accroche: string;
-  texte: string;
-  icone: ReactNode;
-  action: ReactNode;
+  text?: string;
 }) {
+  const { state, loading } = useEntitlements();
+  if (loading || state !== "premium_parcours") return null;
   return (
-    <AppShell>
-      <PageHeader eyebrow={eyebrow} title={titre} description={accroche} />
-      <div className="animate-rise mx-auto max-w-xl rounded-3xl border border-border bg-card p-8 text-center shadow-soft sm:p-12">
-        <span className="mx-auto mb-6 inline-flex size-12 items-center justify-center rounded-2xl bg-accent/15 text-accent-ink">
-          {icone}
-        </span>
-        <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{texte}</p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">{action}</div>
-      </div>
-    </AppShell>
-  );
-}
-
-function EcranConnexion() {
-  return (
-    <EcranBloque
-      eyebrow="Espace membre"
-      titre={
-        <>
-          Cet espace demande <span className="font-normal italic">un compte.</span>
-        </>
-      }
-      accroche="Connectez-vous pour retrouver votre dossier."
-      texte="L'Éducation reste ouverte sans compte : posez vos questions fiscales et consultez les
-        sources autant que vous voulez. Le reste de LedgerMind s'appuie sur votre dossier, donc
-        sur votre compte."
-      icone={<LogIn className="size-5" />}
-      action={
-        <>
-          <Button asChild size="lg" variant="accent">
-            <Link to="/auth">
-              Se connecter <ArrowRight />
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link to="/education">Continuer sur l&apos;Éducation</Link>
-          </Button>
-        </>
-      }
-    />
-  );
-}
-
-/** Repli quand aucun écran de démonstration n'existe pour la fonctionnalité demandée. */
-function EcranPremium() {
-  return (
-    <EcranBloque
-      eyebrow="Premium"
-      titre={
-        <>
-          Cet espace fait partie de <span className="font-normal italic">Premium.</span>
-        </>
-      }
-      accroche="Le gratuit sert à comprendre ; Premium sert à agir."
-      texte="L'Éducation vous explique la règle. Premium ouvre le parcours fiscal, puis les outils
-        qui l'appliquent à votre situation : diagnostic, échéances, documents, déclarations."
-      icone={<Sparkles className="size-5" />}
-      action={
-        <>
-          <Button asChild size="lg" variant="accent">
-            <Link to="/premium">
-              Découvrir Premium <ArrowRight />
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link to="/education">Rester sur l&apos;Éducation</Link>
-          </Button>
-        </>
-      }
-    />
-  );
-}
-
-function EcranParcoursIncomplet() {
-  return (
-    <EcranBloque
-      eyebrow="Parcours fiscal"
-      titre={
-        <>
-          Finissez votre parcours <span className="font-normal italic">d&apos;abord.</span>
-        </>
-      }
-      accroche="Les outils s'appuient sur votre diagnostic."
-      texte="Tableau de bord, documents, échéances et simulateur travaillent tous à partir de
-        votre régime et de vos seuils. Tant que le parcours n'est pas terminé, ils n'auraient rien
-        à afficher. Comptez une dizaine de minutes."
-      icone={<Compass className="size-5" />}
-      action={
-        <Button asChild size="lg" variant="accent">
-          <Link to="/onboarding">
-            Reprendre le parcours <ArrowRight />
-          </Link>
-        </Button>
-      }
-    />
-  );
-}
-
-function EcranParcoursTermine() {
-  return (
-    <EcranBloque
-      eyebrow="Parcours fiscal"
-      titre={
-        <>
-          C&apos;est déjà <span className="font-normal italic">fait.</span>
-        </>
-      }
-      accroche="Votre dossier est instruit."
-      texte="Votre diagnostic et votre feuille de route sont enregistrés — inutile de les refaire.
-        Vos données restent modifiables depuis vos paramètres, sans repasser par tout le parcours."
-      icone={<CircleCheckBig className="size-5" />}
-      action={
-        <>
-          <Button asChild size="lg" variant="accent">
-            <Link to="/dashboard">
-              Aller au tableau de bord <ArrowRight />
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link to="/parametres">Modifier mon profil</Link>
-          </Button>
-        </>
-      }
-    />
+    <div className="flex flex-col gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm">{text}</p>
+      <Button asChild variant="accent" size="sm" className="shrink-0">
+        <Link to="/onboarding">Continuer le parcours</Link>
+      </Button>
+    </div>
   );
 }

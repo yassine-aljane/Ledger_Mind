@@ -1,250 +1,197 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Check, Loader2, LogIn, Minus, Sparkles } from "lucide-react";
-import { useState } from "react";
-import { AppShell, PageHeader } from "@/components/lm/AppShell";
-import { Badge } from "@/components/ui/badge";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Check, Loader2, Minus } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import { MarketingLayout } from "@/components/lm/Marketing";
 import { Button } from "@/components/ui/button";
 import { accessState, landingPathFor, useEntitlements } from "@/lib/entitlements";
-import { markPremiumPending, setPlan, usePlan } from "@/lib/plan";
+import { markPremiumPending, setPlan } from "@/lib/plan";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/premium")({
   head: () => ({
     meta: [
-      { title: "Premium — LedgerMind" },
-      { name: "description", content: "Débloquez toute la puissance fiscale de LedgerMind." },
-      { property: "og:title", content: "Passez Premium — LedgerMind" },
-      { property: "og:description", content: "Diagnostic, capture, simulateur, historique et expert-comptable." },
+      { title: "Offre Premium — LedgerMind" },
+      {
+        name: "description",
+        content:
+          "Free : l'Éducation fiscale sourcée. Premium : parcours d'immatriculation, feuille de route, capture de factures et mise en relation avec des cabinets.",
+      },
+      { property: "og:title", content: "Offre Premium — LedgerMind" },
+      {
+        property: "og:description",
+        content: "Passez de comprendre à agir : feuille de route, factures, cabinets.",
+      },
     ],
   }),
-  component: PremiumPage,
+  component: Pricing,
 });
 
-const TIERS = [
-  {
-    id: "free",
-    name: "Gratuit",
-    price: "0 €",
-    tag: "Toujours",
-    desc: "Pour comprendre les bases de la fiscalité française.",
-    features: [
-      { on: true, label: "Fiches Éducation illimitées" },
-      { on: true, label: "Recherche dans le glossaire fiscal" },
-      { on: false, label: "Diagnostic personnalisé" },
-      { on: false, label: "Reçus fiscaux & pipeline" },
-      { on: false, label: "Simulateur de contrat" },
-      { on: false, label: "Mise en relation expert-comptable" },
-    ],
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    price: "12 €",
-    tag: "/ mois",
-    desc: "L'assistant fiscal complet, comme un cabinet dans votre poche.",
-    highlight: true,
-    features: [
-      { on: true, label: "Tout du Gratuit" },
-      { on: true, label: "Diagnostic & régime recommandé" },
-      { on: true, label: "OCR factures & justificatifs" },
-      { on: true, label: "Reçus fiscaux + provisions" },
-      { on: true, label: "Simulateur en langage naturel" },
-      { on: true, label: "Historique & export comptable" },
-      { on: true, label: "Emails d'expert-comptable automatisés" },
-    ],
-  },
+/** [libellé, inclus au gratuit, inclus au Premium] */
+const ROWS: Array<[string, boolean, boolean]> = [
+  ["Questions fiscales illimitées, réponses sourcées BOFiP", true, true],
+  ["Agent pédagogique complet — sans inscription", true, true],
+  ["Alertes de fraîcheur et textes périmés signalés", true, true],
+  ["Historique sauvegardé (avec compte)", false, true],
+  ["Diagnostic sans SIREN en quelques minutes", false, true],
+  ["Vérification SIRET officielle et immatriculation guidée", false, true],
+  ["Feuille de route personnalisée (étapes, seuils, échéances)", false, true],
+  ["Analyse de factures et virements + détection de doublons", false, true],
+  ["Emails prêts à envoyer à des cabinets comptables", false, true],
+  ["Tableau de bord et historique complet", false, true],
 ];
 
-function PremiumPage() {
+function Card({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border border-border bg-card text-card-foreground shadow-soft",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="rule-label text-muted-foreground">
+      <span className="mr-2 inline-block h-px w-6 -translate-y-[3px] bg-accent align-middle" />
+      {children}
+    </p>
+  );
+}
+
+function Pastille({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex w-fit items-center gap-1.5 rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Pricing() {
   const navigate = useNavigate();
-  const plan = usePlan();
-  const { authed, parcoursDone } = useEntitlements();
-  const [loading, setLoading] = useState(false);
+  const { authed, isPremium, parcoursDone } = useEntitlements();
+  const [busy, setBusy] = useState(false);
 
   /**
    * Activation (démo, sans paiement).
    *
-   * Deux cas. Connecté : la formule est posée sur le compte, et on l'envoie là où son nouvel
-   * état lui donne accès — l'onboarding s'il reste à faire, le tableau de bord sinon. Déconnecté :
-   * la formule est attachée à un identifiant, on ne peut donc pas l'activer tout de suite. On
-   * mémorise l'intention et on passe par l'authentification, qui l'honorera au retour.
+   * Déconnecté : la formule est attachée à un compte, on ne peut donc pas l'activer tout de
+   * suite. On mémorise l'intention et on passe par l'authentification, qui l'honorera au retour.
+   * Connecté : on pose la formule, puis on envoie là où son nouvel état donne accès — le
+   * parcours s'il reste à faire, le tableau de bord sinon.
    */
-  function activate() {
+  function upgrade() {
     if (!authed) {
       markPremiumPending();
       navigate({ to: "/auth" });
       return;
     }
-    setLoading(true);
+    setBusy(true);
     setTimeout(() => {
       setPlan("premium");
-      setLoading(false);
+      setBusy(false);
+      toast.success("Premium activé. Choisissez votre parcours : avec ou sans SIRET.");
       navigate({ to: landingPathFor(accessState(true, "premium", parcoursDone)) });
     }, 700);
   }
 
+  const premiumHome = parcoursDone ? "/dashboard" : "/onboarding";
+
   return (
-    <AppShell>
-      <PageHeader
-        eyebrow="Premium"
-        title={
-          <>
-            Débloquez la <span className="italic font-normal">totalité</span> de votre cabinet.
-          </>
-        }
-        description="14 jours d'essai. Sans engagement. Résiliation en un clic."
-      />
+    <MarketingLayout>
+      <div className="mx-auto max-w-6xl px-5 py-14 sm:py-20">
+        <div className="animate-rise max-w-2xl">
+          <SectionLabel>Tarifs</SectionLabel>
+          <h1 className="mt-4 text-[clamp(2.2rem,5vw,3.6rem)] leading-[1.02]">
+            Comprendre est gratuit.
+            <br />
+            <span className="text-safran italic">Agir change tout.</span>
+          </h1>
+          <p className="mt-5 text-muted-foreground">
+            L&apos;Éducation est ouverte à tous, sans compte. Premium débloque le parcours
+            d&apos;action.
+          </p>
+        </div>
 
-      <div className="grid md:grid-cols-2 gap-6 mb-16">
-        {TIERS.map((t) => (
-          <div
-            key={t.id}
-            className={cn(
-              "animate-rise relative overflow-hidden rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 md:p-10",
-              t.highlight
-                ? "surface-ink border-ink shadow-lift"
-                : "card-hover border-border bg-card",
-            )}
-          >
-            {t.highlight && (
-              <>
-                <div className="absolute -right-24 -top-24 size-72 rounded-full bg-accent/30 blur-3xl" />
-                <div className="surface-grain absolute inset-0 opacity-50" />
-              </>
-            )}
-            <div className="relative">
-              <div className="flex items-center justify-between mb-6">
-                <span
-                  className={cn(
-                    "rule-label",
-                    t.highlight ? "text-accent" : "text-accent-ink",
-                  )}
-                >
-                  {t.name}
-                </span>
-                {t.highlight && <Badge variant="accent">Recommandé</Badge>}
-              </div>
+        <div className="mt-12 grid gap-5 lg:grid-cols-2">
+          <Card className="animate-rise flex flex-col p-8">
+            <Pastille>Éducation</Pastille>
+            <p className="num mt-6 text-5xl">0 €</p>
+            <p className="mt-2 text-sm text-muted-foreground">Sans compte, sans carte bancaire.</p>
+            <ul className="mt-7 flex-1 space-y-3 text-sm">
+              {ROWS.filter((r) => r[1]).map(([label]) => (
+                <li key={label} className="flex gap-3">
+                  <Check className="mt-0.5 size-4 shrink-0 text-success-ink" /> {label}
+                </li>
+              ))}
+            </ul>
+            <Button asChild variant="outline" className="mt-8 w-full">
+              <Link to="/education">Utiliser l&apos;Éducation</Link>
+            </Button>
+          </Card>
 
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className="num text-4xl font-medium">{t.price}</span>
-                <span
-                  className={cn(
-                    "text-sm",
-                    t.highlight ? "text-ink-foreground/60" : "text-muted-foreground",
-                  )}
-                >
-                  {t.tag}
+          <Card className="animate-rise surface-ink relative flex flex-col overflow-hidden border-0 p-8">
+            <div className="shimmer-premium pointer-events-none absolute inset-0" aria-hidden />
+            <div className="relative flex flex-1 flex-col">
+              <Pastille className="border-ink-foreground/30 bg-ink-foreground text-ink">
+                Premium
+              </Pastille>
+              <p className="num mt-6 text-5xl text-ink-foreground">
+                29 €{" "}
+                <span className="font-sans text-base font-medium text-ink-foreground/60">
+                  / mois
                 </span>
-              </div>
-              <p
-                className={cn(
-                  "mb-8 text-sm",
-                  t.highlight ? "text-ink-foreground/70" : "text-muted-foreground",
-                )}
-              >
-                {t.desc}
               </p>
-
-              <ul className="space-y-3 mb-10">
-                {t.features.map((f) => (
-                  <li key={f.label} className="flex items-center gap-3 text-sm">
-                    <span
-                      className={cn(
-                        "flex size-5 shrink-0 items-center justify-center rounded-full",
-                        f.on
-                          ? t.highlight
-                            ? "bg-accent text-accent-foreground"
-                            : "bg-success text-success-foreground"
-                          : t.highlight
-                            ? "bg-ink-foreground/10 text-ink-foreground/40"
-                            : "bg-border text-muted-foreground",
-                      )}
-                    >
-                      {f.on ? <Check className="size-3" /> : <Minus className="size-3" />}
-                    </span>
-                    <span
-                      className={cn(
-                        !f.on &&
-                          (t.highlight
-                            ? "text-ink-foreground/40 line-through"
-                            : "text-muted-foreground line-through"),
-                      )}
-                    >
-                      {f.label}
-                    </span>
+              <p className="mt-2 text-sm text-ink-foreground/70">
+                Sans engagement. Le prix d&apos;une heure de conseil, chaque mois.
+              </p>
+              <ul className="mt-7 flex-1 space-y-3 text-sm text-ink-foreground/85">
+                {ROWS.map(([label, , premium]) => (
+                  <li key={label} className="flex gap-3">
+                    {premium ? (
+                      <Check className="mt-0.5 size-4 shrink-0 text-accent" />
+                    ) : (
+                      <Minus className="mt-0.5 size-4 shrink-0 opacity-40" />
+                    )}
+                    {label}
                   </li>
                 ))}
               </ul>
-
-              {t.id === "premium" ? (
+              {isPremium ? (
                 <Button
-                  type="button"
-                  size="lg"
-                  variant="accent"
-                  onClick={activate}
-                  disabled={loading || plan === "premium"}
-                  className="w-full rounded-full"
+                  asChild
+                  className="mt-8 w-full bg-ink-foreground text-ink hover:bg-ink-foreground/90"
                 >
-                  {plan === "premium" ? (
-                    <>
-                      <Check /> Premium actif
-                    </>
-                  ) : loading ? (
-                    <>
-                      <Loader2 className="animate-spin" /> Activation…
-                    </>
-                  ) : authed ? (
-                    <>
-                      <Sparkles /> Démarrer l&apos;essai — 14 jours
-                    </>
-                  ) : (
-                    // Sans compte, la formule n'a rien à quoi s'attacher : on annonce l'étape
-                    // intermédiaire plutôt que de promettre une activation immédiate.
-                    <>
-                      <LogIn /> Se connecter pour activer
-                    </>
-                  )}
+                  <Link to={premiumHome}>
+                    {parcoursDone
+                      ? "Votre abonnement est actif — Tableau de bord"
+                      : "Votre abonnement est actif — Continuer le parcours"}
+                  </Link>
                 </Button>
               ) : (
-                <div className="rule-label w-full py-4 text-center text-muted-foreground">
-                  Plan actuel par défaut
-                </div>
+                <Button variant="accent" className="mt-8 w-full" onClick={upgrade} disabled={busy}>
+                  {busy ? <Loader2 className="animate-spin" /> : "Passer Premium"}
+                </Button>
               )}
             </div>
-          </div>
-        ))}
+          </Card>
+        </div>
+
+        <p className="mt-8 max-w-2xl text-xs text-muted-foreground">
+          LedgerMind fournit une information fiscale documentée et des outils de préparation. Il ne
+          se substitue pas à un expert-comptable : la mise en relation Premium existe précisément
+          pour cela.
+        </p>
       </div>
-
-      {/* Social proof / faux testimonial strip */}
-      <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-10 shadow-soft md:p-14">
-        <div className="surface-grain absolute inset-0" />
-        <div className="relative grid md:grid-cols-3 gap-10">
-          <Metric k="2 400+" v="freelances accompagnés" />
-          <Metric k="18 h" v="économisées par mois en moyenne" />
-          <Metric k="0" v="pénalité fiscale rapportée en 2025" />
-        </div>
-      </section>
-
-      {plan === "premium" && (
-        <div className="mt-12 text-center">
-          <button
-            type="button"
-            onClick={() => setPlan("free")}
-            className="rule-label text-muted-foreground transition-colors duration-200 hover:text-destructive"
-          >
-            (démo) revenir au plan gratuit
-          </button>
-        </div>
-      )}
-    </AppShell>
-  );
-}
-
-function Metric({ k, v }: { k: string; v: string }) {
-  return (
-    <div>
-      <p className="num mb-2 text-3xl font-medium">{k}</p>
-      <p className="text-sm text-muted-foreground">{v}</p>
-    </div>
+    </MarketingLayout>
   );
 }

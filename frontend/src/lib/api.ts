@@ -703,3 +703,36 @@ export async function fetchCaptureDocumentMessages(
 export function formatMoney(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+/**
+ * Relit un détail de session comme s'il s'agissait d'un tour d'orchestrateur.
+ *
+ * Sert à REPRENDRE un parcours interrompu : la session vit côté serveur, mais quitter un écran
+ * démonte son composant et perd son état React. Au remontage, on redemande le détail et on le
+ * retraduit en tour pour réafficher exactement l'étape en cours.
+ *
+ * `/detail` ne renvoie pas de `ui_action` — c'est une notion d'affichage, pas de persistance.
+ * On la redérive donc de la phase, seule source de vérité sur l'avancement.
+ */
+export function detailAsTurn(detail: SessionDetail): OrchestratorTurnResponse {
+  const phase = detail.phase;
+  let ui_action: OrchestratorTurnResponse["ui_action"] = "ask_question";
+  if (phase === "verification") ui_action = "show_verification_result";
+  else if (phase === "verification_registry_document") ui_action = "upload_registry_document";
+  else if (phase === "verification_document") ui_action = "upload_sirene_document";
+  else if (phase === "diagnostic_roadmap") ui_action = "show_roadmap";
+  else if (phase === "tax_classification") ui_action = "show_tax_result";
+  else if (phase === "compliance_check") ui_action = "show_compliance";
+  else if (phase === "done") ui_action = "done";
+
+  return {
+    session_id: detail.session_id,
+    phase: detail.phase,
+    ui_action,
+    message: null,
+    quick_replies: [],
+    profile: detail.profile,
+    roadmap: detail.roadmap,
+    diagnostic_profile: detail.diagnostic_profile,
+  };
+}

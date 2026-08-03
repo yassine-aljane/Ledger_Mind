@@ -223,12 +223,12 @@
   }
 
   html {
-    /* Hausse de la taille de police de base (16px navigateur -> 23px) : comme les utilitaires
-       Tailwind (text-sm, text-lg, ...) sont en rem, tout le site grandit proportionnellement
-       depuis ce seul endroit, sans retoucher chaque composant. Décision de lisibilité
-       volontaire — les primitives shadcn ont été recalibrées pour cette base (voir
-       components/ui/button.tsx & co.), et non l'inverse. */
-    font-size: 23px;
+    /* Racine laissée à la valeur navigateur (16px), comme dans le design system d'origine.
+       Une surcharge à 23px a été essayée : comme tous les utilitaires Tailwind sont en rem,
+       elle agrandissait AUSSI chaque marge, padding et hauteur de 44 % — un rail de 368px,
+       des cartes à 46px de padding — et il fallait recalibrer chaque composant à la main pour
+       compenser. Régler la taille du texte se fait au cas par cas (voir les échelles `text-*`),
+       pas en déplaçant la référence de tout le système d'espacement. */
     -webkit-font-smoothing: antialiased;
     scroll-behavior: smooth;
   }

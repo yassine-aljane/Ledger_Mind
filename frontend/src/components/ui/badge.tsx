@@ -3,10 +3,9 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-// Densité calibrée pour la racine à 23px (voir styles.css) : chasse mono + capitales espacées,
-// dans la même famille visuelle que l'utilitaire `rule-label`.
+// Chasse mono + capitales espacées, dans la même famille visuelle que l'utilitaire `rule-label`.
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[0.55rem] font-medium uppercase tracking-[0.12em] transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [&_svg]:size-3 [&_svg]:shrink-0",
+  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-[0.65rem] font-medium uppercase tracking-[0.12em] transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [&_svg]:size-3.5 [&_svg]:shrink-0",
   {
     variants: {
       variant: {

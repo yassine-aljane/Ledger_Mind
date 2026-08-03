@@ -2,6 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
+  Compass,
   FileStack,
   Gauge,
   History,
@@ -9,19 +10,14 @@ import {
   LogOut,
   Moon,
   Receipt,
+  Settings,
   Sparkles,
   Sun,
-  Compass,
   Users,
   Wallet,
 } from "lucide-react";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
-import {
-  displayShortName,
-  getStoredUser,
-  logout,
-  type AuthUser,
-} from "@/lib/auth";
+import type { ComponentType, ReactNode } from "react";
+import { displayName, logout } from "@/lib/auth";
 import { useEntitlements, type Feature, type LockReason } from "@/lib/entitlements";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -31,16 +27,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 // Un seul endroit décrit la navigation, et chaque entrée déclare la fonctionnalité dont elle
-// dépend : c'est `lib/entitlements` qui décide de son verrouillage, pas la barre elle-même.
-const nav = [
+// dépend : c'est `lib/entitlements` qui décide de son verrouillage, pas le rail lui-même.
+const NAV = [
   { to: "/education", label: "Éducation", icon: BookOpen, feature: "education" },
-  { to: "/onboarding", label: "Parcours", icon: Compass, feature: "onboarding" },
-  { to: "/dashboard", label: "Dashboard", icon: Gauge, feature: "dashboard" },
+  { to: "/dashboard", label: "Tableau de bord", icon: Gauge, feature: "dashboard" },
+  { to: "/onboarding", label: "Parcours fiscal", icon: Compass, feature: "onboarding" },
+  { to: "/capture", label: "Capture", icon: Receipt, feature: "capture" },
   { to: "/activite", label: "Activité", icon: Wallet, feature: "activite" },
-  { to: "/referral", label: "Expert-Comptable", icon: Users, feature: "referral" },
-  { to: "/capture", label: "Documents", icon: Receipt, feature: "capture" },
-  { to: "/simulateur", label: "Simulateur", icon: FileStack, feature: "simulateur" },
+  { to: "/referral", label: "Cabinets", icon: Users, feature: "referral" },
   { to: "/historique", label: "Historique", icon: History, feature: "historique" },
+  { to: "/simulateur", label: "Simulateur", icon: FileStack, feature: "simulateur" },
+  { to: "/parametres", label: "Profil", icon: Settings, feature: "profile" },
 ] as const satisfies readonly {
   to: string;
   label: string;
@@ -64,9 +61,15 @@ export function LogoutBubble() {
     navigate({ to: "/auth", replace: true });
   }
   return (
-    <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-1.5 text-muted-foreground">
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      onClick={handleSignOut}
+      aria-label="Se déconnecter"
+      title="Se déconnecter"
+      className="text-muted-foreground"
+    >
       <LogOut />
-      <span className="hidden lg:inline">Déconnexion</span>
     </Button>
   );
 }
@@ -87,85 +90,197 @@ export function ThemeToggle({ className }: { className?: string }) {
   );
 }
 
+function NavLink({
+  item,
+  active,
+  motif,
+}: {
+  item: (typeof NAV)[number];
+  active: boolean;
+  motif: LockReason;
+}) {
+  const locked = motif !== "none";
+  return (
+    <Link
+      to={item.to}
+      title={locked ? LOCK_TITLE[motif] : item.label}
+      className={cn(
+        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+      )}
+    >
+      <item.icon className="size-4 shrink-0" />
+      <span className="flex-1 truncate">{item.label}</span>
+      {locked && <Lock className="size-3 shrink-0 opacity-70" />}
+    </Link>
+  );
+}
+
+/** Encart bas de rail : ce que vaut la formule actuelle, et le geste qui suit. */
+function CarteFormule() {
+  const { state } = useEntitlements();
+
+  if (state === "free") {
+    return (
+      <div className="shimmer-premium rounded-2xl border border-accent/40 bg-accent/10 p-4">
+        <p className="rule-label text-accent-ink">Formule actuelle · Free</p>
+        <p className="mt-2 text-sm font-medium">Débloquez le parcours fiscal complet.</p>
+        <Button asChild variant="accent" size="sm" className="mt-3 w-full">
+          <Link to="/premium">
+            <Sparkles /> Passer Premium
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (state === "premium_parcours") {
+    return (
+      <div className="rounded-2xl border border-accent/40 bg-accent/8 p-4">
+        <p className="rule-label text-accent-ink">Parcours en cours</p>
+        <p className="mt-2 text-sm font-medium">
+          Terminez le parcours pour débloquer le tableau de bord.
+        </p>
+        <Button asChild variant="accent" size="sm" className="mt-3 w-full">
+          <Link to="/onboarding">Reprendre le parcours</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (state === "invite") {
+    return (
+      <div className="space-y-2 rounded-2xl border border-border p-4">
+        <p className="text-sm font-medium">Éducation libre</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          L&apos;agent pédagogue est ouvert sans compte. Connectez-vous pour conserver
+          l&apos;historique.
+        </p>
+        <Button asChild variant="accent" size="sm" className="w-full">
+          <Link to="/auth">Se connecter</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function BlocCompte() {
+  const { user, state } = useEntitlements();
+  if (state === "invite") return null;
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{displayName(user)}</p>
+        <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+      </div>
+      <LogoutBubble />
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const { state, plan, lockReason, landingPath } = useEntitlements();
-
-  useEffect(() => {
-    setUser(getStoredUser());
-  }, [pathname]);
-
+  const { state, lockReason } = useEntitlements();
   const authed = state !== "invite";
 
+  const entrees = NAV.map((item) => ({
+    item,
+    motif: lockReason(item.feature),
+    active: pathname === item.to || pathname.startsWith(`${item.to}/`),
+  }))
+    // « Parcours terminé » n'est pas un verrou à montrer : l'entrée n'a plus rien à proposer.
+    .filter(({ motif }) => motif !== "deja_fait");
+
   return (
-    <div className="min-h-screen">
-      <nav className="fixed inset-x-0 top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-6">
-          {/* Le logo ramène à l'écran auquel l'utilisateur a droit, pas systématiquement au
-              tableau de bord — qui est fermé tant que le parcours n'est pas terminé. */}
-          <Link to={landingPath} className="shrink-0" aria-label="LedgerMind, accueil">
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto flex w-full max-w-[1400px]">
+        {/* Rail desktop */}
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border px-4 py-6 lg:flex">
+          {/* Le wordmark ramène à l'accueil du site, comme partout ailleurs sur le web. Le
+              raccourci vers l'espace de travail, lui, est l'entrée de navigation correspondante. */}
+          <Link to="/" className="px-2" aria-label="LedgerMind, accueil">
             <Wordmark />
           </Link>
 
-          <div className="hidden items-center gap-1 md:flex">
-            {nav.map((item) => {
-              const active = pathname.startsWith(item.to);
-              const motif = lockReason(item.feature);
-              const locked = motif !== "none";
-              // « Parcours terminé » n'est pas un verrou à afficher : l'entrée disparaît, elle
-              // n'a plus rien à proposer. Les autres motifs restent visibles, cadenassés — ils
-              // montrent ce que l'utilisateur gagnerait à débloquer.
-              if (motif === "deja_fait") return null;
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  title={locked ? LOCK_TITLE[motif] : item.label}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.62rem] font-medium transition-colors",
-                    active
-                      ? "bg-secondary text-foreground"
-                      : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
-                  )}
-                >
-                  <item.icon className="size-3.5 shrink-0" />
-                  {item.label}
-                  {locked && <Lock className="size-3 shrink-0 text-accent" />}
-                </Link>
-              );
-            })}
-          </div>
+          <nav className="mt-8 space-y-1" aria-label="Navigation principale">
+            {entrees.map(({ item, motif, active }) => (
+              <NavLink key={item.to} item={item} active={active} motif={motif} />
+            ))}
+          </nav>
 
-          <div className="flex shrink-0 items-center gap-2">
-            {plan === "free" ? (
-              <Link
-                to="/premium"
-                className="shimmer-premium hidden items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 font-mono text-[0.55rem] font-medium uppercase tracking-[0.12em] text-accent-ink transition-colors hover:bg-accent/20 sm:inline-flex"
-              >
-                <Sparkles className="size-3" />
-                Passer Premium
-              </Link>
-            ) : (
-              <Badge variant="accent" className="hidden sm:inline-flex">
-                <Sparkles /> Premium
-              </Badge>
-            )}
-            {authed && <CentreActionsButton />}
-            <ThemeToggle />
-            {authed && <LogoutBubble />}
-            <Link
-              to={authed ? "/parametres" : "/auth"}
-              className="inline-flex h-8 max-w-40 items-center truncate rounded-full bg-primary px-3.5 text-[0.62rem] font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
-              title={user ? displayShortName(user) : "Compte"}
-            >
-              {authed ? displayShortName(user) : "Se connecter"}
-            </Link>
+          <div className="mt-auto space-y-3 pt-6">
+            <CarteFormule />
+            <BlocCompte />
+            <div className="flex items-center justify-between px-1">
+              <span className="rule-label text-muted-foreground">Apparence</span>
+              <ThemeToggle />
+            </div>
           </div>
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          {/* Header mobile */}
+          <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-3 backdrop-blur lg:hidden">
+            <Link to="/" aria-label="LedgerMind, accueil">
+              <Wordmark />
+            </Link>
+            <div className="flex items-center gap-2">
+              <Badge variant={state === "premium_complet" ? "accent" : "outline"}>
+                {state === "invite"
+                  ? "Visiteur"
+                  : state === "free"
+                    ? "Free"
+                    : state === "premium_parcours"
+                      ? "Premium · parcours"
+                      : "Premium"}
+              </Badge>
+              {authed && <CentreActionsButton />}
+              <ThemeToggle />
+              {authed && <LogoutBubble />}
+            </div>
+          </header>
+
+          {/* Le Centre d'Actions vit hors du rail : il ouvre un panneau, ce n'est pas une page. */}
+          {authed && (
+            <div className="hidden justify-end px-8 pt-6 lg:flex">
+              <CentreActionsButton />
+            </div>
+          )}
+
+          <main className="px-4 pb-28 pt-6 sm:px-8 lg:pb-16">{children}</main>
+        </div>
+      </div>
+
+      {/* Barre mobile */}
+      <nav
+        aria-label="Navigation principale"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur lg:hidden"
+      >
+        <div className="flex overflow-x-auto">
+          {entrees.slice(0, 5).map(({ item, motif, active }) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={cn(
+                "flex flex-1 shrink-0 flex-col items-center gap-1 px-3 py-2.5 text-[0.5rem] font-medium",
+                active ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              <span className="relative">
+                <item.icon className="size-4" />
+                {motif !== "none" && (
+                  <Lock className="absolute -right-2 -top-1 size-2.5 text-accent" />
+                )}
+              </span>
+              {item.label}
+            </Link>
+          ))}
         </div>
       </nav>
-
-      <main className="mx-auto max-w-7xl px-6 pb-24 pt-24">{children}</main>
     </div>
   );
 }
@@ -182,12 +297,12 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="animate-rise mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <header className="animate-rise mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
-        {eyebrow && <p className="rule-label mb-3 text-accent-ink">{eyebrow}</p>}
-        <h1 className="text-balance text-4xl md:text-5xl">{title}</h1>
+        {eyebrow && <p className="rule-label mb-2 text-accent-ink">{eyebrow}</p>}
+        <h1 className="text-balance text-3xl sm:text-4xl">{title}</h1>
         {description && (
-          <p className="mt-4 text-pretty text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
             {description}
           </p>
         )}

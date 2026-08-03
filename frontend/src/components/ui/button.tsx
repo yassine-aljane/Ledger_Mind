@@ -4,11 +4,8 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-// Densité calibrée pour la racine à 23px (voir styles.css) : les hauteurs et les icônes sont
-// resserrées d'un cran par rapport au shadcn d'origine, pensé pour une racine à 16px, afin que
-// les contrôles restent proportionnés au texte agrandi au lieu de paraître surdimensionnés.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -22,11 +19,11 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-8 px-3.5 py-1.5",
-        sm: "h-7 rounded-md px-2.5 text-xs",
-        lg: "h-10 rounded-xl px-6",
-        icon: "h-8 w-8",
-        "icon-sm": "h-7 w-7 rounded-md",
+        default: "h-9 px-4 py-2",
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-11 rounded-xl px-8",
+        icon: "h-9 w-9",
+        "icon-sm": "h-8 w-8 rounded-md",
       },
     },
     defaultVariants: {
