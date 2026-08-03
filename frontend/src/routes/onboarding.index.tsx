@@ -1,7 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { AccessGate } from "@/components/lm/AccessGate";
 import { LogoutBubble } from "@/components/lm/AppShell";
 import { Wordmark } from "@/components/lm/Logo";
+import { repriseEnCours, routeDeReprise } from "@/lib/reprise";
 
 export const Route = createFileRoute("/onboarding/")({
   head: () => ({
@@ -25,6 +28,48 @@ function OnboardingRoute() {
 }
 
 function Gate() {
+  const navigate = useNavigate();
+  // Tant qu'on n'a pas interrogé le serveur, on ne sait pas s'il faut poser la question
+  // du choix ou reprendre un parcours entamé. Afficher le choix d'abord le ferait
+  // clignoter devant quelqu'un qui y a déjà répondu.
+  const [verification, setVerification] = useState(true);
+
+  /**
+   * Un parcours interrompu se reprend à son étape, pas à son début.
+   *
+   * Sans ce contrôle, revenir ici après avoir validé son SIRET reposait la question
+   * « avez-vous un SIREN ? », et repartir de la branche A ouvrait une nouvelle session :
+   * la vérification déjà faite et le KBIS en attente étaient perdus.
+   */
+  useEffect(() => {
+    let annule = false;
+    void (async () => {
+      try {
+        const reprise = await repriseEnCours();
+        if (annule) return;
+        const cible = reprise ? routeDeReprise(reprise.detail) : null;
+        if (cible) {
+          navigate({ to: cible, replace: true });
+          return;
+        }
+      } catch {
+        // Rien de reprenable : on pose la question normalement.
+      }
+      if (!annule) setVerification(false);
+    })();
+    return () => {
+      annule = true;
+    };
+  }, [navigate]);
+
+  if (verification) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="px-6 h-16 flex items-center justify-between max-w-7xl mx-auto w-full">

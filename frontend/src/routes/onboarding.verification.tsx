@@ -18,6 +18,7 @@ import {
   type OrchestratorTurnResponse,
   type UserProfile,
 } from "@/lib/api";
+import { repriseEnCours, routeDeReprise } from "@/lib/reprise";
 
 export const Route = createFileRoute("/onboarding/verification")({
   head: () => ({
@@ -217,38 +218,21 @@ function VerificationPage() {
    */
   useEffect(() => {
     let annule = false;
-    const sid = (() => {
-      try {
-        return getStoredSessionId();
-      } catch {
-        return null;
-      }
-    })();
-
-    if (!sid) {
-      setBooting(false);
-      return;
-    }
 
     void (async () => {
       try {
-        const detail = await fetchSessionDetail(sid);
-        if (annule) return;
-        if (detail.branch !== "intake") return;
-        if (detail.phase === "profile_questions") {
-          navigate({ to: "/onboarding/profil", replace: true });
+        const reprise = await repriseEnCours("intake");
+        if (annule || !reprise) return;
+
+        const { detail } = reprise;
+        const cible = routeDeReprise(detail);
+        // Une phase déjà au-delà de la vérification appartient à un autre écran :
+        // on y renvoie plutôt que d'afficher une étape franchie.
+        if (cible && cible !== "/onboarding/verification") {
+          navigate({ to: cible, replace: true });
           return;
         }
-        if (
-          detail.phase === "verification" ||
-          detail.phase === "verification_registry_document" ||
-          detail.phase === "verification_document"
-        ) {
-          setOrchestratorResult(detailAsTurn(detail));
-        }
-      } catch {
-        // Session introuvable ou expirée : on repart du formulaire, sans message d'erreur —
-        // l'utilisateur n'a rien fait de mal.
+        if (cible) setOrchestratorResult(detailAsTurn(detail));
       } finally {
         if (!annule) setBooting(false);
       }

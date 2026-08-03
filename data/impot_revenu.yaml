@@ -1,0 +1,90 @@
+# ============================================================================
+#  IMPÔT SUR LE REVENU — BARÈME, QUOTIENT FAMILIAL, DÉCOTE, CFP, ACRE
+# ============================================================================
+#  Complète `seuils.yaml`, qui reste la source unique pour les abattements,
+#  plafonds micro, taux de cotisations sociales et versement libératoire.
+#  AUCUNE valeur n'est dupliquée entre les deux fichiers.
+#
+#  ⚠️  À RÉVISER À CHAQUE LOI DE FINANCES : le barème est revalorisé chaque
+#      année, et le plafond du quotient familial avec lui.
+#
+#  Règle du projet : aucun taux ni seuil codé en dur dans la logique. Toute
+#  valeur vit ici avec sa source et sa date de vérification.
+#
+#  PROVENANCE : valeurs issues de la spécification de calcul fournie au projet
+#  (formules_calcul_impot_micro_entreprise.md). Les URL ci-dessous sont les
+#  pages officielles de référence à consulter pour confirmation ; `verifie`
+#  indique si un contrôle auprès de la source a eu lieu.
+# ============================================================================
+
+annee: 2026                    # imposition 2026 sur les revenus 2025
+date_verif: "2026-08-03"
+verifie: false                 # valeurs non encore recoupées avec la source officielle
+
+# --- Barème progressif de l'IR (par part) ----------------------------------
+#  `plafond: null` sur la dernière tranche = pas de borne supérieure.
+bareme:
+  revenus_annee: 2025
+  tranches:
+    - { plancher: 0,      plafond: 11600,  taux: 0.00 }
+    - { plancher: 11600,  plafond: 29579,  taux: 0.11 }
+    - { plancher: 29579,  plafond: 84577,  taux: 0.30 }
+    - { plancher: 84577,  plafond: 181917, taux: 0.41 }
+    - { plancher: 181917, plafond: null,   taux: 0.45 }
+  annee: 2026
+  source: "https://www.impots.gouv.fr/particulier/questions/comment-est-calcule-mon-impot"
+  date_verif: "2026-08-03"
+  verifie: false
+
+# --- Quotient familial -----------------------------------------------------
+#  Avantage en impôt plafonné PAR DEMI-PART s'ajoutant aux parts de base
+#  (1 pour une personne seule, 2 pour un couple marié ou pacsé).
+quotient_familial:
+  plafond_demi_part: 1807
+  parts_base_seul: 1
+  parts_base_couple: 2
+  # Parent isolé et autres situations particulières relèvent d'un plafond
+  # supérieur : à traiter par une surcharge explicite, pas par ce chiffre.
+  annee: 2026
+  source: "https://www.service-public.fr/particuliers/vosdroits/F2705"
+  date_verif: "2026-08-03"
+  verifie: false
+
+# --- Décote ----------------------------------------------------------------
+#  decote = max(0 ; montant − taux × IR) puis IR_net = IR − decote.
+decote:
+  celibataire: 897
+  couple: 1486
+  taux: 0.4525
+  # Le montant « couple » est donné comme approximatif par la spécification.
+  a_verifier: ["couple"]
+  annee: 2026
+  source: "https://bofip.impots.gouv.fr/bofip/1911-PGP"
+  date_verif: "2026-08-03"
+  verifie: false
+
+# --- Contribution à la formation professionnelle ---------------------------
+#  Assise sur le CA encaissé, comme les cotisations sociales.
+cfp:
+  vente: 0.001
+  services_bic: 0.003
+  bnc_regime_general: 0.002
+  bnc_cipav: 0.002
+  annee: 2026
+  source: "https://www.urssaf.fr/accueil/independant/creer-entreprise/auto-entrepreneur/cotisations-contributions.html"
+  date_verif: "2026-08-03"
+  verifie: false
+
+# --- ACRE — exonération de début d'activité --------------------------------
+#  ⚠️  APPROXIMATION ASSUMÉE : la réduction ne porte en toute rigueur que sur
+#      la part « cotisations » du taux global ; la CSG-CRDS reste due. Appliquer
+#      50 % sur le taux entier surestime légèrement l'allègement. Le moteur
+#      signale cette approximation dans ses résultats.
+acre:
+  reduction: 0.5
+  trimestres_civils: 4
+  approximation: "réduction appliquée au taux global, CSG-CRDS incluse"
+  annee: 2026
+  source: "https://www.urssaf.fr/accueil/independant/creer-entreprise/beneficier-exoneration-acre.html"
+  date_verif: "2026-08-03"
+  verifie: false

@@ -184,12 +184,15 @@ function BlocCompte() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { state, lockReason } = useEntitlements();
+  const { state, lockReason, loading } = useEntitlements();
   const authed = state !== "invite";
 
   const entrees = NAV.map((item) => ({
     item,
-    motif: lockReason(item.feature),
+    // Avant hydratation, l'état est celui d'un visiteur : masquer les verrous plutôt
+    // que d'en afficher de faux, sinon une entrée apparaît puis disparaît à chaque
+    // navigation.
+    motif: loading ? ("none" as LockReason) : lockReason(item.feature),
     active: pathname === item.to || pathname.startsWith(`${item.to}/`),
   }))
     // « Parcours terminé » n'est pas un verrou à montrer : l'entrée n'a plus rien à proposer.
