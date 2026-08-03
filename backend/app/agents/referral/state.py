@@ -14,6 +14,10 @@ class Comptable(TypedDict):
     email: Optional[str]
     site_web: Optional[str]
     telephone: Optional[str]
+    adresse: Optional[str]
+    lat: Optional[float]
+    lon: Optional[float]
+    distance_km: Optional[float]
     source: str  # "overpass" | "entreprise_api"
 
 
@@ -34,6 +38,8 @@ class AgentState(TypedDict):
     # Résultats intermédiaires
     comptables: List[Comptable]
     emails_generes: List[EmailGenere]
+    ville_lat: Optional[float]
+    ville_lon: Optional[float]
 
     # Gestion des erreurs / cas limites
     error: Optional[str]

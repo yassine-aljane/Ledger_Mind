@@ -22,7 +22,7 @@ BLOCKLIST_PATTERNS = (
 # Sert à écarter les faux positifs de recherche (site sans rapport trouvé par erreur).
 RELEVANCE_KEYWORDS = ("comptable", "expertise comptable", "expert-comptable")
 
-CANDIDATE_PATHS = ["", "/contact", "/nous-contacter", "/mentions-legales", "/mentions-légales"]
+CANDIDATE_PATHS = ["", "/contact", "/mentions-legales"]
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; comptable-agent-poc/1.0)"}
 
@@ -69,7 +69,7 @@ def extract_email_from_website(site_web: str) -> Optional[str]:
     for path in CANDIDATE_PATHS:
         url = urljoin(site_web, path)
         try:
-            resp = requests.get(url, headers=HEADERS, timeout=8)
+            resp = requests.get(url, headers=HEADERS, timeout=5)
             if resp.status_code != 200:
                 continue
             emails, relevant = _extract_emails_from_html(resp.text)

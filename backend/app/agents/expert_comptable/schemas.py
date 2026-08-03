@@ -19,11 +19,15 @@ class CabinetComptable(BaseModel):
     site_web: str | None = None
     email: str | None = None
     distance_km: float | None = None
+    lat: float | None = None
+    lon: float | None = None
     source: str  # "Recherche d'Entreprises (api.gouv.fr)" | "OpenStreetMap (Overpass)"
 
 
 class RechercheExpertsComptables(BaseModel):
     ville_recherchee: str
+    ville_lat: float | None = None
+    ville_lon: float | None = None
     cabinets: list[CabinetComptable]
     sources: list[str]
     annuaire_officiel_url: str
