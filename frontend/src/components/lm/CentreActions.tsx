@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   ArrowRight,
+  Bell,
   CalendarDays,
   Check,
   ExternalLink,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/api";
 import {
   fetchFilVeille,
+  fetchNotificationsVeille,
   majPreferencesVeille,
   marquerToutVeilleLu,
   type Nouveaute,
@@ -802,27 +804,100 @@ function VueVeille() {
  * filtre CSS crée un « containing block » pour les descendants en `position: fixed`, et sans
  * cette mise en portail le panneau restait contraint à la hauteur du <nav>.
  */
-export function CentreActionsButton() {
+/**
+ * Bouton d'ouverture du Centre d'Actions.
+ *
+ * Deux entrées, parce que ce sont deux urgences différentes : le CALENDRIER donne l'agenda
+ * qu'on consulte quand on le décide, la CLOCHE signale ce qui vient de tomber et qu'on n'a pas
+ * demandé. Mélanger les deux sur une seule icône revenait à noyer l'alerte dans la routine.
+ */
+export function CentreActionsButton({
+  variante = "agenda",
+}: {
+  variante?: "agenda" | "veille";
+}) {
+  const estCloche = variante === "veille";
   const [ouvert, setOuvert] = useState(false);
-  const [vue, setVue] = useState<Vue>("agenda");
+  const [vue, setVue] = useState<Vue>(variante);
+  const [nonLues, setNonLues] = useState(0);
   const plan = usePlan();
+
+  // Compteur de nouveautés non lues : sans lui, une veille qui trouve quelque chose reste
+  // invisible tant que personne n'ouvre le panneau — donc invisible pour de bon.
+  // La lecture est sans coût côté serveur (rien qu'une requête Mongo, aucun appel LLM).
+  useEffect(() => {
+    if (plan !== "premium" || !estCloche) return;
+    let annule = false;
+    const rafraichir = () =>
+      fetchNotificationsVeille(true)
+        .then((r) => {
+          if (!annule) setNonLues(r.non_lues);
+        })
+        .catch(() => {});
+    rafraichir();
+    // Le cycle de veille tourne côté serveur : on resynchronise périodiquement plutôt que
+    // d'attendre un rechargement de page.
+    const timer = setInterval(rafraichir, 5 * 60 * 1000);
+    return () => {
+      annule = true;
+      clearInterval(timer);
+    };
+  }, [plan, ouvert, estCloche]);
 
   return (
     <Sheet
       open={ouvert}
       onOpenChange={(next) => {
         setOuvert(next);
-        if (next) setVue("agenda");
+        if (next) setVue(variante);
       }}
     >
       <SheetTrigger asChild>
         <button
           type="button"
-          title="Centre d'Actions"
-          aria-label="Ouvrir le Centre d'Actions"
-          className="grid size-8 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-all duration-200 hover:border-ink hover:text-foreground active:scale-95"
+          title={
+            estCloche
+              ? nonLues > 0
+                ? `${nonLues} nouveauté${nonLues > 1 ? "s" : ""} réglementaire${nonLues > 1 ? "s" : ""}`
+                : "Veille réglementaire"
+              : "Agenda fiscal"
+          }
+          aria-label={
+            estCloche
+              ? nonLues > 0
+                ? `Ouvrir la veille réglementaire, ${nonLues} nouveauté${nonLues > 1 ? "s" : ""} non lue${nonLues > 1 ? "s" : ""}`
+                : "Ouvrir la veille réglementaire"
+              : "Ouvrir l'agenda fiscal"
+          }
+          className={cn(
+            "relative grid size-8 shrink-0 place-items-center rounded-full border transition-all duration-200 active:scale-95",
+            nonLues > 0
+              ? "border-accent/50 bg-accent/10 text-accent-ink hover:border-accent"
+              : "border-border text-muted-foreground hover:border-ink hover:text-foreground",
+          )}
         >
-          <CalendarDays className="size-3.5" />
+          {estCloche ? (
+            <Bell className={cn("size-3.5", nonLues > 0 && "animate-cloche")} />
+          ) : (
+            <CalendarDays className="size-3.5" />
+          )}
+          {estCloche && nonLues > 0 && (
+            <>
+              {/* Compteur en rouge : c'est la convention universelle du « non lu ». Le safran
+                  reste la couleur de l'action volontaire (passer Premium, déclarer) ; le rouge
+                  dit « ceci vous attend », ce qui n'est pas la même chose. */}
+              <span
+                aria-hidden
+                className="absolute -right-1 -top-1 size-4 animate-ping rounded-full bg-destructive/40"
+              />
+              <span
+                aria-hidden
+                className="num absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-destructive text-[0.5rem] font-semibold text-destructive-foreground ring-2 ring-background"
+              >
+                {nonLues > 9 ? "9+" : nonLues}
+              </span>
+            </>
+          )}
         </button>
       </SheetTrigger>
 

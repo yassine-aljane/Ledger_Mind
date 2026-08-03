@@ -21,6 +21,13 @@ from pydantic import BaseModel, Field
 
 Impact = Literal["information", "action_recommandee", "action_obligatoire"]
 
+#: Nature d'une publication.
+#:   actualite — un fait NOUVEAU et daté : une règle change, un barème bouge, une date tombe
+#:   reference — une page permanente qui décrit une règle inchangée (calendrier fiscal, CA12…)
+#: Seules les actualités remontent dans la veille. Une page de référence n'apprend rien à
+#: quelqu'un qui a déjà sa feuille de route : elle appartient au corpus du pédagogue, pas ici.
+Nature = Literal["actualite", "reference"]
+
 #: Niveaux d'autorité, du plus contraignant au plus indicatif.
 #:   1 — texte opposable (Légifrance, BOFiP)
 #:   2 — source administrative officielle (URSSAF, impots.gouv.fr, service-public, DGFiP…)
@@ -91,6 +98,7 @@ class Nouveaute(BaseModel):
     titre: str
     resume: str
     impact: Impact = "information"
+    nature: Nature = "actualite"
     echeance: str | None = None
     sources: list[Source]
     criteres: Criteres = Field(default_factory=Criteres)
@@ -99,6 +107,17 @@ class Nouveaute(BaseModel):
     #: Marquée périmée plutôt que supprimée : une information ancienne reste une information.
     perime: bool = False
     cycle_id: str | None = None
+
+    @property
+    def echeance_depassee(self) -> bool:
+        """Une échéance passée n'est plus une action à faire.
+
+        Sans ce contrôle, l'écran affiche « Action obligatoire — avant le 15/12/2025 » des mois
+        après la date : le pire des messages, parce qu'il est à la fois faux et anxiogène.
+        """
+        if not self.echeance:
+            return False
+        return self.echeance[:10] < datetime.now().strftime("%Y-%m-%d")
 
     @property
     def autorite_max(self) -> int:

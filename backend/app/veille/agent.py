@@ -44,6 +44,7 @@ Réponds en JSON STRICT, sans texte autour :
   "titre": "une phrase claire, sans jargon",
   "resume": "2 à 3 phrases : ce qui change, et ce que la personne doit faire",
   "impact": "information"|"action_recommandee"|"action_obligatoire",
+  "nature": "actualite"|"reference",
   "echeance": "AAAA-MM-JJ" ou null,
   "criteres": {{
     "regimes": [],
@@ -68,6 +69,35 @@ texte le restreint EXPLICITEMENT.
 - activites ∈ {sorted(ACTIVITES_CONNUES)}
 - international=true seulement si la mesure ne vise QUE ceux qui facturent hors de France.
 """
+
+
+#: Motifs de titres à écarter AVANT toute qualification.
+#:
+#: La recherche Légifrance interroge le JORF en « un des mots » : un texte contenant simplement
+#: « commerciale » ou « non » ressort, si bien qu'un cycle réel remonte surtout des avis de
+#: vacance d'emploi et des nominations. Les filtrer ici évite de dépenser un appel LLM par
+#: document pour s'entendre répondre « pertinent: false » — sur un cycle observé, 15 candidats
+#: sur 22 étaient de ce type.
+_MOTIFS_BRUIT = (
+    "avis de vacance",
+    "vacance d'un emploi",
+    "vacance de l'emploi",
+    "vacance d'emploi",
+    "nomination",
+    "portant nomination",
+    "cessation de fonctions",
+    "tableau d'avancement",
+    "liste d'aptitude",
+    "medaille",
+    "légion d'honneur",
+    "ordre national du merite",
+)
+
+
+def est_bruit(titre: str) -> bool:
+    """Vrai pour les publications administratives sans portée fiscale."""
+    bas = titre.lower()
+    return any(motif in bas for motif in _MOTIFS_BRUIT)
 
 
 async def qualifier(titre: str, texte: str) -> dict | None:
@@ -111,6 +141,7 @@ def _construire(candidat: dict, qualif: dict, cycle_id: str) -> Nouveaute | None
         titre=titre,
         resume=qualif["resume"].strip(),
         impact=qualif.get("impact") or "information",
+        nature=qualif.get("nature") or "reference",
         echeance=echeance,
         sources=[
             Source(
@@ -127,21 +158,142 @@ def _construire(candidat: dict, qualif: dict, cycle_id: str) -> Nouveaute | None
     )
 
 
+# --------------------------------------------------------------------- Sources d'actualité
+
+#: Pages d'ACTUALITÉ officielles, distinctes des pages de référence du corpus.
+#:
+#: Une page de référence décrit une règle qui ne bouge pas ; une page d'actualité annonce ce qui
+#: change. La veille n'a d'intérêt que sur les secondes — c'est ce que montrait le premier cycle
+#: réel : 18 candidats sur 19 étaient de la documentation permanente.
+SOURCES_ACTUALITE: tuple[dict, ...] = (
+    {"url": "https://www.impots.gouv.fr/actualites", "libelle": "DGFiP — Actualités", "autorite": 2},
+    {"url": "https://www.impots.gouv.fr/professionnel/actualites", "libelle": "DGFiP — Actualités professionnels", "autorite": 2},
+    {"url": "https://www.urssaf.fr/accueil/actualites.html", "libelle": "URSSAF — Actualités", "autorite": 2},
+    {"url": "https://boss.gouv.fr/portail/accueil/nouveautes.html", "libelle": "BOSS — Nouveautés", "autorite": 2},
+    {"url": "https://www.economie.gouv.fr/loi-finances-2026", "libelle": "Loi de finances 2026", "autorite": 1},
+)
+
+#: Nombre maximal de nouveautés extraites d'une même page. Une page d'actualités en liste
+#: souvent une vingtaine ; au-delà des plus récentes, on remonte dans des mois écoulés.
+MAX_PAR_PAGE = 6
+
+_SYSTEME_LOT = f"""Tu dépouilles une page d'ACTUALITÉS fiscales ou sociales françaises, destinée à des indépendants et créateurs de contenu.
+
+La page liste plusieurs annonces. Extrais-en AU PLUS {MAX_PAR_PAGE}, les plus récentes et les plus utiles. Réponds en JSON STRICT :
+{{"nouveautes": [{{
+  "titre": "une phrase claire, sans jargon",
+  "resume": "2 à 3 phrases : ce qui change, et ce que la personne doit faire",
+  "impact": "information"|"action_recommandee"|"action_obligatoire",
+  "nature": "actualite"|"reference",
+  "echeance": "AAAA-MM-JJ" ou null,
+  "criteres": {{"regimes": [], "tax_categories": [], "regimes_tva": [], "seuils": [],
+                "activites": [], "international": true|false|null}}
+}}]}}
+
+RÈGLES ABSOLUES :
+- N'extrais QUE ce qui est écrit sur la page. N'invente ni titre, ni chiffre, ni date.
+- N'extrais que ce qui concerne les indépendants/créateurs. Si rien ne les concerne, renvoie {{"nouveautes": []}} — une liste vide est une réponse correcte.
+- nature="actualite" seulement pour un fait NOUVEAU et daté. "reference" pour une page permanente. Dans le doute : "reference".
+- echeance : uniquement une date FUTURE explicitement imposée. Jamais une date passée.
+- Ne donne aucun conseil personnalisé : tu informes, tu ne recommandes pas de stratégie.
+- tax_categories ∈ ["BNC","BIC","mixed"] ; regimes_tva ∈ ["franchise","reel_simplifie","reel_normal"]
+- seuils ∈ {sorted(SEUILS_CONNUS)} ; activites ∈ {sorted(ACTIVITES_CONNUES)}
+"""
+
+
+async def qualifier_lot(titre: str, texte: str) -> list[dict]:
+    """Extrait plusieurs nouveautés d'une page d'actualités.
+
+    C'est la différence décisive avec `qualifier` : une page listant vingt annonces ne doit pas
+    produire une seule entrée fourre-tout. Une liste vide est un résultat acceptable.
+    """
+    try:
+        brut = await chat_json_with_system(
+            _SYSTEME_LOT,
+            f"Page : {titre}\n\nContenu : {texte[:12000]}",
+            temperature=0.1,
+            max_tokens=2000,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Dépouillement impossible pour « %s » : %s", titre, exc)
+        return []
+
+    items = brut.get("nouveautes") or []
+    if not isinstance(items, list):
+        return []
+    return [i for i in items[:MAX_PAR_PAGE] if isinstance(i, dict) and i.get("resume")]
+
+
+async def _collecter_actualites() -> list[tuple[dict, list[dict]]]:
+    """Interroge les pages d'actualité et en dépouille les annonces.
+
+    Chaque annonce garde l'URL de la PAGE comme source : on ne peut pas vérifier une URL d'article
+    reconstituée par un modèle, et une source fausse serait pire qu'une source imprécise.
+    """
+    from app.mcp import client as mcp
+
+    resultats: list[tuple[dict, list[dict]]] = []
+    for source in SOURCES_ACTUALITE:
+        try:
+            page = await mcp.call_tool("docs-officiels", "fetch_page", {"cle_ou_url": source["url"]})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Source d'actualité injoignable (%s) : %s", source["url"], exc)
+            continue
+        texte = page.get("texte", "") if isinstance(page, dict) else ""
+        if not texte:
+            continue
+        annonces = await qualifier_lot(source["libelle"], texte)
+        if annonces:
+            resultats.append((source, annonces))
+    return resultats
+
+
 async def collecter_et_qualifier() -> dict:
     """Étapes 1 et 2 : remplit le catalogue. Ne notifie personne."""
     from app.veille import scheduler
 
     cycle_id = datetime.now().isoformat(timespec="seconds")
-    candidats = await scheduler._collecter()
-
     nouvelles, connues, ecartees = 0, 0, 0
+    bruit = 0
+
+    # 1) Pages d'actualité : plusieurs annonces par page.
+    for source, annonces in await _collecter_actualites():
+        for annonce in annonces:
+            item = _construire(
+                {"titre": annonce.get("titre", source["libelle"]), "url": source["url"],
+                 "source": source["libelle"], "autorite": source["autorite"]},
+                annonce, cycle_id,
+            )
+            if item is None or item.nature != "actualite" or item.echeance_depassee:
+                ecartees += 1
+                continue
+            if store.upsert_nouveaute(item):
+                nouvelles += 1
+            else:
+                connues += 1
+
+    # 2) Sources historiques (Légifrance, BOFiP, docs officiels) : une annonce par document.
+    candidats = await scheduler._collecter()
     for candidat in candidats:
+        if est_bruit(candidat["titre"]):
+            bruit += 1
+            continue
         qualif = await qualifier(candidat["titre"], candidat.get("texte", ""))
         if qualif is None:
             ecartees += 1
             continue
         item = _construire(candidat, qualif, cycle_id)
         if item is None:
+            ecartees += 1
+            continue
+        # Une page de référence décrit une règle inchangée : elle a sa place dans le corpus du
+        # pédagogue (déjà ré-ingérée par `scheduler.run_veille`), pas dans un fil d'actualité.
+        if item.nature != "actualite":
+            ecartees += 1
+            continue
+        # Une échéance déjà passée n'annonce plus rien : la publier afficherait « action
+        # obligatoire avant le 15/12/2025 » huit mois après la date.
+        if item.echeance_depassee:
             ecartees += 1
             continue
         if store.upsert_nouveaute(item):
@@ -151,14 +303,15 @@ async def collecter_et_qualifier() -> dict:
 
     perimees = store.marquer_perimees(FRAICHEUR_MAX_JOURS)
     logger.info(
-        "Veille — cycle %s : %d nouvelle(s), %d connue(s), %d écartée(s), %d périmée(s)",
-        cycle_id, nouvelles, connues, ecartees, perimees,
+        "Veille — cycle %s : %d nouvelle(s), %d connue(s), %d écartée(s), %d bruit, %d périmée(s)",
+        cycle_id, nouvelles, connues, ecartees, bruit, perimees,
     )
     return {
         "cycle_id": cycle_id,
         "nouvelles": nouvelles,
         "connues": connues,
         "ecartees": ecartees,
+        "bruit": bruit,
         "perimees": perimees,
     }
 
@@ -183,6 +336,8 @@ def distribuer(profil: ProfilVeille) -> dict:
     candidates = []
     for nouveaute in store.nouveautes_actives():
         if nouveaute.id in connues or nouveaute.perime:
+            continue
+        if nouveaute.echeance_depassee or nouveaute.nature != "actualite":
             continue
         verdict = evaluer(nouveaute, profil)
         if notifiable(verdict, nouveaute, prefs.mode):
@@ -224,6 +379,10 @@ def pour_utilisateur(user, profil_guidance: dict | None = None, inclure_contexte
 
     fil = []
     for nouveaute in store.nouveautes_actives():
+        # Le catalogue vieillit entre deux cycles : une échéance franchie hier ne doit plus
+        # s'afficher aujourd'hui, même si la nouveauté était parfaitement valable à la collecte.
+        if nouveaute.echeance_depassee or nouveaute.nature != "actualite":
+            continue
         verdict = evaluer(nouveaute, profil)
         if not verdict.retenue:
             continue
@@ -241,8 +400,16 @@ def pour_utilisateur(user, profil_guidance: dict | None = None, inclure_contexte
             }
         )
 
+    # Tri : ce qui contraint d'abord, puis l'échéance la plus proche, puis la pertinence.
+    # Une obligation qui tombe dans huit jours doit précéder une obligation sans date.
     ordre = {"action_obligatoire": 0, "action_recommandee": 1, "information": 2}
-    fil.sort(key=lambda n: (ordre.get(n["impact"], 3), -n["pertinence"]))
+    fil.sort(
+        key=lambda n: (
+            ordre.get(n["impact"], 3),
+            n["echeance"] or "9999-12-31",
+            -n["pertinence"],
+        )
+    )
     return fil
 
 

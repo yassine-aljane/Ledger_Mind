@@ -194,3 +194,52 @@ async def test_publication_non_pertinente_est_ecartee(monkeypatch):
 
     monkeypatch.setattr("app.veille.agent.chat_json_with_system", faux)
     assert await agent.qualifier("Titre", "Texte") is None
+
+
+# ------------------------------------------------------------------ Filtre de bruit
+
+
+def test_les_avis_de_vacance_demploi_sont_ecartes_sans_appel_llm():
+    """La recherche Légifrance interroge en « un des mots » : sans ce filtre, un cycle réel
+    dépense un appel LLM par avis de nomination pour s'entendre répondre « non pertinent »."""
+    assert agent.est_bruit("Avis de vacance d'un emploi de sous-directeur")
+    assert agent.est_bruit("Arrêté du 3 août 2026 portant nomination au conseil")
+    assert agent.est_bruit("Avis de vacance de l'emploi de directeur de l'INJEP")
+
+
+def test_un_texte_fiscal_nest_pas_pris_pour_du_bruit():
+    assert not agent.est_bruit("CFE 2025 : date limite de paiement fixée au 15 décembre 2025")
+    assert not agent.est_bruit("Déclaration européenne de services (DES)")
+    assert not agent.est_bruit("Relèvement du plafond micro-BNC pour 2026")
+
+
+# ------------------------------------------------------------------ Fraîcheur
+
+
+def test_une_echeance_passee_est_detectee():
+    """« Action obligatoire avant le 15/12/2025 » affiché en août 2026 : à la fois faux et
+    anxiogène. C'est le défaut qu'on a constaté à l'écran."""
+    assert _nouveaute(echeance="2020-01-01").echeance_depassee is True
+    assert _nouveaute(echeance="2099-01-01").echeance_depassee is False
+    assert _nouveaute(echeance=None).echeance_depassee is False
+
+
+def test_une_page_de_reference_nest_pas_une_actualite():
+    """Le calendrier fiscal ou « comment déposer une CA12 » décrivent une règle inchangée :
+    ils appartiennent au corpus du pédagogue, pas à un fil d'actualité."""
+    candidat = {"titre": "T", "url": "https://impots.gouv.fr/a", "source": "DGFiP", "autorite": 2}
+    reference = agent._construire(
+        candidat, {"resume": "R", "nature": "reference", "criteres": {}}, "c1"
+    )
+    actualite = agent._construire(
+        candidat, {"resume": "R", "nature": "actualite", "criteres": {}}, "c1"
+    )
+    assert reference.nature == "reference"
+    assert actualite.nature == "actualite"
+
+
+def test_la_nature_par_defaut_est_reference():
+    """Dans le doute, on ne publie pas : une qualification muette ne doit pas remplir le fil."""
+    candidat = {"titre": "T", "url": "https://impots.gouv.fr/a", "source": "DGFiP", "autorite": 2}
+    item = agent._construire(candidat, {"resume": "R", "criteres": {}}, "c1")
+    assert item.nature == "reference"
