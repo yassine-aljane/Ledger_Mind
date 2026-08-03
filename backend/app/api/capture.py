@@ -6,16 +6,22 @@ import asyncio
 import base64
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 
 from app.agents.capture.app import nodes
 from app.agents.capture.app.schemas import (
     AnalyzeResponse,
     AnswerResponse,
     BankTransfer,
+    Contract,
+    ContratListItem,
+    DocumentDetail,
     Invoice,
     InvoiceListItem,
     PendingQuestion,
@@ -74,6 +80,17 @@ def _build_analyze_response(graph, config, thread_id: str) -> AnalyzeResponse:
             pending=pending,
         )
 
+    if values.get("document_type") == "autre":
+        return AnalyzeResponse(
+            status=Status.non_pris_en_charge,
+            thread_id=thread_id,
+            document_id=document_id,
+            document_type="autre",
+            detected_nature=values.get("detected_nature"),
+            message=values.get("message"),
+            saved=False,
+        )
+
     if values.get("document_type") == "virement":
         return AnalyzeResponse(
             status=Status.completed,
@@ -81,6 +98,19 @@ def _build_analyze_response(graph, config, thread_id: str) -> AnalyzeResponse:
             document_id=document_id,
             document_type="virement",
             transfer=BankTransfer(**(values.get("virement") or {})),
+            analysis=values.get("analysis"),
+            incoherences=values.get("incoherences"),
+            saved=values.get("saved"),
+            duplicate_skipped=values.get("duplicate_skipped"),
+        )
+
+    if values.get("document_type") == "contrat":
+        return AnalyzeResponse(
+            status=Status.completed,
+            thread_id=thread_id,
+            document_id=document_id,
+            document_type="contrat",
+            contract=Contract(**(values.get("contrat") or {})),
             analysis=values.get("analysis"),
             incoherences=values.get("incoherences"),
             saved=values.get("saved"),
@@ -106,6 +136,10 @@ def _build_analyze_response(graph, config, thread_id: str) -> AnalyzeResponse:
 
 
 def _sync_user_capture_context(user_id: str, resp: AnalyzeResponse) -> None:
+    # Un document hors périmètre n'est pas enregistré : l'inscrire au fil
+    # d'activité y ferait apparaître une pièce qui n'existe nulle part.
+    if resp.status == Status.non_pris_en_charge:
+        return
     now = datetime.now(timezone.utc).isoformat()
     entry = {
         "thread_id": resp.thread_id,
@@ -115,6 +149,7 @@ def _sync_user_capture_context(user_id: str, resp: AnalyzeResponse) -> None:
         "expense_category": resp.expense_category,
         "invoice_number": (resp.invoice.invoice_number if resp.invoice else None),
         "total_ttc": (resp.invoice.total_ttc if resp.invoice else None),
+        "contract_type": (resp.contract.contract_type if resp.contract else None),
         "created_at": now,
     }
     users_collection().update_one(
@@ -255,9 +290,204 @@ async def list_invoices(user: UserPublic = Depends(get_current_user)):
                 payment_date=d.get("payment_date"),
                 payment_days_until=nodes.days_until(d.get("payment_date")),
                 created_at=d.get("created_at"),
+                filename=d.get("filename"),
+                has_file=bool(d.get("has_file")),
             )
         )
     return out
+
+
+def _build_document_detail(d: dict[str, Any], document_id: str) -> DocumentDetail:
+    """Met un document stocké à la forme de la fiche exposée par l'API."""
+    # Virements et contrats portent `document_type`; les factures d'avant ce
+    # champ n'en ont pas — la présence de leur bloc métier fait alors foi.
+    dtype = d.get("document_type")
+    if dtype not in ("facture", "virement", "contrat"):
+        dtype = "virement" if "transfer" in d else "contrat" if "contract" in d else "facture"
+    common = {
+        "document_id": d.get("document_id", document_id),
+        "filename": d.get("filename"),
+        "mime": d.get("mime"),
+        "has_file": bool(d.get("has_file")),
+        "created_at": d.get("created_at"),
+        "analysis": d.get("analysis"),
+        "incoherences": d.get("incoherences"),
+        "ocr_text": d.get("ocr_text"),
+        "detected_language": d.get("detected_language"),
+        "writing_mode": d.get("writing_mode"),
+        "uncertain_fields": d.get("uncertain_fields"),
+        "corrected_fields": d.get("corrected_fields"),
+        "editable_fields": nodes.champs_editables(dtype),
+    }
+    if dtype == "virement":
+        return DocumentDetail(
+            document_type="virement",
+            transfer=BankTransfer(**(d.get("transfer") or {})),
+            **common,
+        )
+    if dtype == "contrat":
+        return DocumentDetail(
+            document_type="contrat",
+            contract=Contract(**(d.get("contract") or {})),
+            **common,
+        )
+    return DocumentDetail(
+        document_type="facture",
+        invoice=Invoice(**(d.get("invoice") or {})),
+        expense_category=d.get("expense_category"),
+        paid=d.get("paid"),
+        payment_date=d.get("payment_date"),
+        payment_days_until=nodes.days_until(d.get("payment_date")),
+        **common,
+    )
+
+
+@router.get("/documents/{document_id}", response_model=DocumentDetail)
+async def document_detail(document_id: str, user: UserPublic = Depends(get_current_user)):
+    """Vue complète d'un document déjà traité (facture, virement ou contrat)."""
+    runtime = get_runtime()
+    deps = runtime["deps"]
+    d = await asyncio.to_thread(deps.db.get_document_by_id, user.id, document_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+    return _build_document_detail(d, document_id)
+
+
+class CaptureUpdateBody(BaseModel):
+    """Corrections humaines : un champ métier -> sa nouvelle valeur (texte brut)."""
+
+    updates: dict[str, Any] = Field(min_length=1)
+
+
+class CaptureUpdateResponse(BaseModel):
+    document: DocumentDetail
+    corrected: list[str]
+    # True si la synthèse a été rejouée, False si elle aurait dû l'être mais a
+    # échoué, None si la correction ne le justifiait pas.
+    resynthese: bool | None = None
+
+
+@router.patch("/documents/{document_id}", response_model=CaptureUpdateResponse)
+async def update_document(
+    document_id: str,
+    body: CaptureUpdateBody,
+    user: UserPublic = Depends(get_current_user),
+):
+    """Corrige des champs extraits. L'utilisateur fait autorité sur la machine."""
+    runtime = get_runtime()
+    deps = runtime["deps"]
+    try:
+        doc = await asyncio.to_thread(
+            nodes.update_document_fields, deps, user.id, document_id, body.updates
+        )
+    except nodes.DocumentIntrouvable:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+    except DuplicateKeyError:
+        # La correction rendrait cette pièce identique à une autre déjà
+        # enregistrée : l'index de déduplication s'y oppose.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Cette correction rendrait le document identique à une pièce déjà "
+                "enregistrée. Vérifiez qu'il ne s'agit pas d'un doublon."
+            ),
+        )
+
+    return CaptureUpdateResponse(
+        document=_build_document_detail(doc, document_id),
+        corrected=doc.get("corrected_now") or [],
+        resynthese=doc.get("resynthese"),
+    )
+
+
+def _forget_capture_history(user_id: str, document_id: str) -> None:
+    """Retire la pièce du fil d'activité de l'utilisateur.
+
+    `agent_context.capture` conserve une entrée par analyse : la laisser après
+    suppression ferait réapparaître un document qui n'existe plus.
+    """
+    users = users_collection()
+    users.update_one(
+        {"id": user_id},
+        {"$pull": {"agent_context.capture.history": {"document_id": document_id}}},
+    )
+    # Le dernier document consulté ne doit pas pointer sur une pièce effacée.
+    users.update_one(
+        {"id": user_id, "agent_context.capture.last_document_id": document_id},
+        {
+            "$set": {
+                "agent_context.capture.last_document_id": None,
+                "agent_context.capture.last_thread_id": None,
+            }
+        },
+    )
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+async def delete_document(document_id: str, user: UserPublic = Depends(get_current_user)):
+    """Supprime définitivement une pièce et tout ce qui s'y rattache."""
+    runtime = get_runtime()
+    deps = runtime["deps"]
+    removed = await asyncio.to_thread(deps.db.delete_document, user.id, document_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+    await asyncio.to_thread(_forget_capture_history, user.id, document_id)
+    return Response(status_code=204)
+
+
+# Types rendus tels quels dans le navigateur. Tout le reste est renvoyé en
+# téléchargement neutre : servir un dépôt utilisateur `inline` avec son type
+# déclaré laisserait un .html ou .svg s'exécuter sur l'origine de l'API.
+_INLINE_MIMES = {
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/gif",
+}
+
+_EXT_MIMES = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+
+
+def _serve_mime(mime: str | None, filename: str | None) -> str | None:
+    """Type MIME sûr pour l'affichage, `None` si le document doit être téléchargé."""
+    candidate = (mime or "").split(";")[0].strip().lower()
+    if candidate not in _INLINE_MIMES and filename:
+        suffix = Path(filename).suffix.lower()
+        candidate = _EXT_MIMES.get(suffix, candidate)
+    return candidate if candidate in _INLINE_MIMES else None
+
+
+@router.get("/documents/{document_id}/file")
+async def document_file(document_id: str, user: UserPublic = Depends(get_current_user)):
+    """Renvoie la pièce d'origine (PDF/image) pour affichage."""
+    runtime = get_runtime()
+    deps = runtime["deps"]
+    found = await asyncio.to_thread(deps.db.get_original_file, user.id, document_id)
+    if not found:
+        raise HTTPException(
+            status_code=404,
+            detail="Pièce d'origine non conservée pour ce document.",
+        )
+    data, filename, mime = found
+    safe_mime = _serve_mime(mime, filename)
+    disposition = "inline" if safe_mime else "attachment"
+    name = Path(filename or document_id).name.replace('"', "")
+    return Response(
+        content=data,
+        media_type=safe_mime or "application/octet-stream",
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{name}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/documents/{document_id}/messages", response_model=list[DocumentMessage])
@@ -281,6 +511,27 @@ async def list_virements(user: UserPublic = Depends(get_current_user)):
             analysis=d.get("analysis"),
             incoherences=d.get("incoherences"),
             created_at=d.get("created_at"),
+            filename=d.get("filename"),
+            has_file=bool(d.get("has_file")),
+        )
+        for d in docs
+    ]
+
+
+@router.get("/contrats", response_model=list[ContratListItem])
+async def list_contrats(user: UserPublic = Depends(get_current_user)):
+    runtime = get_runtime()
+    deps = runtime["deps"]
+    docs = await asyncio.to_thread(deps.db.list_contrats, user.id)
+    return [
+        ContratListItem(
+            document_id=d.get("document_id", ""),
+            contract=Contract(**(d.get("contract") or {})),
+            analysis=d.get("analysis"),
+            incoherences=d.get("incoherences"),
+            created_at=d.get("created_at"),
+            filename=d.get("filename"),
+            has_file=bool(d.get("has_file")),
         )
         for d in docs
     ]

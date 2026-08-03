@@ -55,6 +55,14 @@ def build_graph(deps: Deps, checkpointer):
     g.add_node("analyze_virement", _bind(nodes.analyze_virement_node, deps))
     g.add_node("check_duplicate_virement", _bind(nodes.check_duplicate_virement_node, deps))
     g.add_node("save_virement", _bind(nodes.save_virement_node, deps))
+    # -- branche contrat --
+    g.add_node("extract_contrat", _bind(nodes.extract_contrat_node, deps))
+    g.add_node("ask_missing_contrat_field", _bind(nodes.ask_missing_contrat_field_node, deps))
+    g.add_node("analyze_contrat", _bind(nodes.analyze_contrat_node, deps))
+    g.add_node("check_duplicate_contrat", _bind(nodes.check_duplicate_contrat_node, deps))
+    g.add_node("save_contrat", _bind(nodes.save_contrat_node, deps))
+    # -- sortie : document hors périmètre --
+    g.add_node("reject_unsupported", _bind(nodes.reject_unsupported_node, deps))
 
     g.add_edge(START, "ocr")
     g.add_edge("ocr", "detect_language")
@@ -65,12 +73,18 @@ def build_graph(deps: Deps, checkpointer):
         {"detect_document_type": "detect_document_type", "translate_to_fr": "translate_to_fr"},
     )
     g.add_edge("translate_to_fr", "detect_document_type")
-    # facture -> pipeline facture ; virement -> pipeline virement
+    # facture / virement / contrat -> pipeline correspondant ; autre -> sortie
     g.add_conditional_edges(
         "detect_document_type",
         nodes.route_by_doc_type,
-        {"extract_fields": "extract_fields", "extract_virement": "extract_virement"},
+        {
+            "extract_fields": "extract_fields",
+            "extract_virement": "extract_virement",
+            "extract_contrat": "extract_contrat",
+            "reject_unsupported": "reject_unsupported",
+        },
     )
+    g.add_edge("reject_unsupported", END)
     # Pipeline facture
     g.add_conditional_edges(
         "extract_fields",
@@ -100,5 +114,19 @@ def build_graph(deps: Deps, checkpointer):
     g.add_edge("analyze_virement", "check_duplicate_virement")
     g.add_edge("check_duplicate_virement", "save_virement")
     g.add_edge("save_virement", END)
+    # Pipeline contrat (HITL champ manquant -> analyse -> dédup -> sauvegarde)
+    g.add_conditional_edges(
+        "extract_contrat",
+        nodes.route_after_extract_contrat,
+        {"ask_missing_contrat_field": "ask_missing_contrat_field", "analyze_contrat": "analyze_contrat"},
+    )
+    g.add_conditional_edges(
+        "ask_missing_contrat_field",
+        nodes.route_after_ask_contrat,
+        {"ask_missing_contrat_field": "ask_missing_contrat_field", "analyze_contrat": "analyze_contrat"},
+    )
+    g.add_edge("analyze_contrat", "check_duplicate_contrat")
+    g.add_edge("check_duplicate_contrat", "save_contrat")
+    g.add_edge("save_contrat", END)
 
     return g.compile(checkpointer=checkpointer)

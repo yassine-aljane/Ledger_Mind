@@ -409,6 +409,7 @@ export type CaptureInvoice = {
   amount_eur?: number | null;
   exchange_rate?: number | null;
   rate_date?: string | null;
+  rate_source?: string | null;
   paid: boolean | null;
   due_date?: string | null;
   payment_terms_days?: number | null;
@@ -423,6 +424,7 @@ export type CaptureVirement = {
   amount_eur?: number | null;
   exchange_rate?: number | null;
   rate_date?: string | null;
+  rate_source?: string | null;
   direction?: string | null;
   sender_name?: string | null;
   sender_iban?: string | null;
@@ -434,6 +436,35 @@ export type CaptureVirement = {
   transfer_type?: string | null;
 };
 
+export type CaptureContractParty = {
+  name: string | null;
+  role: string | null;
+  identifier: string | null;
+};
+
+export type CaptureContract = {
+  contract_type: string | null;
+  title: string | null;
+  reference: string | null;
+  parties?: CaptureContractParty[] | null;
+  signature_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  duration_months?: number | null;
+  is_open_ended?: boolean | null;
+  amount: number | null;
+  currency: string | null;
+  amount_eur?: number | null;
+  exchange_rate?: number | null;
+  rate_date?: string | null;
+  rate_source?: string | null;
+  payment_schedule?: string | null;
+  notice_period_days?: number | null;
+  renewal?: string | null;
+  jurisdiction?: string | null;
+  obligations?: string[] | null;
+};
+
 export type CapturePending = {
   type: string;
   question: string;
@@ -442,12 +473,13 @@ export type CapturePending = {
 };
 
 export type CaptureAnalyzeResult = {
-  status: "completed" | "en_attente_utilisateur" | "erreur";
+  status: "completed" | "en_attente_utilisateur" | "erreur" | "non_pris_en_charge";
   thread_id: string;
   document_id: string | null;
   document_type?: string | null;
   invoice?: CaptureInvoice | null;
   transfer?: CaptureVirement | null;
+  contract?: CaptureContract | null;
   analysis?: string | null;
   expense_category?: string | null;
   incoherences?: string[] | null;
@@ -458,6 +490,9 @@ export type CaptureAnalyzeResult = {
   duplicate_skipped?: boolean | null;
   pending?: CapturePending | null;
   error?: string | null;
+  /** Explication d'un dénouement qui n'est pas une erreur (document écarté). */
+  message?: string | null;
+  detected_nature?: string | null;
 };
 
 export type CaptureInvoiceItem = {
@@ -470,6 +505,8 @@ export type CaptureInvoiceItem = {
   payment_date?: string | null;
   payment_days_until?: number | null;
   created_at?: string | null;
+  filename?: string | null;
+  has_file?: boolean;
 };
 
 export type CaptureVirementItem = {
@@ -478,6 +515,47 @@ export type CaptureVirementItem = {
   analysis?: string | null;
   incoherences?: string[] | null;
   created_at?: string | null;
+  filename?: string | null;
+  has_file?: boolean;
+};
+
+export type CaptureContratItem = {
+  document_id: string;
+  contract: CaptureContract;
+  analysis?: string | null;
+  incoherences?: string[] | null;
+  created_at?: string | null;
+  filename?: string | null;
+  has_file?: boolean;
+};
+
+/** Vue complète d'un document déjà traité — facture, virement et contrat réunis. */
+export type CaptureDocumentDetail = {
+  document_id: string;
+  document_type: "facture" | "virement" | "contrat";
+  filename?: string | null;
+  mime?: string | null;
+  has_file: boolean;
+  created_at?: string | null;
+  analysis?: string | null;
+  incoherences?: string[] | null;
+  ocr_text?: string | null;
+  detected_language?: string | null;
+  /** "imprime" | "manuscrit" | "mixte" — mode d'écriture constaté à la lecture. */
+  writing_mode?: string | null;
+  /** Champs dont la lecture était douteuse et qui ont été soumis à confirmation. */
+  uncertain_fields?: string[] | null;
+  /** Champs corrigés à la main : leur valeur ne vient plus de la machine. */
+  corrected_fields?: string[] | null;
+  /** Champs que l'utilisateur peut corriger pour ce type de document. */
+  editable_fields?: string[];
+  invoice?: CaptureInvoice | null;
+  expense_category?: string | null;
+  paid?: boolean | null;
+  payment_date?: string | null;
+  payment_days_until?: number | null;
+  transfer?: CaptureVirement | null;
+  contract?: CaptureContract | null;
 };
 
 export type CaptureDocumentMessage = {
@@ -543,6 +621,72 @@ export async function fetchCaptureVirements(): Promise<CaptureVirementItem[]> {
   });
   if (!response.ok) throw new Error(await parseError(response));
   return response.json();
+}
+
+export async function fetchCaptureContrats(): Promise<CaptureContratItem[]> {
+  const response = await fetch(`${API_BASE}/api/capture/contrats`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export async function fetchCaptureDocument(documentId: string): Promise<CaptureDocumentDetail> {
+  const response = await fetch(
+    `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}`,
+    { headers: authHeaders() },
+  );
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export type CaptureUpdateResult = {
+  document: CaptureDocumentDetail;
+  corrected: string[];
+  /** true : synthèse rejouée · false : elle aurait dû l'être mais a échoué · null : inutile. */
+  resynthese: boolean | null;
+};
+
+/**
+ * Corrige des champs extraits. L'utilisateur fait autorité : la valeur saisie
+ * remplace celle lue par la machine, et les calculs qui en dépendent suivent.
+ */
+export async function updateCaptureDocument(
+  documentId: string,
+  updates: Record<string, string>,
+): Promise<CaptureUpdateResult> {
+  const response = await fetch(
+    `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ updates }),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+/** Suppression définitive : la pièce, son fichier d'origine et sa discussion. */
+export async function deleteCaptureDocument(documentId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}`,
+    { method: "DELETE", headers: authHeaders() },
+  );
+  if (!response.ok) throw new Error(await parseError(response));
+}
+
+/**
+ * Pièce d'origine (PDF/image). L'endpoint exige l'en-tête d'authentification :
+ * un `src` direct ne fonctionnerait pas, il faut passer par un blob.
+ */
+export async function fetchCaptureDocumentFile(documentId: string): Promise<Blob> {
+  const response = await fetch(
+    `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}/file`,
+    { headers: authHeaders() },
+  );
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.blob();
 }
 
 export async function fetchCaptureDocumentMessages(
