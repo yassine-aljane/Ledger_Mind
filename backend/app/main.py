@@ -13,6 +13,7 @@ from app.api import (
     guidance,
     orchestrator,
     rapport,
+    rapport_fiscal,
     referral,
     verification,
 )
@@ -56,6 +57,7 @@ app.include_router(guidance.router)
 # recherche d'expert-comptable (déclenchée depuis la déclaration).
 app.include_router(facture.router)
 app.include_router(rapport.router)
+app.include_router(rapport_fiscal.router)
 app.include_router(declaration.router)
 app.include_router(expert_comptable.router)
 app.include_router(echeancier.router)

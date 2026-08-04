@@ -336,7 +336,7 @@ def test_les_constantes_exposees_portent_leur_provenance():
 
 
 def test_le_registre_decrit_chaque_outil():
-    assert len(OUTILS) == 6
+    assert len(OUTILS) == 7
     for outil in OUTILS:
         assert outil.description, f"{outil.nom} doit porter une description"
         assert callable(outil.fonction)

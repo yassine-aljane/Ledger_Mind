@@ -108,6 +108,49 @@ class UserProfile(BaseModel):
     revenus_intracommunautaires: bool | None = None
     versement_liberatoire: bool | None = None
 
+    # --- Déclaratif utilisateur : entrées exigées par le moteur d'impôt et la facturation ---
+    #
+    # Ces champs ne se déduisent d'aucun registre : ni le SIRENE ni le RNE ne connaissent le
+    # foyer fiscal, la caisse de retraite ou l'IBAN. Sans eux, le moteur d'impôt REFUSE de
+    # calculer l'IR au barème plutôt que d'afficher un montant inventé — d'où leur collecte.
+    #
+    # `fiscal_category` est plus précis que `tax_category` : celui-ci est DÉDUIT par la
+    # classification (BNC/BIC/mixed), celui-là est DÉCLARÉ et distingue vente et prestation,
+    # que l'abattement et le taux de cotisations ne traitent pas de la même façon.
+    fiscal_category: Literal["BIC_VENTE", "BIC_SERVICE", "BNC"] | None = None
+    bnc_caisse: Literal["REGIME_GENERAL", "CIPAV"] | None = None
+    company_address: str | None = None
+    activity_start_date: str | None = None
+    location_zone: Literal["metropole", "dom"] | None = None
+
+    # Foyer fiscal — sans `fiscal_parts` ET `other_household_income`, pas d'IR au barème.
+    rfr_n_minus_2: float | None = None
+    family_status: Literal["celibataire", "marie", "pacse"] | None = None
+    fiscal_parts: float | None = None
+    other_household_income: float | None = None
+
+    acre_active: bool | None = None
+    acre_start_date: str | None = None
+
+    # Facturation — mentions que la facture laisse vides tant qu'elles ne sont pas connues.
+    invoicing_iban: str | None = None
+    professional_liability_insurance: bool | None = None
+    rcs_rm_number: str | None = None
+    default_payment_terms: str | None = None
+    default_client_type: Literal["particuliers", "professionnels", "les_deux"] | None = None
+
+    # Rapprochement des encaissements — le rapport fiscal ne voit que les virements ; tout
+    # autre moyen de paiement doit être déclaré à la main, sans quoi le CA est sous-estimé.
+    accepted_payment_methods: list[str] = []
+    manual_income_declaration_mode: str | None = None
+    cumulative_revenue_current_year: float | None = None
+    prior_threshold_breach_history: bool | None = None
+
+    # Questions posées auxquelles l'utilisateur a répondu « je ne sais pas ». Sans cette trace,
+    # l'onboarding reposerait indéfiniment la même question : une non-réponse est une réponse,
+    # et vaut mieux qu'une valeur inventée pour débloquer le parcours.
+    unknown_fields: list[str] = []
+
 
 class OrchestratorState(BaseModel):
     session_id: str

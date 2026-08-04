@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AccessGate } from "@/components/lm/AccessGate";
-import { CabinetsMap, CabinetContactLines, type CabinetMapPoint } from "@/components/lm/CabinetsMap";
+import { CabinetsMap } from "@/components/lm/CabinetsMap";
+import { CabinetContactLines, type CabinetMapPoint } from "@/components/lm/cabinets";
 import {
   Check,
   ChevronDown,
@@ -75,8 +76,9 @@ function ReferralPage() {
   const mapPoints: CabinetMapPoint[] = useMemo(
     () =>
       cabinets
-        // Annotation nécessaire : sans elle, TS infère `adresse` comme requis sur l'objet
-        // littéral et le prédicat du `filter` ne colle plus à CabinetMapPoint.
+        // Type de retour annoté : sans lui, l'objet produit déclare `adresse` comme
+        // requis-mais-nullable, ce que `CabinetMapPoint` (où il est optionnel) ne
+        // satisfait pas — et le prédicat du `filter` devient invalide.
         .map((c, i): CabinetMapPoint | null => {
           if (c.lat == null || c.lon == null) return null;
           return {

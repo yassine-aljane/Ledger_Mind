@@ -1,0 +1,91 @@
+# ============================================================================
+#  FACTURATION — MENTIONS OBLIGATOIRES ET VALEURS RÉGLEMENTAIRES
+# ============================================================================
+#  Complète `seuils.yaml`, qui reste la source unique des seuils de franchise
+#  en base de TVA. AUCUNE valeur n'est dupliquée entre les deux fichiers.
+#
+#  ⚠️  VALEURS À VÉRIFIER EN DIRECT — voir `verifier_en_direct` sur chaque bloc.
+#      Le montant de l'indemnité de recouvrement et le seuil de dispense du n°
+#      de TVA intracommunautaire sont fixés par décret : ils changent sans
+#      préavis et doivent être recoupés avant tout usage déclaratif.
+#
+#  Règle du projet : aucune mention légale ni montant réglementaire codé en dur
+#  dans la logique. Le code lit ce fichier ; le texte affiché sur la facture
+#  est celui écrit ici, mot pour mot.
+# ============================================================================
+
+annee: 2026
+date_verif: "2026-08-03"
+source_principale: "https://entreprendre.service-public.fr/vosdroits/F31808"
+
+# --- Indemnité forfaitaire pour frais de recouvrement ----------------------
+#  Due de plein droit en cas de retard, UNIQUEMENT entre professionnels.
+#  Ne se mentionne pas sur une facture adressée à un particulier.
+indemnite_recouvrement:
+  montant: 40
+  devise: "EUR"
+  due_aux_particuliers: false
+  mention: "Indemnité forfaitaire pour frais de recouvrement en cas de retard de paiement : 40 €"
+  base_legale: "art. L441-10 et D441-5 du code de commerce"
+  source: "https://entreprendre.service-public.fr/vosdroits/F31808"
+  date_verif: "2026-08-03"
+  verifier_en_direct: true      # montant fixé par décret, susceptible de révision
+
+# --- Numéro de TVA intracommunautaire du vendeur ---------------------------
+#  Dispense en dessous du seuil : « Sauf pour les factures d'un montant total
+#  HT inférieur ou égal à 150 € » (fiche F31808).
+tva_intracommunautaire:
+  seuil_dispense_ht: 150
+  source: "https://entreprendre.service-public.fr/vosdroits/F31808"
+  date_verif: "2026-08-03"
+  verifier_en_direct: true
+
+# --- Pénalités de retard ---------------------------------------------------
+#  Le taux légal est révisé chaque semestre : la mention reste volontairement
+#  générique plutôt que d'afficher un taux chiffré qui serait périmé.
+penalites_retard:
+  mention: "Taux légal en vigueur, exigibles sans rappel nécessaire"
+  base_legale: "art. L441-10 du code de commerce"
+  source: "https://entreprendre.service-public.fr/vosdroits/F31808"
+  date_verif: "2026-08-03"
+  verifier_en_direct: true      # taux révisé semestriellement
+
+# --- Régime de TVA ---------------------------------------------------------
+#  Les SEUILS de franchise vivent dans seuils.yaml (bloc `tva_franchise`).
+#  Ici, uniquement le texte des mentions.
+tva:
+  mention_franchise: "TVA non applicable, art. 293 B du code général des impôts"
+  mention_autoliquidation: "Auto-liquidation"
+  base_legale_franchise: "art. 293 B du code général des impôts"
+  source: "https://entreprendre.service-public.fr/vosdroits/F31808"
+  date_verif: "2026-08-03"
+
+# --- Autres mentions -------------------------------------------------------
+mentions:
+  escompte_neant: "Escompte pour paiement anticipé : néant"
+  association_agreee: "Membre d'une association agréée, le règlement par chèque et carte bancaire est accepté"
+  garantie_legale: "Garantie légale de conformité applicable (2 ans) pour les biens éligibles"
+  source: "https://entreprendre.service-public.fr/vosdroits/F31808"
+  date_verif: "2026-08-03"
+
+# --- Délai de paiement par défaut ------------------------------------------
+#  Plafond légal entre professionnels : 60 jours date de facture, ou 45 jours
+#  fin de mois. Le défaut retenu reste en deçà.
+paiement:
+  delai_defaut_jours: 30
+  delai_maximum_jours: 60
+  base_legale: "art. L441-10 du code de commerce"
+  source: "https://entreprendre.service-public.fr/vosdroits/F31808"
+  date_verif: "2026-08-03"
+  verifier_en_direct: true
+
+# --- Numérotation ----------------------------------------------------------
+#  Séquences distinctes et continues. L'année ne remet PAS le compteur à zéro :
+#  la continuité prime sur l'esthétique, casser la suite serait illégal.
+numerotation:
+  prefixe_facture: "FA"
+  prefixe_avoir: "AV"
+  format: "{prefixe}-{annee}-{compteur:06d}"
+  base_legale: "art. 242 nonies A de l'annexe II au CGI"
+  source: "https://entreprendre.service-public.fr/vosdroits/F31808"
+  date_verif: "2026-08-03"
