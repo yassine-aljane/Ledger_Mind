@@ -26,9 +26,7 @@ import { usePlan, type Plan } from "@/lib/plan";
  * Les écrans consomment `lockReason()` plutôt que de recombiner ces règles chacun de leur côté :
  * sans ça, deux écrans finissent tôt ou tard par verrouiller pour des raisons différentes.
  */
-
 export type AccessState = "invite" | "free" | "premium_parcours" | "premium_complet";
-
 export type Feature =
   | "education"
   | "profile"
@@ -40,7 +38,6 @@ export type Feature =
   | "referral"
   | "simulateur"
   | "historique";
-
 /**
  * Pourquoi un écran est fermé.
  *
@@ -51,10 +48,8 @@ export type Feature =
  *   deja_fait     le parcours est terminé : on ne le refait pas, on va au tableau de bord
  */
 export type LockReason = "none" | "auth" | "premium" | "parcours" | "deja_fait";
-
 /** Ouvert à tous, même sans compte : c'est la porte d'entrée du produit. */
 const PUBLIC_FEATURES: ReadonlySet<Feature> = new Set<Feature>(["education"]);
-
 /**
  * Premium requis, mais SANS attendre la fin du parcours.
  *
@@ -73,20 +68,18 @@ const TOOL_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
   "historique",
   "profile",
 ]);
-
 export const LOCK_MESSAGES: Record<Exclude<LockReason, "none">, string> = {
   auth: "Connectez-vous pour accéder à cet espace.",
   premium: "Cette fonctionnalité fait partie de la formule Premium.",
   parcours: "Terminez votre mise en route pour débloquer cet espace.",
   deja_fait: "Mise en route terminée — votre profil fiscal est déjà en place.",
 };
-
 export type Entitlements = {
   user: AuthUser | null;
   authed: boolean;
   plan: Plan;
   isPremium: boolean;
-  /** Le parcours d'onboarding est instruit (SIREN vérifié ou diagnostic + feuille de route). */
+  /** Le parcours a produit un régime, une feuille de route ou une classification fiscale. */
   parcoursDone: boolean;
   state: AccessState;
   /** L'état réel n'est connu qu'après hydratation : ne rien verrouiller ni rediriger avant. */
@@ -96,7 +89,6 @@ export type Entitlements = {
   lockReason: (feature: Feature) => LockReason;
   canAccess: (feature: Feature) => boolean;
 };
-
 /**
  * Le parcours compte comme fait seulement quand le dossier est INSTRUIT jusqu'au bout :
  * branche A = vérification SIREN **et** questions d'intake (catégorie fiscale / phase done) ;
@@ -117,13 +109,11 @@ export function isParcoursDone(user: AuthUser | null | undefined): boolean {
 export function isParcoursAcheve(user: AuthUser | null | undefined): boolean {
   return hasCompletedOnboarding(user);
 }
-
 export function accessState(authed: boolean, plan: Plan, parcoursDone: boolean): AccessState {
   if (!authed) return "invite";
   if (plan !== "premium") return "free";
   return parcoursDone ? "premium_complet" : "premium_parcours";
 }
-
 /**
  * Destination naturelle d'un état donné.
  *
@@ -156,16 +146,12 @@ export function lockReasonFor(
   parcoursAcheve: boolean = true,
 ): LockReason {
   if (PUBLIC_FEATURES.has(feature)) return "none";
-
   if (state === "invite") return "auth";
-
   if (state === "free") return "premium";
-
   // À partir d'ici : connecté ET Premium. Reste à savoir où en est le parcours.
   // La feuille de route est le RÉSULTAT du parcours, pas le parcours : la fermer une fois le
   // dossier instruit reviendrait à priver l'utilisateur de son propre diagnostic.
   if (PREMIUM_SANS_PARCOURS.has(feature)) return "none";
-
   if (feature === "onboarding") {
     // Le parcours ne se refait pas UNE FOIS ACHEVÉ : on renvoie alors au tableau de bord
     // plutôt que de laisser réécrire un diagnostic déjà validé. Tant qu'il est en cours —
@@ -173,14 +159,11 @@ export function lockReasonFor(
     // rester ouverte, sinon l'utilisateur ne peut plus reprendre là où il s'est arrêté.
     return state === "premium_complet" && parcoursAcheve ? "deja_fait" : "none";
   }
-
   if (TOOL_FEATURES.has(feature)) {
     return state === "premium_complet" ? "none" : "parcours";
   }
-
   return "none";
 }
-
 export function useEntitlements(): Entitlements {
   const plan = usePlan();
   // Lecture synchrone du cache navigateur au montage : chaque page remonte AppShell, et si
@@ -204,7 +187,6 @@ export function useEntitlements(): Entitlements {
     // réseau — sinon chaque écran protégé afficherait un état d'attente à chaque navigation.
     sync();
     window.addEventListener("storage", sync);
-
     // Puis on resynchronise depuis le serveur : le cache peut dater d'avant la fin du parcours,
     // auquel cas l'utilisateur resterait bloqué derrière « terminez votre parcours ». Un échec
     // 401 vide la session côté `fetchMe`, ce qui nous ramène proprement à l'état visiteur.
@@ -218,17 +200,14 @@ export function useEntitlements(): Entitlements {
           if (!annule) sync();
         });
     }
-
     return () => {
       annule = true;
       window.removeEventListener("storage", sync);
     };
   }, []);
-
   const parcoursDone = isParcoursDone(user);
   const parcoursAcheve = isParcoursAcheve(user);
   const state = accessState(authed, plan, parcoursDone);
-
   return {
     user,
     authed,
