@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   fetchMe,
@@ -26,6 +27,9 @@ import { usePlan, type Plan } from "@/lib/plan";
  * Les écrans consomment `lockReason()` plutôt que de recombiner ces règles chacun de leur côté :
  * sans ça, deux écrans finissent tôt ou tard par verrouiller pour des raisons différentes.
  */
+
+/** Clé partagée du compte courant : une seule requête pour toute l'application. */
+export const ME_QUERY_KEY = ["auth", "me"] as const;
 
 export type AccessState = "invite" | "free" | "premium_parcours" | "premium_complet";
 
@@ -204,26 +208,42 @@ export function useEntitlements(): Entitlements {
     // réseau — sinon chaque écran protégé afficherait un état d'attente à chaque navigation.
     sync();
     window.addEventListener("storage", sync);
-
-    // Puis on resynchronise depuis le serveur : le cache peut dater d'avant la fin du parcours,
-    // auquel cas l'utilisateur resterait bloqué derrière « terminez votre parcours ». Un échec
-    // 401 vide la session côté `fetchMe`, ce qui nous ramène proprement à l'état visiteur.
-    let annule = false;
-    if (isAuthed()) {
-      fetchMe()
-        .then((u) => {
-          if (!annule) setUser(u);
-        })
-        .catch(() => {
-          if (!annule) sync();
-        });
-    }
-
-    return () => {
-      annule = true;
-      window.removeEventListener("storage", sync);
-    };
+    return () => window.removeEventListener("storage", sync);
   }, []);
+
+  /**
+   * UNE seule requête `/api/auth/me`, partagée par tous les consommateurs du hook.
+   *
+   * Ce hook est appelé par six composants rendus en même temps sur chaque page
+   * (rail, encart de formule, bloc compte, et les trois variantes d'AccessGate), et
+   * `AppShell` se remonte à chaque navigation. Avec un `fetch` par instance, une
+   * session de test a produit 286 appels à cet endpoint sur 448 requêtes — 64 % du
+   * trafic, chacun frappant MongoDB.
+   *
+   * React Query déduplique par clé : les six consommateurs partagent le même appel,
+   * et `staleTime` évite de le rejouer à chaque navigation.
+   */
+  const { data, isError } = useQuery({
+    queryKey: ME_QUERY_KEY,
+    queryFn: fetchMe,
+    enabled: authed,
+    staleTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (!data) return;
+    setUser(data);
+  }, [data]);
+
+  useEffect(() => {
+    // Un 401 vide la session côté `fetchMe` : on relit le stockage pour retomber
+    // proprement sur l'état visiteur.
+    if (!isError) return;
+    setUser(getStoredUser());
+    setAuthed(isAuthed());
+  }, [isError]);
 
   const parcoursDone = isParcoursDone(user);
   const parcoursAcheve = isParcoursAcheve(user);

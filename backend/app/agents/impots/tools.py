@@ -145,15 +145,61 @@ def verifier_plafonds(
     """
     entrees = [ActiviteCA(**a) for a in activites]
     depassements = moteur.controler_plafonds(entrees, jours_activite)
+    # État de CHAQUE catégorie, dépassement ou non : « conforme » est une information, pas
+    # une absence d'information. Sans cela, l'appelant ne peut afficher que les anomalies.
+    etats = []
+    for activite in entrees:
+        plafond, proratise = moteur.plafond_applicable(activite.categorie, jours_activite)
+        etats.append(
+            {
+                "categorie": activite.categorie.value,
+                "ca": activite.ca,
+                "plafond": plafond,
+                "plafond_proratise": proratise,
+                "conforme": activite.ca <= plafond,
+                "marge_restante": max(plafond - activite.ca, 0.0),
+            }
+        )
     return _arrondir(
         {
             "depassements": [d.model_dump(mode="json") for d in depassements],
             "au_dessus_du_plafond": bool(depassements),
+            "plafonds": etats,
+            "jours_activite": jours_activite,
             "note": (
                 "La sortie du régime micro suppose un dépassement sur deux années "
                 "consécutives ; ce contrôle porte sur une seule période."
             ),
         }
+    )
+
+
+def parametres_categorie(
+    categorie: str, caisse_bnc: str = "REGIME_GENERAL", jours_activite: Optional[int] = None
+) -> Dict[str, Any]:
+    """Constantes effectivement appliquées à une catégorie fiscale, avec leur provenance.
+
+    Rend le calcul vérifiable : un utilisateur doit pouvoir retrouver chaque taux dans la
+    source officielle plutôt que de faire confiance au résultat.
+    """
+    cat = CategorieFiscale(categorie)
+    caisse = CaisseBNC(caisse_bnc) if cat is CategorieFiscale.bnc else None
+    plafond, proratise = moteur.plafond_applicable(cat, jours_activite)
+    return _arrondir(
+        {
+            "categorie": cat.value,
+            "caisse_bnc": caisse.value if caisse else None,
+            "taux_abattement": C.abattement_taux(cat),
+            "abattement_minimum": C.abattement_minimum(),
+            "taux_social": C.taux_social(cat, caisse),
+            "taux_cfp": C.taux_cfp(cat, caisse),
+            "taux_versement_liberatoire": C.taux_versement_liberatoire(cat),
+            "plafond_ca": plafond,
+            "plafond_proratise": proratise,
+            "acre": C.acre(),
+            "provenance": C.provenance(),
+        },
+        4,  # les taux sont des fractions : 2 décimales les écraseraient
     )
 
 
@@ -223,6 +269,7 @@ OUTILS: List[OutilFiscal] = [
     OutilFiscal("calculer_cotisations", calculer_cotisations, _resume(calculer_cotisations)),
     OutilFiscal("calculer_ir_bareme", calculer_ir_bareme, _resume(calculer_ir_bareme)),
     OutilFiscal("verifier_plafonds", verifier_plafonds, _resume(verifier_plafonds)),
+    OutilFiscal("parametres_categorie", parametres_categorie, _resume(parametres_categorie)),
     OutilFiscal("constantes_fiscales", constantes_fiscales, _resume(constantes_fiscales)),
 ]
 

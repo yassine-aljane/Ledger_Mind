@@ -29,9 +29,44 @@ _PROFILE_QUESTION_FIELDS = {
     "has_recurring_contracts",
     "in_kind_gifts",
     "international_clients",
+    # Identité légale et catégorie fiscale précise
+    "fiscal_category",
+    "bnc_caisse",
+    "siret",
+    "company_address",
+    "activity_start_date",
+    "location_zone",
+    # Régime de TVA
+    "regime_tva",
+    "numero_tva_intracommunautaire",
+    # Foyer fiscal, exigé par le moteur d'impôt
+    "versement_liberatoire",
+    "rfr_n_minus_2",
+    "family_status",
+    "fiscal_parts",
+    "other_household_income",
+    "acre_active",
+    "acre_start_date",
+    # Facturation
+    "invoicing_iban",
+    "professional_liability_insurance",
+    "rcs_rm_number",
+    "default_payment_terms",
+    "default_client_type",
+    # Rapprochement des encaissements
+    "accepted_payment_methods",
+    "manual_income_declaration_mode",
+    "cumulative_revenue_current_year",
+    "prior_threshold_breach_history",
 }
 
-LIST_FIELDS = {"activity_types", "revenue_sources", "currencies", "secondary_activity_types"}
+LIST_FIELDS = {
+    "activity_types",
+    "revenue_sources",
+    "currencies",
+    "secondary_activity_types",
+    "accepted_payment_methods",
+}
 BOOL_FIELDS = {
     "invoices_already_issued",
     "has_recurring_contracts",
@@ -39,7 +74,64 @@ BOOL_FIELDS = {
     "international_clients",
     "has_secondary_activity",
     "main_activity_commercial",
+    "versement_liberatoire",
+    "acre_active",
+    "professional_liability_insurance",
+    "prior_threshold_breach_history",
 }
+
+# Montants : seul un nombre explicite est retenu. Une fourchette (« Moins de 20 000 € ») ne
+# devient JAMAIS une valeur ponctuelle — le moteur préfère refuser de calculer l'IR plutôt que
+# de s'appuyer sur un chiffre que l'utilisateur n'a pas donné.
+NUMBER_FIELDS = {
+    "rfr_n_minus_2",
+    "fiscal_parts",
+    "other_household_income",
+    "cumulative_revenue_current_year",
+}
+
+# Réponses à choix fermé. Les libellés présentés à l'utilisateur sont en français ; la valeur
+# stockée est celle qu'attendent le moteur d'impôt et la logique conditionnelle du questionnaire.
+_ENUM_FIELDS: dict[str, list[tuple[tuple[str, ...], str]]] = {
+    "fiscal_category": [
+        (("vente", "marchandise", "bic_vente"), "BIC_VENTE"),
+        (("libéral", "liberal", "bnc"), "BNC"),
+        (("prestation", "service", "commercial", "bic_service"), "BIC_SERVICE"),
+    ],
+    "bnc_caisse": [
+        (("cipav",), "CIPAV"),
+        (("général", "general", "ssi", "regime_general", "régime général"), "REGIME_GENERAL"),
+    ],
+    "location_zone": [
+        (("dom", "guadeloupe", "martinique", "guyane", "réunion", "reunion", "mayotte",
+          "outre-mer", "outre mer"), "dom"),
+        (("métropole", "metropole", "france continentale"), "metropole"),
+    ],
+    "regime_tva": [
+        (("réel normal", "reel normal", "reel_normal"), "reel_normal"),
+        (("réel simplifié", "reel simplifie", "reel_simplifie", "simplifié"), "reel_simplifie"),
+        # « Non, je facture de la TVA » : assujetti sans que le régime précis soit connu.
+        (("franchise", "pas de tva", "ne facture pas"), "franchise"),
+    ],
+    "family_status": [
+        (("pacs",), "pacse"),
+        (("marié", "marie", "mariée"), "marie"),
+        (("célibataire", "celibataire", "seul"), "celibataire"),
+    ],
+    "default_client_type": [
+        (("les deux", "deux", "both", "mixte"), "les_deux"),
+        (("professionnel", "entreprise", "b2b"), "professionnels"),
+        (("particulier", "b2c"), "particuliers"),
+    ],
+}
+
+# « Je ne sais pas » n'est PAS une absence de réponse : la question a été posée. La consigner
+# évite de la reposer indéfiniment, sans pour autant inventer une valeur.
+_UNKNOWN_RE = re.compile(
+    r"(je\s+ne\s+sais\s+pas|j['’]?e?\s*sais\s+pas|aucune\s+id[ée]e|sais\s+pas|"
+    r"pas\s+s[ûu]r|je\s+ne\s+sais)",
+    re.IGNORECASE,
+)
 
 _CONFUSION_RE = re.compile(
     r"("
@@ -98,15 +190,66 @@ def _coerce_value(field: str, value: Any, current_profile: UserProfile) -> Any:
             return "unknown"
         return None
 
+    if field in _ENUM_FIELDS:
+        val_lower = str(value).strip().lower()
+        for motifs, valeur_stockee in _ENUM_FIELDS[field]:
+            if any(m in val_lower for m in motifs):
+                return valeur_stockee
+        return None
+
+    if field in NUMBER_FIELDS:
+        return _nombre(value)
+
     return str(value).strip() or None
+
+
+def _nombre(valeur: Any) -> float | None:
+    """Extrait un nombre d'une réponse en français, ou rien.
+
+    « 1,5 » → 1.5 ; « 20 000 € » → 20000.0 ; « Aucun autre revenu » → 0.0.
+    Une FOURCHETTE (« Moins de 20 000 € », « 20 000 € – 50 000 € ») renvoie `None` : la
+    convertir en valeur ponctuelle reviendrait à inventer un chiffre que l'utilisateur n'a
+    pas donné, et le calcul d'impôt qui en découlerait serait faux sans le dire.
+    """
+    if isinstance(valeur, (int, float)) and not isinstance(valeur, bool):
+        return float(valeur)
+
+    texte = str(valeur).strip().lower()
+    if not texte or _UNKNOWN_RE.search(texte):
+        return None  # « aucune idée » contient « aucun » : ce n'est pas zéro
+    if any(m in texte for m in ("aucun", "rien", "zéro", "zero", "pas de revenu")):
+        return 0.0
+    if any(m in texte for m in ("moins de", "plus de", "entre", "–", "—", " à ", "environ", "ou plus")):
+        return None  # fourchette : non convertible en valeur ponctuelle
+
+    # Espaces (y compris insécables) et virgule décimale à la française.
+    normalise = (
+        texte.replace(" ", "").replace(" ", "").replace(" ", "").replace(",", ".")
+    )
+    trouves = re.findall(r"-?\d+(?:\.\d+)?", normalise)
+    if len(trouves) != 1:
+        return None  # zéro nombre, ou plusieurs : ambigu
+    try:
+        return float(trouves[0])
+    except ValueError:
+        return None
 
 
 def _value_from_raw_answer(field: str, last_answer: str, current_profile: UserProfile) -> Any:
     answer = last_answer.strip()
     ans_lower = answer.lower()
 
+    # Priorité absolue sur toute autre lecture : « aucune idée » contient « aucun », que la
+    # liste de mots négatifs ci-dessous lirait comme « non ». Une non-réponse ne doit jamais
+    # devenir une réponse — elle sera consignée dans `unknown_fields` par `apply_updates`.
+    if _UNKNOWN_RE.search(answer):
+        return None
+
     if field in LIST_FIELDS:
         return _coerce_value(field, [answer], current_profile)
+
+    if field in _ENUM_FIELDS or field in NUMBER_FIELDS:
+        return _coerce_value(field, answer, current_profile)
 
     if field in BOOL_FIELDS:
         # Mots-clés génériques (oui/non explicites) + vocabulaire concret des exemples donnés
@@ -159,6 +302,14 @@ def apply_updates(
             fallback = _value_from_raw_answer(target_field, last_answer, profile)
             if fallback is not None:
                 profile_dict[target_field] = fallback
+
+        # Toujours pas de valeur, et l'utilisateur dit ne pas savoir : on le CONSIGNE. Sans
+        # cela, `next_missing_field` reposerait éternellement la même question.
+        if profile_dict.get(target_field) in (None, [], "") and _UNKNOWN_RE.search(last_answer):
+            inconnus = list(profile_dict.get("unknown_fields") or [])
+            if target_field not in inconnus:
+                inconnus.append(target_field)
+            profile_dict["unknown_fields"] = inconnus
 
     try:
         return UserProfile.model_validate(profile_dict)
