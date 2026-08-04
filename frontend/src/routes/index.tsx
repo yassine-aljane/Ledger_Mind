@@ -4,15 +4,10 @@ import {
   ArrowRight,
   BookOpen,
   Compass,
-  FileStack,
   Gauge,
-  History,
   Receipt,
-  Settings,
   ShieldCheck,
   Sparkles,
-  Users,
-  Wallet,
 } from "lucide-react";
 import {
   useEffect,
@@ -35,105 +30,54 @@ function SectionLabel({ children, className }: { children: ReactNode; className?
   );
 }
 
-const SERVICES: {
-  icon: ComponentType<{ className?: string }>;
+const SERVICE_GROUPS: {
+  n: string;
   title: string;
-  role: string;
-  tier: "free" | "compte" | "premium";
-  preview: { kicker: string; lines: string[] };
+  tagline: string;
+  description: string;
+  includes: string[];
+  icon: ComponentType<{ className?: string }>;
+  access: string;
 }[] = [
   {
+    n: "01",
+    title: "Comprendre",
+    tagline: "Questions & sources",
+    description:
+      "L’Assistant fiscal répond sans compte, cite le BOFiP et signale les textes périmés. La porte d’entrée LedgerMind.",
+    includes: ["Assistant fiscal"],
     icon: BookOpen,
-    title: "Assistant fiscal",
-    role: "Posez vos questions — réponses sourcées BOFiP, sans inscription.",
-    tier: "free",
-    preview: {
-      kicker: "Réponse live",
-      lines: [
-        "Micro-BNC : cotisations ~21,1 % sur l'encaissé.",
-        "Source : BOFiP-BIC-DECLA — fraîcheur OK.",
-      ],
-    },
+    access: "Sans compte",
   },
   {
+    n: "02",
+    title: "Démarrer",
+    tagline: "Profil & mise en route",
+    description:
+      "Vérification SIREN ou diagnostic rapide, puis un compte qui sauvegarde vos discussions et ouvre les démos.",
+    includes: ["Mise en route", "Mon compte"],
     icon: Compass,
-    title: "Mise en route",
-    role: "Vérification SIREN ou diagnostic rapide, puis profil fiscal construit.",
-    tier: "premium",
-    preview: {
-      kicker: "Étapes",
-      lines: ["1. SIREN vérifié", "2. Régime proposé", "3. Feuille de route prête"],
-    },
+    access: "Compte · Premium",
   },
   {
-    icon: Gauge,
-    title: "Ma situation",
-    role: "Votre régime, seuils et prochaines actions, au même endroit.",
-    tier: "premium",
-    preview: {
-      kicker: "Pilotage",
-      lines: ["CA YTD · 38 240 €", "Seuil TVA · 68 %", "Prochaine échéance · 15 jours"],
-    },
-  },
-  {
+    n: "03",
+    title: "Gérer",
+    tagline: "Pièces & déclarations",
+    description:
+      "Justificatifs lus automatiquement, facturation jusqu’à la déclaration, registre des transactions exportable.",
+    includes: ["Justificatifs", "Facturation", "Transactions"],
     icon: Receipt,
-    title: "Justificatifs",
-    role: "Factures et virements lus, classés, incohérences signalées.",
-    tier: "premium",
-    preview: {
-      kicker: "OCR",
-      lines: ["Facture #LM-042 · 1 200 € HT", "Doublon ? Non", "TVA déductible · Oui"],
-    },
+    access: "Premium",
   },
   {
-    icon: Wallet,
-    title: "Facturation",
-    role: "De la facture à la déclaration, étape par étape.",
-    tier: "premium",
-    preview: {
-      kicker: "Parcours",
-      lines: ["Facture → Rapport → Déclaration", "Mentions légales OK", "Prêt URSSAF"],
-    },
-  },
-  {
-    icon: Users,
-    title: "Expert-comptable",
-    role: "Cabinets près de vous + premier message déjà rédigé.",
-    tier: "premium",
-    preview: {
-      kicker: "Mise en relation",
-      lines: ["3 cabinets · Lyon", "Email d'intro prêt", "1 clic pour envoyer"],
-    },
-  },
-  {
-    icon: History,
-    title: "Transactions",
-    role: "Vos écritures indexées, filtrables, exportables.",
-    tier: "premium",
-    preview: {
-      kicker: "Registre",
-      lines: ["24 écritures ce mois", "Export FEC disponible", "Filtres client / TVA"],
-    },
-  },
-  {
-    icon: FileStack,
-    title: "Scénarios",
-    role: "« Et si je signe ce contrat ? » — impact fiscal ligne par ligne.",
-    tier: "premium",
-    preview: {
-      kicker: "Et si…",
-      lines: ["Contrat 5 000 €", "Net estimé · 3 945 €", "Impact seuil TVA · +4 pts"],
-    },
-  },
-  {
-    icon: Settings,
-    title: "Mon compte",
-    role: "Identité fiscale, préférences et accès.",
-    tier: "compte",
-    preview: {
-      kicker: "Profil",
-      lines: ["Discussions sauvegardées", "Démos Premium visibles", "Préférences sync"],
-    },
+    n: "04",
+    title: "Décider",
+    tagline: "Pilotage & entourage",
+    description:
+      "Vue d’ensemble de votre situation, scénarios « et si… », et mise en relation avec un expert-comptable près de vous.",
+    includes: ["Ma situation", "Scénarios", "Expert-comptable"],
+    icon: Gauge,
+    access: "Premium",
   },
 ];
 
@@ -163,13 +107,6 @@ const TICKER = [
   "Scénario contrat",
 ];
 
-function tierLabel(tier: "free" | "compte" | "premium") {
-  if (tier === "free") return "Sans compte";
-  if (tier === "compte") return "Avec compte";
-  return "Premium";
-}
-
-/** Compteur qui s'anime une fois entré dans le viewport. */
 function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [value, setValue] = useState(0);
@@ -336,37 +273,6 @@ function MarqueeStrip({ items, className }: { items: string[]; className?: strin
   );
 }
 
-/** Ticket fiscal animé — chiffre + jauge, distinct du fond vidéo. */
-function FiscalPulseTicket() {
-  return (
-    <div className="relative mx-auto w-full max-w-sm overflow-hidden border border-border bg-card shadow-lift">
-      <div className="perforated-top h-3 bg-secondary" aria-hidden />
-      <div className="px-5 py-5">
-        <p className="rule-label text-accent-ink">Reçu illustratif</p>
-        <p className="mt-2 font-display text-lg">Seuil franchise TVA</p>
-        <p className="mt-4 num text-4xl tracking-tight text-foreground">
-          <CountUp to={68} suffix=" %" />
-        </p>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
-          <div
-            className="h-full origin-left animate-[lm-rise_1.2s_var(--ease-out-expo)_both] bg-accent"
-            style={{ width: "68%" }}
-          />
-        </div>
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          Vous approchez du plafond — l&apos;Assistant vous le dit avant l&apos;URSSAF.
-        </p>
-        <div className="dotted-divider mt-5" />
-        <div className="mt-4 flex justify-between font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          <span>LedgerMind</span>
-          <span>Démo</span>
-        </div>
-      </div>
-      <div className="perforated-bottom h-3 bg-secondary" aria-hidden />
-    </div>
-  );
-}
-
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -389,18 +295,6 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
-  const [activeService, setActiveService] = useState(0);
-  const active = SERVICES[activeService];
-
-  useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) return;
-    const id = window.setInterval(() => {
-      setActiveService((i) => (i + 1) % SERVICES.length);
-    }, 4200);
-    return () => clearInterval(id);
-  }, []);
-
   return (
     <MarketingLayout>
       {/* ---------- Héros plein cadre (vidéo seule ici) ---------- */}
@@ -501,9 +395,9 @@ function Landing() {
               </div>
               <div>
                 <p className="num text-2xl text-foreground sm:text-3xl">
-                  <CountUp to={9} />
+                  <CountUp to={4} />
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">services nommés</p>
+                <p className="mt-1 text-xs text-muted-foreground">pôles métier</p>
               </div>
             </div>
           </div>
@@ -513,115 +407,116 @@ function Landing() {
         </div>
       </section>
 
-      {/* ---------- Services interactifs + aperçu ---------- */}
-      <section id="services" className="scroll-mt-24 border-t border-border bg-secondary/40">
-        <div className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
-          <div className="max-w-2xl">
+      {/* ---------- Zigzag des 4 pôles ---------- */}
+      <section id="services" className="scroll-mt-24 border-t border-border">
+        <div className="mx-auto max-w-6xl px-5 pt-16 pb-8 sm:pt-20 sm:pb-10">
+          <div className="max-w-xl">
             <SectionLabel>Les services</SectionLabel>
             <h2 className="mt-4 font-display text-3xl leading-tight sm:text-4xl">
-              Survolez un métier —{" "}
-              <span className="italic text-accent-ink">voyez ce qu&apos;il fait.</span>
+              Quatre pôles —{" "}
+              <span className="italic text-accent-ink">survolez pour ouvrir.</span>
             </h2>
+            <p className="mt-3 text-sm text-muted-foreground sm:text-base">
+              Quatre étapes. Au survol, les services du pôle s&apos;affichent en titres.
+            </p>
           </div>
 
-          <div className="mt-12 grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-            <ul className="divide-y divide-border border-y border-border">
-              {SERVICES.map((s, i) => {
-                const on = i === activeService;
-                return (
-                  <li key={s.title}>
-                    <button
-                      type="button"
-                      onMouseEnter={() => setActiveService(i)}
-                      onFocus={() => setActiveService(i)}
-                      onClick={() => setActiveService(i)}
+          <ol className="relative mt-8 list-none sm:mt-10">
+            {SERVICE_GROUPS.map((g, i) => {
+              const right = i % 2 === 1;
+              return (
+                <li
+                  key={g.title}
+                  className={cn(
+                    "relative z-10 flex py-1.5 transition-[padding] duration-500 ease-out-expo sm:py-2",
+                    "has-[:hover]:py-4 has-[:focus-within]:py-4 sm:has-[:hover]:py-5 sm:has-[:focus-within]:py-5",
+                    right
+                      ? "justify-end lg:pr-[12%]"
+                      : "justify-start lg:pl-[12%]",
+                  )}
+                >
+                  <div
+                    className="group relative w-full max-w-md cursor-default outline-none"
+                    tabIndex={0}
+                  >
+                    <div
                       className={cn(
-                        "flex w-full items-start gap-4 py-4 text-left transition-colors duration-300",
-                        on ? "bg-accent/10" : "hover:bg-card/80",
+                        "flex items-center gap-4 sm:gap-5",
+                        right && "flex-row-reverse text-right",
                       )}
                     >
                       <span
                         className={cn(
-                          "mt-1.5 h-10 w-1 shrink-0 rounded-full transition-all duration-300",
-                          on ? "bg-accent scale-y-100" : "bg-transparent scale-y-50",
+                          "relative z-10 grid size-16 shrink-0 place-items-center rounded-full border-2 border-border bg-background font-mono text-sm font-semibold shadow-soft transition-all duration-500 sm:size-[4.5rem] sm:text-base",
+                          "group-hover:size-[4.75rem] group-hover:border-accent group-hover:bg-accent group-hover:text-accent-foreground group-hover:shadow-lift sm:group-hover:size-20",
+                          "group-focus-visible:border-accent group-focus-visible:bg-accent group-focus-visible:text-accent-foreground",
                         )}
-                        aria-hidden
-                      />
-                      <s.icon
-                        className={cn(
-                          "mt-0.5 size-5 shrink-0 transition-colors",
-                          on ? "text-accent-ink" : "text-muted-foreground",
-                        )}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span
-                            className={cn(
-                              "font-display text-lg sm:text-xl",
-                              on ? "text-foreground" : "text-muted-foreground",
-                            )}
-                          >
-                            {s.title}
-                          </span>
-                          <span
-                            className={cn(
-                              "font-mono text-[0.55rem] uppercase tracking-[0.16em]",
-                              s.tier === "free" && "text-success-ink",
-                              s.tier === "compte" && "text-info-ink",
-                              s.tier === "premium" && "text-accent-ink",
-                            )}
-                          >
-                            {tierLabel(s.tier)}
-                          </span>
-                        </span>
-                        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                          {s.role}
-                        </span>
+                      >
+                        {g.n}
                       </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                      <div>
+                        <h3 className="flex items-center gap-2 font-display text-xl tracking-tight sm:text-2xl">
+                          {!right && (
+                            <g.icon className="size-4 text-accent opacity-60 transition-opacity group-hover:opacity-100" />
+                          )}
+                          {g.title}
+                          {right && (
+                            <g.icon className="size-4 text-accent opacity-60 transition-opacity group-hover:opacity-100" />
+                          )}
+                        </h3>
+                        <p className="mt-0.5 font-mono text-[0.55rem] uppercase tracking-[0.16em] text-muted-foreground">
+                          {g.access}
+                        </p>
+                      </div>
+                    </div>
 
-            <aside className="lg:sticky lg:top-28">
-              <div
-                key={active.title}
-                className="animate-fade-in relative overflow-hidden border border-border bg-card p-6 shadow-soft"
-              >
-                <div
-                  className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full opacity-30 blur-2xl"
-                  style={{ background: "var(--gradient-safran)" }}
-                  aria-hidden
-                />
-                <active.icon className="relative size-7 text-accent" />
-                <p className="relative mt-4 rule-label text-accent-ink">{active.preview.kicker}</p>
-                <h3 className="relative mt-2 font-display text-2xl">{active.title}</h3>
-                <ul className="relative mt-5 space-y-3">
-                  {active.preview.lines.map((line) => (
-                    <li
-                      key={line}
-                      className="flex gap-3 border-l-2 border-accent/50 pl-3 text-sm text-foreground/90"
+                    <div
+                      className={cn(
+                        "grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-500 ease-out-expo",
+                        "group-hover:grid-rows-[1fr] group-hover:opacity-100",
+                        "group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100",
+                      )}
                     >
-                      {line}
-                    </li>
-                  ))}
-                </ul>
-                <p className="relative mt-6 text-xs text-muted-foreground">
-                  Aperçu illustratif — le vrai écran s&apos;ouvre selon votre niveau d&apos;accès.
-                </p>
-              </div>
-              <div className="mt-6 hidden lg:block">
-                <FiscalPulseTicket />
-              </div>
-            </aside>
-          </div>
+                      <div className="overflow-hidden">
+                        <div
+                          className={cn(
+                            "mt-3 border-t border-border/70 pt-3",
+                            right && "text-right",
+                          )}
+                        >
+                          <p className="rule-label mb-2 text-accent-ink">Services</p>
+                          <ul className={cn("flex flex-col gap-1", right && "items-end")}>
+                            {g.includes.map((svc) => (
+                              <li
+                                key={svc}
+                                className="font-display text-lg leading-snug text-foreground sm:text-xl"
+                              >
+                                {svc}
+                              </li>
+                            ))}
+                          </ul>
+                          <p
+                            className={cn(
+                              "mt-2 max-w-xs text-xs leading-relaxed text-muted-foreground",
+                              right && "ml-auto",
+                            )}
+                          >
+                            {g.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         </div>
       </section>
 
       {/* ---------- Parcours d'accès ---------- */}
       <section id="parcours" className="scroll-mt-24">
-        <div className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
+        <div className="mx-auto max-w-6xl px-5 pt-10 pb-20 sm:pt-12 sm:pb-28">
           <div className="max-w-2xl">
             <SectionLabel>Comment ça s&apos;ouvre</SectionLabel>
             <h2 className="mt-4 font-display text-3xl leading-tight sm:text-4xl">
