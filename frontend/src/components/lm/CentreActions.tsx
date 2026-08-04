@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   ArrowRight,
@@ -48,6 +49,9 @@ import {
 } from "@/lib/echeancier-api";
 
 type Vue = "agenda" | "veille" | "historique";
+
+/** Signal « le compteur a changé » — la vue Veille l'émet, la cloche l'écoute. */
+const EVT_VEILLE_LUE = "lm.veille.lue";
 
 const COULEUR_STATUT: Record<Echeance["statut"], string> = {
   en_retard: "bg-destructive",
@@ -652,20 +656,36 @@ const AUTORITE_LABEL: Record<number, string> = {
   3: "Presse spécialisée",
 };
 
-function VeilleCard({ n }: { n: Nouveaute }) {
+function VeilleCard({ n, nouveau = false }: { n: Nouveaute; nouveau?: boolean }) {
   const impact = IMPACT_VEILLE[n.impact] ?? IMPACT_VEILLE.information;
   const source = n.sources[0];
   return (
-    <div className="card-hover animate-rise space-y-3 rounded-2xl border border-border bg-card p-5 shadow-soft">
+    <div
+      className={cn(
+        "card-hover animate-rise space-y-3 rounded-2xl border bg-card p-5 shadow-soft",
+        // Une nouveauté arrivée depuis la dernière visite se distingue par sa BORDURE, pas par
+        // son fond : le fond coloré rendrait le résumé moins lisible, alors que c'est lui qu'on
+        // vient lire. Le liseré safran suffit à la repérer d'un coup d'œil dans une liste.
+        nouveau
+          ? "border-accent/60 shadow-[0_0_0_1px_var(--accent)] ring-1 ring-accent/20"
+          : "border-border",
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <Badge variant={impact.variante}>{impact.label}</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={impact.variante}>{impact.label}</Badge>
+          {nouveau && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 font-mono text-[0.55rem] font-semibold uppercase tracking-[0.12em] text-accent-foreground">
+              <Sparkles className="size-2.5" /> Nouveau
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {n.echeance && (
             <span className="num text-xs text-muted-foreground">
               Avant le {new Date(`${n.echeance}T00:00:00`).toLocaleDateString("fr-FR")}
             </span>
           )}
-          {!n.lue && n.notifiee && <span className="size-1.5 rounded-full bg-accent" />}
         </div>
       </div>
 
@@ -710,6 +730,11 @@ function VueVeille() {
   const [prefs, setPrefs] = useState<PreferencesVeille | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Ce qui était non lu à l'ARRIVÉE sur l'écran. On le fige : la lecture marque aussitôt tout
+  // comme lu côté serveur, si bien que `n.lue` ne peut plus servir à distinguer quoi que ce
+  // soit une fois la page affichée. Sans cette photo, le liseré « Nouveau » ne s'afficherait
+  // jamais — le compteur et le repère visuel se détruiraient l'un l'autre.
+  const [nouveauxIds, setNouveauxIds] = useState<Set<string> | null>(null);
 
   function charger() {
     setLoading(true);
@@ -718,6 +743,19 @@ function VueVeille() {
         setNouveautes(fil.nouveautes);
         setPrefs(fil.preferences);
         setErreur(null);
+        setNouveauxIds((precedent) => {
+          if (precedent) return precedent;
+          const neufs = new Set(
+            fil.nouveautes.filter((n) => n.notifiee && !n.lue).map((n) => n.id),
+          );
+          // Une fois la photo prise, et SEULEMENT après, on éteint le compteur.
+          if (neufs.size > 0) {
+            marquerToutVeilleLu()
+              .then(() => window.dispatchEvent(new CustomEvent(EVT_VEILLE_LUE)))
+              .catch(() => {});
+          }
+          return neufs;
+        });
       })
       .catch((e) => setErreur(e instanceof Error ? e.message : "Erreur de chargement."))
       .finally(() => setLoading(false));
@@ -788,7 +826,7 @@ function VueVeille() {
       ) : (
         <div className="space-y-3">
           {nouveautes.map((n) => (
-            <VeilleCard key={n.id} n={n} />
+            <VeilleCard key={n.id} n={n} nouveau={nouveauxIds?.has(n.id) ?? false} />
           ))}
         </div>
       )}
@@ -828,12 +866,34 @@ export function CentreActionsButton({
   useEffect(() => {
     if (plan !== "premium" || !estCloche) return;
     let annule = false;
+    // `null` = on n'a pas encore de point de comparaison : à la toute première lecture, on
+    // affiche le compteur sans annoncer « nouveauté », sinon chaque connexion déclencherait un
+    // toast pour des mesures déjà connues de l'utilisateur.
+    let precedent: number | null = null;
+
     const rafraichir = () =>
       fetchNotificationsVeille(true)
         .then((r) => {
-          if (!annule) setNonLues(r.non_lues);
+          if (annule) return;
+          if (precedent !== null && r.non_lues > precedent) {
+            const arrivees = r.non_lues - precedent;
+            toast.info(
+              arrivees > 1
+                ? `${arrivees} nouveautés réglementaires vous concernent`
+                : "Une nouveauté réglementaire vous concerne",
+              { description: "Ouvrez la veille pour la consulter." },
+            );
+          }
+          precedent = r.non_lues;
+          setNonLues(r.non_lues);
         })
         .catch(() => {});
+
+    const remiseAZero = () => {
+      precedent = 0;
+      setNonLues(0);
+    };
+    window.addEventListener(EVT_VEILLE_LUE, remiseAZero);
     rafraichir();
     // Le cycle de veille tourne côté serveur : on resynchronise périodiquement plutôt que
     // d'attendre un rechargement de page.
@@ -841,6 +901,7 @@ export function CentreActionsButton({
     return () => {
       annule = true;
       clearInterval(timer);
+      window.removeEventListener(EVT_VEILLE_LUE, remiseAZero);
     };
   }, [plan, ouvert, estCloche]);
 
