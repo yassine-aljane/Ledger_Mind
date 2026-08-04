@@ -250,6 +250,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       ? "Premium · parcours"
                       : "Premium"}
               </Badge>
+              {authed && <CentreActionsButton variante="veille" />}
               {authed && <CentreActionsButton />}
               <ThemeToggle />
               {authed && <LogoutBubble />}
@@ -258,7 +259,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           {/* Le Centre d'Actions vit hors du rail : il ouvre un panneau, ce n'est pas une page. */}
           {authed && (
-            <div className="hidden justify-end px-8 pt-6 lg:flex">
+            <div className="hidden justify-end gap-2 px-8 pt-6 lg:flex">
+              <CentreActionsButton variante="veille" />
               <CentreActionsButton />
             </div>
           )}

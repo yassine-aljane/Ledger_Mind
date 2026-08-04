@@ -472,6 +472,42 @@
   animation: lm-stagger-in 0.35s var(--ease-out-expo) both;
 }
 
+/* Landing — bandeau défilant + curseur machine à écrire */
+@keyframes lm-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@utility animate-marquee {
+  animation: lm-marquee 38s linear infinite;
+}
+
+@keyframes lm-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility animate-caret {
+  animation: lm-caret 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .animate-caret {
+    animation: none !important;
+  }
+}
+
 @utility suggestion-chip {
   position: relative;
   color: var(--color-marine);
@@ -557,4 +593,35 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* « Cloche » — la sonnerie d'une nouveauté réglementaire. Un balancement bref, joué à
+   l'apparition puis toutes les quelques secondes : assez pour attirer l'œil, assez rare pour
+   ne pas devenir un clignotement qu'on finit par ignorer. */
+@keyframes lm-cloche {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0deg);
+  }
+  75% {
+    transform: rotate(12deg);
+  }
+  80% {
+    transform: rotate(-10deg);
+  }
+  85% {
+    transform: rotate(8deg);
+  }
+  90% {
+    transform: rotate(-6deg);
+  }
+  95% {
+    transform: rotate(3deg);
+  }
+}
+
+@utility animate-cloche {
+  transform-origin: 50% 10%;
+  animation: lm-cloche 4s ease-in-out infinite;
 }
