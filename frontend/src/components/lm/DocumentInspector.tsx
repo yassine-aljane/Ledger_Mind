@@ -27,6 +27,7 @@ import {
   fetchCaptureDocument,
   fetchCaptureDocumentFile,
   formatMoney,
+  libelleCadeau,
   updateCaptureDocument,
   type CaptureDocumentDetail,
 } from "@/lib/api";
@@ -548,6 +549,9 @@ export function DocumentInspector({ documentId, onChat }: Props) {
         (c?.contract_type ? `Contrat de ${c.contract_type}` : "Contrat")
       );
     }
+    if (detail.document_type === "cadeau") {
+      return detail.cadeau ? libelleCadeau(detail.cadeau) : "Cadeau reçu";
+    }
     return detail.invoice?.issuer_name ?? "Facture";
   }, [detail]);
 
@@ -572,9 +576,11 @@ export function DocumentInspector({ documentId, onChat }: Props) {
 
   const isVirement = detail.document_type === "virement";
   const isContrat = detail.document_type === "contrat";
+  const isCadeau = detail.document_type === "cadeau";
   const inv = detail.invoice;
   const tr = detail.transfer;
   const ct = detail.contract;
+  const gift = detail.cadeau;
 
   // Un IBAN signalé par un contrôle est mis en évidence dans la fiche.
   const flagged = (value: string | null | undefined) =>
@@ -596,7 +602,60 @@ export function DocumentInspector({ documentId, onChat }: Props) {
   const editables = new Set(detail.editable_fields ?? []);
   const corriges = new Set(detail.corrected_fields ?? []);
 
-  const sections: { title: string; rows: Row[] }[] = isContrat
+  const sections: { title: string; rows: Row[] }[] = isCadeau
+    ? [
+        {
+          // L'estimation vient en premier : c'est le point de départ du parcours, et
+          // la valeur retenue se lit dans la foulée de la fourchette dont elle sort.
+          // Confiance et source ne sont pas répétées ici — l'origine du montant est
+          // déjà dite par la ligne « Valeur retenue » et par la pastille d'état.
+          title: "Estimation automatique",
+          rows: [
+            row("Objet reconnu", null, text(gift?.objet_identifie)),
+            row(
+              "Fourchette estimée",
+              null,
+              text(
+                gift?.fourchette_min != null && gift?.fourchette_max != null
+                  ? `${formatMoney(gift.fourchette_min)} – ${formatMoney(gift.fourchette_max)} ${
+                      gift.devise ?? "EUR"
+                    }`
+                  : gift?.valeur_estimee != null
+                    ? `≈ ${formatMoney(gift.valeur_estimee)} ${gift.devise ?? "EUR"}`
+                    : null,
+              ),
+            ),
+            row(
+              // La valeur qui compte, dite avec son origine : confirmée telle quelle,
+              // corrigée après estimation, ou saisie sans estimation du tout.
+              "Valeur retenue TTC",
+              "valeur_ttc",
+              money(gift?.valeur_ttc, gift?.devise, gift?.valeur_eur),
+              { raw: gift?.valeur_ttc },
+            ),
+            // Pas de ligne « Origine du montant » : la pastille d'état en tête de fiche
+            // (« Valeur saisie à la main » / « Estimation confirmée » / « Valeur corrigée
+            // par vous ») le dit déjà, et plus visiblement.
+          ],
+        },
+        {
+          title: "Avantage en nature",
+          rows: [
+            row("Description", "description", text(gift?.description), {
+              raw: gift?.description,
+            }),
+            row("Marque / client", "marque", text(gift?.marque), { raw: gift?.marque }),
+            row("Reçu le", "date_reception", text(frDate(gift?.date_reception)), {
+              raw: gift?.date_reception,
+            }),
+            row("Contrepartie", "contrepartie", text(gift?.contrepartie), {
+              raw: gift?.contrepartie,
+            }),
+            row("Devise", "devise", text(gift?.devise), { raw: gift?.devise }),
+          ],
+        },
+      ]
+    : isContrat
     ? [
         {
           title: "Contrat",
@@ -781,8 +840,12 @@ export function DocumentInspector({ documentId, onChat }: Props) {
     <div className="animate-rise space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <Badge variant={isVirement ? "info" : isContrat ? "warning" : "success"}>
-            {isVirement ? "Virement" : isContrat ? "Contrat" : "Facture"}
+          <Badge
+            variant={
+              isVirement ? "info" : isContrat ? "warning" : isCadeau ? "accent" : "success"
+            }
+          >
+            {isVirement ? "Virement" : isContrat ? "Contrat" : isCadeau ? "Cadeau" : "Facture"}
           </Badge>
           <h2 className="truncate text-lg">{label}</h2>
         </div>
@@ -855,7 +918,17 @@ export function DocumentInspector({ documentId, onChat }: Props) {
           {/* Bandeau chiffré : la pièce s'annonce par ses montants, pas par du texte. */}
           <div className="rounded-2xl border border-border bg-secondary/30 p-5">
             <div className="flex items-start justify-between gap-3">
-              {isContrat ? (
+              {isCadeau ? (
+                <Hero
+                  label="Valeur déclarée TTC"
+                  amount={gift?.valeur_ttc}
+                  currency={gift?.devise}
+                  amountEur={gift?.valeur_eur}
+                  rate={gift?.exchange_rate}
+                  rateDate={gift?.rate_date}
+                  rateSource={gift?.rate_source}
+                />
+              ) : isContrat ? (
                 <Hero
                   label="Contrepartie"
                   amount={ct?.amount}
@@ -887,7 +960,23 @@ export function DocumentInspector({ documentId, onChat }: Props) {
                 />
               )}
 
-              {isContrat ? (
+              {/* Un cadeau annonce QUI a fixé la valeur : c'est l'information dont
+                  dépend la responsabilité en cas de contrôle. */}
+              {isCadeau ? (
+                gift?.valeur_corrigee ? (
+                  <StatePill tone="success" icon={PenLine}>
+                    Valeur corrigée par vous
+                  </StatePill>
+                ) : gift?.valeur_estimee != null ? (
+                  <StatePill tone="neutral" icon={CheckCircle2}>
+                    Estimation confirmée
+                  </StatePill>
+                ) : (
+                  <StatePill tone="neutral" icon={PenLine}>
+                    Valeur saisie à la main
+                  </StatePill>
+                )
+              ) : isContrat ? (
                 joursRestants != null && joursRestants < 0 ? (
                   <StatePill tone="neutral" icon={CircleDashed}>
                     Échu depuis {Math.abs(joursRestants)} j

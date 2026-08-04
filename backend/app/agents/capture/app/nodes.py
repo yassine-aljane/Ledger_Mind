@@ -35,7 +35,7 @@ from .db import (
     DuplicateVirementError,
 )
 from .mistral_client import MistralClient
-from .schemas import BankTransfer, Contract, ContractParty, Invoice, LineItem
+from .schemas import BankTransfer, Cadeau, Contract, ContractParty, Invoice, LineItem
 
 
 logger = logging.getLogger(__name__)
@@ -1033,6 +1033,12 @@ def route_after_ask(state: Dict[str, Any]) -> str:
 _NON_EDITABLES = {
     "amount_eur", "exchange_rate", "rate_date", "rate_source",
     "line_items", "parties", "obligations",
+    # Sorties de l'estimation par vision : ce sont des observations de la machine,
+    # pas des champs du document. L'utilisateur corrige la valeur RETENUE
+    # (`valeur_ttc`) ; réécrire l'estimation effacerait la trace de ce que le
+    # modèle avait proposé, et donc la possibilité de comparer les deux.
+    "valeur_eur", "valeur_estimee", "fourchette_min", "fourchette_max",
+    "confiance", "objet_identifie", "source_estimation", "valeur_corrigee",
 }
 
 # Champs dont la correction change le SENS de la pièce, et donc ce que la
@@ -1051,6 +1057,10 @@ _CHAMPS_SENSIBLES = {
         "contract_type", "amount", "currency", "start_date", "end_date",
         "is_open_ended", "duration_months", "notice_period_days", "renewal",
     },
+    "cadeau": {
+        "valeur_ttc", "devise", "date_reception", "marque", "description",
+        "contrepartie",
+    },
 }
 
 # Champs de la clé de déduplication, recopiés à la racine du document pour
@@ -1060,10 +1070,17 @@ _MIROIRS_RACINE = {
     "facture": ("invoice_number", "issuer_tax_id", "total_ttc", "issue_date"),
     "virement": ("transfer_reference", "amount", "execution_date"),
     "contrat": ("reference", "contract_type", "signature_date", "amount"),
+    "cadeau": ("marque", "description", "date_reception", "valeur_ttc"),
 }
 
-_BLOCS = {"facture": "invoice", "virement": "transfer", "contrat": "contract"}
-_MODELES = {"facture": Invoice, "virement": BankTransfer, "contrat": Contract}
+_BLOCS = {
+    "facture": "invoice", "virement": "transfer",
+    "contrat": "contract", "cadeau": "cadeau",
+}
+_MODELES = {
+    "facture": Invoice, "virement": BankTransfer,
+    "contrat": Contract, "cadeau": Cadeau,
+}
 
 
 class DocumentIntrouvable(Exception):
@@ -1083,11 +1100,31 @@ def _type_du_document(doc: Dict[str, Any]) -> str:
     if dtype in _BLOCS:
         return dtype
     # Les factures d'avant l'introduction du champ n'en portent pas.
-    return "virement" if "transfer" in doc else "contrat" if "contract" in doc else "facture"
+    if "transfer" in doc:
+        return "virement"
+    if "contract" in doc:
+        return "contrat"
+    if "cadeau" in doc:
+        return "cadeau"
+    return "facture"
 
 
 def _recalculer(deps: Deps, dtype: str, modele: Any) -> Dict[str, Any]:
     """Rejoue les calculs déterministes après correction : contrôles et devise."""
+    # Un cadeau ne porte pas les mêmes noms de champs que les pièces comptables
+    # (`valeur_ttc`/`devise`/`valeur_eur` au lieu de `amount`/`currency`/`amount_eur`)
+    # et n'a aucun contrôle de cohérence à rejouer : il n'y a pas de document à
+    # recouper, seulement une valeur que l'utilisateur assume.
+    if dtype == "cadeau":
+        modele.valeur_eur, modele.exchange_rate, modele.rate_source = fx.enrich_amount_eur(
+            deps.db, modele.valeur_ttc, modele.devise, modele.date_reception
+        )
+        modele.rate_date = modele.date_reception if modele.valeur_eur is not None else None
+        # La valeur retenue s'écarte-t-elle de ce que la machine avait proposé ?
+        if modele.valeur_estimee is not None and modele.valeur_ttc is not None:
+            modele.valeur_corrigee = abs(modele.valeur_ttc - modele.valeur_estimee) > 0.01
+        return {"incoherences": []}
+
     if dtype == "virement":
         incoherences = compute_virement_incoherences(modele)
         date_taux = modele.execution_date
@@ -1215,13 +1252,25 @@ def update_document_fields(
 # Point d'entrée Q&A séparé (ancré sur OCR stocké + historique, SANS RAG)
 # ---------------------------------------------------------------------------
 def answer_question(deps: Deps, user_id: str, document_id: str, question: str) -> str:
-    # Cherche dans les trois collections : facture, virement OU contrat.
+    # Cherche dans les quatre collections : facture, virement, contrat OU cadeau.
     doc = deps.db.get_document_by_id(user_id, document_id)
     if not doc:
         raise ValueError("Document introuvable pour cette session.")
     history = deps.db.get_history(user_id, document_id)
-    structured = doc.get("invoice") or doc.get("transfer") or doc.get("contract") or {}
-    system, user = prompts.qa_answer(doc.get("ocr_text", ""), structured, history, question)
+    dtype = _type_du_document(doc)
+    # Le bloc métier est choisi par le TYPE, et non par un enchaînement de `or` : un
+    # cadeau n'a ni `invoice` ni `transfer` ni `contract`, et retombait donc sur un
+    # dictionnaire vide — le modèle répondait « aucune information » alors que tous
+    # les champs étaient renseignés.
+    structured = doc.get(_BLOCS.get(dtype, "invoice")) or {}
+    system, user = prompts.qa_answer(
+        doc.get("ocr_text", "") or "",
+        structured,
+        history,
+        question,
+        document_type=dtype,
+        analysis=doc.get("analysis"),
+    )
     answer = deps.mistral.chat_text(MODEL_LARGE, system, user)
     deps.db.append_messages(
         user_id,

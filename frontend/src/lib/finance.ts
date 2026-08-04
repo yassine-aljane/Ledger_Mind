@@ -61,8 +61,17 @@ export type SyntheseFinanciere = {
   total_tva: number;
   prestations_ht: number;
   ventes_ht: number;
+  /** Factures émises, avoirs EXCLUS. */
   nb_factures: number;
+  /** Avoirs émis sur la période — ils réduisent le CA sans compter comme des factures. */
+  nb_avoirs: number;
   panier_moyen: number;
+  /** Total réclamé aux clients (net à payer, acomptes déduits). */
+  net_a_payer: number;
+  /** Part déjà encaissée. */
+  montant_regle: number;
+  /** Ce qui reste à encaisser : le vrai sujet de trésorerie, distinct du CA facturé. */
+  reste_a_encaisser: number;
   /** Variation du CA HT face à la période précédente de même longueur. `null` si pas d'historique. */
   delta_ht_pct: number | null;
   /** Variation du nombre de factures, même règle. */
@@ -83,8 +92,14 @@ function cleMois(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Les dates de l'API arrivent en « AAAA-MM-JJ » ; on tolère aussi un ISO complet. */
-function parseDate(valeur: string): Date | null {
+/**
+ * Les dates de l'API arrivent en « AAAA-MM-JJ » ; on tolère aussi un ISO complet.
+ *
+ * Accepte `null` : `date_emission` l'est tant que le document est un brouillon, et les
+ * appelants filtrent déjà ces cas — inutile de leur imposer une assertion.
+ */
+function parseDate(valeur: string | null | undefined): Date | null {
+  if (!valeur) return null;
   const d = new Date(valeur.length <= 10 ? `${valeur}T00:00:00` : valeur);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -110,25 +125,40 @@ function pointVide(d: Date): PointMensuel {
   };
 }
 
-/** Ventile le HT d'une facture entre prestations et ventes à partir de ses lignes. */
+/**
+ * Un document compte-t-il dans le chiffre d'affaires ?
+ *
+ * Un `brouillon` n'a aucune existence fiscale (ni numéro, ni date d'émission) et une
+ * facture `annulee` a été neutralisée par un avoir : les compter gonflerait le CA et,
+ * pire, la position face au plafond de régime. Seuls les documents réellement émis
+ * entrent dans les calculs.
+ */
+function estComptabilise(f: Facture): boolean {
+  if (f.statut === "brouillon" || f.statut === "annulee") return false;
+  return Boolean(f.date_emission);
+}
+
+/**
+ * Ventile le HT d'un document entre prestations et ventes à partir de ses lignes.
+ *
+ * Le prorata sur `total_ht` fait ici deux choses d'un coup : il absorbe les écarts entre
+ * les lignes et le total (remise en pourcentage, arrondis serveur), et il propage le
+ * SIGNE du document. Un avoir porte des totaux négatifs — cf. `generator.py`, « les
+ * montants sont portés en négatif pour se sommer directement avec les factures » — donc
+ * sa ventilation doit l'être aussi, sans quoi un remboursement viendrait augmenter le CA.
+ */
 function ventilerFacture(f: Facture): { prestations: number; ventes: number } {
   let prestations = 0;
   let ventes = 0;
   for (const l of f.lignes) {
-    const ht = (l.quantite ?? 0) * (l.prix_unitaire_ht ?? 0);
+    const ht = Math.abs((l.quantite ?? 0) * (l.prix_unitaire_ht ?? 0));
     if (l.categorie === "vente") ventes += ht;
     else prestations += ht;
   }
-  // Si les lignes ne reconstituent pas le total (arrondis serveur, remise…), on fait
-  // confiance au total facturé et on répartit au prorata plutôt que d'afficher un
-  // graphique dont la somme des segments contredit le KPI juste à côté.
   const somme = prestations + ventes;
-  if (somme > 0 && Math.abs(somme - f.total_ht) > 0.01) {
-    const ratio = f.total_ht / somme;
-    return { prestations: prestations * ratio, ventes: ventes * ratio };
-  }
   if (somme === 0) return { prestations: f.total_ht, ventes: 0 };
-  return { prestations, ventes };
+  const ratio = f.total_ht / somme;
+  return { prestations: prestations * ratio, ventes: ventes * ratio };
 }
 
 /** Premier jour du mois, `decalage` mois avant `reference`. */
@@ -145,10 +175,14 @@ function agregerFenetre(factures: Facture[], debut: Date, fin: Date) {
   let prestations_ht = 0;
   let ventes_ht = 0;
   let nb_factures = 0;
+  let nb_avoirs = 0;
+  let net_a_payer = 0;
+  let montant_regle = 0;
   const parMois = new Map<string, PointMensuel>();
   const parClient = new Map<string, ClientAgrege>();
 
   for (const f of factures) {
+    if (!estComptabilise(f)) continue;
     const d = parseDate(f.date_emission);
     if (!d || d < debut || d > fin) continue;
 
@@ -158,7 +192,12 @@ function agregerFenetre(factures: Facture[], debut: Date, fin: Date) {
     total_tva += f.total_tva;
     prestations_ht += prestations;
     ventes_ht += ventes;
-    nb_factures += 1;
+    // Un avoir n'est pas « une facture de plus » : il annule tout ou partie d'une autre.
+    // Le compter dans le volume fausserait aussi bien le décompte que le panier moyen.
+    if (f.type_document === "avoir") nb_avoirs += 1;
+    else nb_factures += 1;
+    net_a_payer += f.net_a_payer ?? f.total_ttc;
+    montant_regle += f.montant_regle ?? 0;
 
     const cle = cleMois(d);
     const point = parMois.get(cle) ?? pointVide(d);
@@ -167,13 +206,13 @@ function agregerFenetre(factures: Facture[], debut: Date, fin: Date) {
     point.total_ht += f.total_ht;
     point.total_ttc += f.total_ttc;
     point.total_tva += f.total_tva;
-    point.nb_factures += 1;
+    if (f.type_document !== "avoir") point.nb_factures += 1;
     parMois.set(cle, point);
 
     const nom = f.client?.nom?.trim() || "Client non nommé";
     const c = parClient.get(nom) ?? { nom, total_ht: 0, nb_factures: 0 };
     c.total_ht += f.total_ht;
-    c.nb_factures += 1;
+    if (f.type_document !== "avoir") c.nb_factures += 1;
     parClient.set(nom, c);
   }
 
@@ -184,6 +223,9 @@ function agregerFenetre(factures: Facture[], debut: Date, fin: Date) {
     prestations_ht,
     ventes_ht,
     nb_factures,
+    nb_avoirs,
+    net_a_payer,
+    montant_regle,
     parMois,
     parClient,
   };
@@ -266,7 +308,11 @@ export function construireSynthese(
     prestations_ht: courant.prestations_ht,
     ventes_ht: courant.ventes_ht,
     nb_factures: courant.nb_factures,
+    nb_avoirs: courant.nb_avoirs,
     panier_moyen: courant.nb_factures > 0 ? courant.total_ht / courant.nb_factures : 0,
+    net_a_payer: courant.net_a_payer,
+    montant_regle: courant.montant_regle,
+    reste_a_encaisser: courant.net_a_payer - courant.montant_regle,
     delta_ht_pct,
     delta_factures_pct,
     meilleur_mois,

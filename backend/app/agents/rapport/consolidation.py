@@ -17,7 +17,41 @@ from app.core import conversation_store
 
 
 def factures_periode(uid: str, debut: date, fin: date) -> list[dict]:
-    return facture_store.lister(uid, depuis=debut.isoformat(), jusqua=fin.isoformat())
+    """Factures de la période AYANT une existence fiscale.
+
+    `lister_emises` et non `lister` : un brouillon ne porte ni numéro ni date
+    d'émission, et une facture annulée par avoir a été neutralisée. Les compter
+    gonflerait le CA du rapport et, par ricochet, la position face au seuil.
+    """
+    return facture_store.lister_emises(uid, depuis=debut.isoformat(), jusqua=fin.isoformat())
+
+
+def cadeaux_periode(uid: str, debut: date, fin: date) -> list[dict]:
+    """Cadeaux en nature déclarés sur la période, lus depuis l'espace Justificatifs.
+
+    Jamais bloquant : l'indisponibilité de Mongo ne doit pas empêcher la production
+    d'un rapport qui reste juste sur la partie facturée. On renvoie alors une liste
+    vide, et l'absence d'avantages se lit comme telle dans le rapport.
+    """
+    try:
+        from app.services.capture_runtime import get_runtime
+
+        db = get_runtime()["deps"].db
+        docs = db.list_cadeaux(uid)
+    except Exception:  # noqa: BLE001 — dépendance externe, jamais fatale ici
+        return []
+
+    debut_iso, fin_iso = debut.isoformat(), fin.isoformat()
+    retenus: list[dict] = []
+    for d in docs:
+        c = d.get("cadeau") or {}
+        recu = c.get("date_reception")
+        # Sans date, impossible de rattacher le cadeau à un exercice : on l'écarte
+        # plutôt que de le compter dans une période au hasard.
+        if not recu or not (debut_iso <= recu <= fin_iso):
+            continue
+        retenus.append(c)
+    return retenus
 
 
 def consolider(uid: str, debut: date, fin: date) -> dict:
@@ -38,10 +72,23 @@ def consolider(uid: str, debut: date, fin: date) -> dict:
             else:
                 ht_prestations += montant
 
-    # Avantages en nature : repris du profil partagé (guidance), pas recalculé par facture —
-    # limite connue tant qu'une facture ne peut pas encore porter cette information elle-même.
     profil_partage = conversation_store.get_profil(uid)
-    avantages_nature = profil_partage.get("remuneration_nature")
+
+    # Avantages en nature : désormais consolidés depuis les cadeaux RÉELLEMENT déclarés
+    # (datés, valorisés, confirmés par l'utilisateur) plutôt que depuis l'estimation
+    # unique du profil. Celle-ci ne subsiste qu'en repli, pour les dossiers antérieurs
+    # à la déclaration pièce par pièce.
+    cadeaux = cadeaux_periode(uid, debut, fin)
+    if cadeaux:
+        # `valeur_eur` d'abord : la déclaration se fait en euros, et un cadeau valorisé
+        # en devise étrangère ne doit pas entrer au bilan à sa valeur faciale.
+        avantages_nature = round(
+            sum(float(c.get("valeur_eur") or c.get("valeur_ttc") or 0.0) for c in cadeaux), 2
+        )
+        source_avantages = "cadeaux déclarés"
+    else:
+        avantages_nature = profil_partage.get("remuneration_nature")
+        source_avantages = "profil déclaré" if avantages_nature else None
 
     return {
         "nb_factures": len(factures),
@@ -50,6 +97,12 @@ def consolider(uid: str, debut: date, fin: date) -> dict:
         "ht_prestations": round(ht_prestations, 2),
         "ht_ventes": round(ht_ventes, 2),
         "avantages_nature": avantages_nature,
+        "nb_cadeaux": len(cadeaux),
+        "source_avantages": source_avantages,
+        # Base de recettes au sens fiscal : un avantage en nature est un revenu, il
+        # entre au livre des recettes comme un encaissement. C'est donc CE total, et
+        # non le seul CA facturé, qui situe l'utilisateur face au plafond de son régime.
+        "recettes_totales": round(total_ht + (avantages_nature or 0.0), 2),
         "profil_partage": profil_partage,
     }
 
@@ -59,9 +112,14 @@ def analyse_seuils(brut: dict) -> dict:
 
     Le profil synthétique ne sert qu'à faire fonctionner `analyser()` avec le CA de la période ;
     aucune valeur n'y est inventée, uniquement les chiffres déjà consolidés depuis les factures.
+
+    La base retenue est `recettes_totales` — CA facturé PLUS avantages en nature — et non le
+    seul CA facturé : un cadeau de marque est une recette imposable, l'ignorer sous-estimerait
+    à la fois la position face au plafond et les cotisations dues.
     """
+    recettes = brut.get("recettes_totales", brut["total_ht"])
     profil_synthetique = {
-        "ca_estime_annuel": brut["total_ht"],
+        "ca_estime_annuel": recettes,
         "ca_prestations": brut["ht_prestations"],
         "ca_vente": brut["ht_ventes"],
         "type_activite": "mixte" if (brut["ht_prestations"] > 0 and brut["ht_ventes"] > 0) else (
@@ -70,7 +128,7 @@ def analyse_seuils(brut: dict) -> dict:
     }
     analyse = AJ.analyser(profil_synthetique)
     taux, libelle_taux, source_taux = C.taux_social(analyse.categorie, profil_synthetique)
-    cotisations = round(brut["total_ht"] * taux, 2)
+    cotisations = round(recettes * taux, 2)
 
     return {
         "categorie": analyse.categorie,

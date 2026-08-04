@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
-  Activity,
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
@@ -12,6 +11,7 @@ import {
   ShieldCheck,
   Sparkles,
   TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AccessGate } from "@/components/lm/AccessGate";
@@ -138,14 +138,18 @@ function factureToCalcul(facture: Facture, profile: UserProfile): Calcul {
   const ht = facture.total_ht;
   const rs = profile.tax_category === "BNC" && profile.has_recurring_contracts ? ht * 0.1 : 0;
   const css = ht * 0.01;
+  const emission = facture.date_emission ? new Date(facture.date_emission) : null;
   return {
-    reference: facture.numero,
+    // Un document émis porte toujours un numéro ; le repli ne sert qu'à satisfaire le type.
+    reference: facture.numero ?? "—",
     client: facture.client?.nom ?? "Client",
-    date: new Date(facture.date_emission).toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }),
+    date: emission
+      ? emission.toLocaleDateString("fr-FR", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "—",
     montant_ht: ht,
     tva: facture.total_tva,
     retenue_source: rs,
@@ -347,13 +351,30 @@ function DashboardPage() {
     [synthese, rapports, declarations, seuil],
   );
 
-  const aDesDonnees = factures.length > 0;
+  // Un dossier qui ne contient que des brouillons n'a rien à consolider : la synthèse
+  // les exclut, donc l'écran doit rester sur son état vide plutôt que d'afficher des
+  // graphiques à zéro.
+  const aDesDonnees = synthese.nb_factures > 0 || synthese.nb_avoirs > 0;
 
-  // La facture la plus récente pilote le reçu ; sinon on retombe sur l'estimation profil.
+  /**
+   * La dernière facture ÉMISE pilote le reçu.
+   *
+   * Un brouillon n'a ni numéro ni date d'émission, et un avoir porte des montants
+   * négatifs : ni l'un ni l'autre ne donne un reçu fiscal lisible.
+   */
   const derniereFacture = useMemo(() => {
-    if (factures.length === 0) return null;
-    return [...factures].sort(
-      (a, b) => new Date(b.date_emission).getTime() - new Date(a.date_emission).getTime(),
+    const emises = factures.filter(
+      (f) =>
+        f.type_document === "facture" &&
+        f.statut !== "brouillon" &&
+        f.statut !== "annulee" &&
+        Boolean(f.date_emission),
+    );
+    if (emises.length === 0) return null;
+    return emises.sort(
+      (a, b) =>
+        new Date(b.date_emission as string).getTime() -
+        new Date(a.date_emission as string).getTime(),
     )[0];
   }, [factures]);
 
@@ -834,13 +855,31 @@ function RangeeKpi({
         label="Factures émises"
         icone={FileText}
         valeur={<Chiffre to={synthese.nb_factures} format={(n) => Math.round(n).toString()} />}
-        detail={<Delta pct={synthese.delta_factures_pct} />}
+        detail={
+          <div className="space-y-1">
+            <Delta pct={synthese.delta_factures_pct} />
+            <p>
+              Panier moyen <span className="num">{formatEuros(synthese.panier_moyen)}</span>
+              {synthese.nb_avoirs > 0 && (
+                <>
+                  {" · "}
+                  {synthese.nb_avoirs} avoir{synthese.nb_avoirs > 1 ? "s" : ""} déduit
+                  {synthese.nb_avoirs > 1 ? "s" : ""}
+                </>
+              )}
+            </p>
+          </div>
+        }
       />
       <TuileKpi
-        label="Panier moyen HT"
-        icone={Activity}
-        valeur={<Chiffre to={synthese.panier_moyen} format={formatEuros} />}
-        detail={`Sur ${synthese.nb_factures} facture${synthese.nb_factures > 1 ? "s" : ""}`}
+        label="Reste à encaisser"
+        icone={Wallet}
+        valeur={<Chiffre to={synthese.reste_a_encaisser} format={formatEuros} />}
+        detail={
+          synthese.reste_a_encaisser <= 0
+            ? "Tout est réglé sur la période"
+            : `${formatEuros(synthese.montant_regle)} déjà réglés sur ${formatEuros(synthese.net_a_payer)}`
+        }
       />
       <TuileKpi
         label="TVA collectée"

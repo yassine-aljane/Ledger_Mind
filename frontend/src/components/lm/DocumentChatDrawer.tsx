@@ -6,6 +6,7 @@ import {
   type CaptureDocumentMessage,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Markdown } from "@/components/lm/Markdown";
 import {
   Sheet,
   SheetContent,
@@ -113,8 +114,11 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
                   <div className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                     <Bot className="size-3.5" />
                   </div>
-                  <div className="rounded-2xl rounded-bl-none border border-border bg-secondary/50 p-3.5 text-sm leading-relaxed">
-                    {t.content}
+                  {/* Le modèle répond en markdown : sans rendu, les `**` et les `#`
+                      s'affichaient littéralement au milieu du texte. La réponse de
+                      l'utilisateur, elle, reste du texte brut — c'est sa saisie. */}
+                  <div className="min-w-0 rounded-2xl rounded-bl-none border border-border bg-secondary/50 p-3.5 text-sm leading-relaxed">
+                    <Markdown text={t.content} />
                   </div>
                 </div>
               ) : (
