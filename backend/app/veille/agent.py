@@ -28,7 +28,7 @@ from app.veille.modele import (
     maintenant,
 )
 from app.veille.profil import ProfilVeille, construire_profil
-from app.veille.scoring import evaluer, notifiable
+from app.veille.scoring import est_universelle, evaluer, notifiable
 
 logger = logging.getLogger(__name__)
 
@@ -324,9 +324,11 @@ def distribuer(profil: ProfilVeille) -> dict:
     prefs = store.get_preferences(profil.uid)
     if not prefs.active:
         return {"notifiees": 0, "raison": "veille désactivée"}
-    if profil.est_vide:
-        # Aucun champ discriminant : notifier reviendrait à envoyer de la veille générique.
-        return {"notifiees": 0, "raison": "profil trop incomplet"}
+    # Un profil sans champ discriminant ne permet aucun rattachement fin — mais il ne prive
+    # pas des obligations qui s'imposent à tous. On restreint alors aux mesures universelles
+    # plutôt que de ne rien notifier : ne rien dire d'une échéance obligatoire est pire qu'en
+    # dire trop.
+    universelles_seulement = profil.est_vide
 
     quota = store.MAX_NOTIFS_PAR_SEMAINE - store.compte_semaine(profil.uid)
     if quota <= 0:
@@ -338,6 +340,8 @@ def distribuer(profil: ProfilVeille) -> dict:
         if nouveaute.id in connues or nouveaute.perime:
             continue
         if nouveaute.echeance_depassee or nouveaute.nature != "actualite":
+            continue
+        if universelles_seulement and not est_universelle(nouveaute):
             continue
         verdict = evaluer(nouveaute, profil)
         if notifiable(verdict, nouveaute, prefs.mode):
