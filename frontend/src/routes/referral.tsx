@@ -38,10 +38,6 @@ export const Route = createFileRoute("/referral")({
 
 const VILLES_RAPIDES = ["Paris", "Lyon", "Marseille", "Bordeaux", "Lille", "Nantes", "Toulouse"] as const;
 
-/** Brief par défaut — envoyé à l’API sans formulaire dédié. */
-const DEMANDE_DEFAUT =
-  "Je suis créateur·rice / influenceur·euse (sponsos, multi-plateformes, micro-entreprise). Je cherche un expert-comptable à l'aise avec ces revenus digitaux.";
-
 function ReferralRoute() {
   return (
     <AccessGate feature="referral" premiumKind="referral">
@@ -56,7 +52,7 @@ function cabinetId(c: Pick<ReferralCabinet, "nom_cabinet" | "lat" | "lon">, inde
 
 function ReferralPage() {
   const [ville, setVille] = useState("");
-  const [demande, setDemande] = useState(DEMANDE_DEFAUT);
+  const [demande, setDemande] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emails, setEmails] = useState<ReferralEmail[]>([]);
@@ -244,11 +240,29 @@ function ReferralPage() {
               </div>
             </div>
 
+            <div>
+              <label htmlFor="referral-demande" className="rule-label text-accent-ink">
+                Votre besoin
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Contexte pour les emails générés — décrivez votre activité et ce que vous
+                attendez du cabinet.
+              </p>
+              <textarea
+                id="referral-demande"
+                rows={2}
+                value={demande}
+                onChange={(e) => setDemande(e.target.value)}
+                placeholder="Ex. : créateur multi-plateformes en micro, besoin d’aide sur sponsos et URSSAF…"
+                className="mt-3 w-full resize-none rounded-xl border border-border bg-card/80 px-3 py-2.5 text-sm leading-relaxed transition-colors focus:border-ink focus:outline-none"
+              />
+            </div>
+
             <Button
               type="submit"
               size="lg"
               variant="accent"
-              disabled={loading || !ville.trim()}
+              disabled={loading || !ville.trim() || !demande.trim()}
               className="rounded-full px-8"
             >
               {loading ? (
