@@ -840,7 +840,10 @@ function EtapeExpertComptable({
   }
 
   const mapPoints: CabinetMapPoint[] = (resultat?.cabinets ?? [])
-    .map((c, i) => {
+    // Le type de retour est annoté : sans lui, TS infère `adresse` comme requis sur
+    // l'objet littéral, ce qui rend le prédicat du `filter` incompatible avec
+    // CabinetMapPoint (où elle est optionnelle).
+    .map((c, i): CabinetMapPoint | null => {
       if (c.lat == null || c.lon == null) return null;
       return {
         id: `${c.nom_cabinet}-${i}`,

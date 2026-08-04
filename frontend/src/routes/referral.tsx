@@ -75,7 +75,9 @@ function ReferralPage() {
   const mapPoints: CabinetMapPoint[] = useMemo(
     () =>
       cabinets
-        .map((c, i) => {
+        // Annotation nécessaire : sans elle, TS infère `adresse` comme requis sur l'objet
+        // littéral et le prédicat du `filter` ne colle plus à CabinetMapPoint.
+        .map((c, i): CabinetMapPoint | null => {
           if (c.lat == null || c.lon == null) return null;
           return {
             id: cabinetId(c, i),

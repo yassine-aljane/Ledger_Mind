@@ -87,6 +87,15 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
+  /* Dataviz (« Ma situation ») — voir le bloc :root pour la justification des pas choisis. */
+  --color-dv-serie-1: var(--dv-serie-1);
+  --color-dv-serie-2: var(--dv-serie-2);
+  --color-dv-wash-1: var(--dv-wash-1);
+  --color-dv-wash-2: var(--dv-wash-2);
+  --color-dv-track: var(--dv-track);
+  --color-dv-grid: var(--dv-grid);
+  --color-dv-muted: var(--dv-muted);
+
   --shadow-soft: 0 1px 2px oklch(0.22 0.04 160 / 0.05), 0 8px 24px -12px oklch(0.22 0.04 160 / 0.18);
   --shadow-lift: 0 2px 4px oklch(0.22 0.04 160 / 0.06), 0 24px 48px -24px oklch(0.22 0.04 160 / 0.35);
   --shadow-ring: 0 0 0 1px var(--border);
@@ -164,6 +173,25 @@
   --gradient-ink: linear-gradient(155deg, oklch(0.25 0.04 165), oklch(0.18 0.03 158) 60%, oklch(0.22 0.05 140));
   --gradient-safran: linear-gradient(100deg, oklch(0.82 0.15 78), oklch(0.75 0.16 55));
   --grain: radial-gradient(oklch(0.29 0.052 162 / 0.055) 1px, transparent 1px);
+
+  /* ---- Dataviz : deux séries catégorielles, prestations vs ventes ----
+     Les jetons produit (teal-dark, accent) ne conviennent PAS tels quels aux aplats de
+     données : teal-dark est trop sombre et accent trop clair pour tenir la même bande de
+     clarté, ce qui rend l'un des deux illisible sur parchemin. Ces deux pas-ci sont
+     validés (bande de clarté, plancher de chroma, séparation daltonisme ΔE 8.2 protan,
+     contraste ≥ 3:1 sur la carte). Ils gardent les teintes de la marque — vert fiscal et
+     safran — sans en emprunter les valeurs. Toute retouche doit être revalidée : la
+     séparation protan est juste au-dessus du plancher, la marge est mince. */
+  --dv-serie-1: oklch(0.6 0.13 158);
+  --dv-serie-2: oklch(0.62 0.135 65);
+  /* Lavis d'aire : la teinte de la série à ~10 %, jamais un aplat saturé. */
+  --dv-wash-1: oklch(0.6 0.13 158 / 0.12);
+  --dv-wash-2: oklch(0.62 0.135 65 / 0.12);
+  /* Piste des jauges : pas clair de la MÊME rampe, pour que l'état se lise sur toute la barre. */
+  --dv-track: oklch(0.92 0.03 158);
+  --dv-grid: oklch(0.9 0.014 95);
+  /* Gris de mise en retrait : séries de contexte, sparklines hors période courante. */
+  --dv-muted: oklch(0.78 0.012 155);
 }
 
 .dark {
@@ -215,6 +243,19 @@
 
   --gradient-ink: linear-gradient(155deg, oklch(0.24 0.035 165), oklch(0.16 0.026 158) 60%, oklch(0.2 0.04 140));
   --grain: radial-gradient(oklch(0.95 0.012 92 / 0.045) 1px, transparent 1px);
+
+  /* Dataviz en sombre : des pas CHOISIS, pas un simple éclaircissement des pas clairs.
+     La bande de clarté utile se resserre sur fond encre (L 0.48–0.67) ; ces deux valeurs
+     y tiennent tout en gardant ΔE 7.8 protan — dans la bande plancher, donc admissible
+     uniquement parce que les graphes portent aussi légende, étiquettes directes et
+     séparateurs de 2 px. Ne pas retirer ces encodages secondaires. */
+  --dv-serie-1: oklch(0.545 0.13 162);
+  --dv-serie-2: oklch(0.663 0.155 68);
+  --dv-wash-1: oklch(0.545 0.13 162 / 0.2);
+  --dv-wash-2: oklch(0.663 0.155 68 / 0.2);
+  --dv-track: oklch(0.32 0.04 160);
+  --dv-grid: oklch(1 0 0 / 12%);
+  --dv-muted: oklch(0.45 0.02 155);
 }
 
 @layer base {
