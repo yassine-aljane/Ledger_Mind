@@ -19,5 +19,8 @@ SEUILS_YAML = DATA_DIR / "seuils.yaml"
 # Barème IR, quotient familial, décote, CFP, ACRE — complète seuils.yaml sans
 # rien y dupliquer (voir l'en-tête des deux fichiers).
 IMPOT_REVENU_YAML = DATA_DIR / "impot_revenu.yaml"
+# Mentions obligatoires et montants réglementaires de la facturation. Les seuils
+# de franchise TVA restent dans seuils.yaml : rien n'est dupliqué.
+FACTURATION_YAML = DATA_DIR / "facturation.yaml"
 SOURCES_YAML = DATA_DIR / "sources.yaml"
 REGIMES_DIR = DATA_DIR / "regimes"

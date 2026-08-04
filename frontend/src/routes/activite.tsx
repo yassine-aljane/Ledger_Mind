@@ -2,8 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AccessGate } from "@/components/lm/AccessGate";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
-import { CabinetsMap, CabinetContactLines, type CabinetMapPoint } from "@/components/lm/CabinetsMap";
-import { Markdown } from "@/components/lm/Markdown";
+import { CabinetsMap } from "@/components/lm/CabinetsMap";
+import { CabinetContactLines, type CabinetMapPoint } from "@/components/lm/cabinets";
+import { FactureCycleVie } from "@/components/lm/FactureCycleVie";
+import { RapportFiscalPanel } from "@/components/lm/RapportFiscal";
 import { fetchMe, getStoredUser, isAuthed, isSirenVerified } from "@/lib/auth";
 import {
   fetchMySessions,
@@ -13,20 +15,11 @@ import {
   type SessionDetail,
 } from "@/lib/api";
 import {
-  creerFacture,
-  listerFactures,
-  telechargerFacturePdf,
-  genererRapport,
-  listerRapports,
-  telechargerRapportPdf,
   genererDeclaration,
   listerDeclarations,
   marquerDeclarationRevue,
   telechargerDeclarationPdf,
   rechercherExpertsComptables,
-  type Facture,
-  type LigneFacture,
-  type RapportActivite,
   type Declaration,
   type RechercheExpertsComptables,
 } from "@/lib/facturation-api";
@@ -67,10 +60,6 @@ function todayIso() {
 function firstOfMonthIso() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
-}
-
-function ligneVide(): LigneFacture {
-  return { designation: "", quantite: 1, prix_unitaire_ht: 0, taux_tva: 0, categorie: "prestation" };
 }
 
 function Provenance({ children }: { children: React.ReactNode }) {
@@ -223,7 +212,9 @@ function ActiviteGate() {
 
 function ActiviteJourney({ profile }: { profile: NonNullable<SessionDetail["profile"]> }) {
   const [etape, setEtape] = useState<Etape>("facture");
-  const [dernierRapport, setDernierRapport] = useState<RapportActivite | null>(null);
+  // La période du dernier rapport établi préremplit la déclaration : les deux doivent porter
+  // sur le même intervalle, sans quoi les montants ne se correspondent plus.
+  const [periodeRapport, setPeriodeRapport] = useState<{ debut: string; fin: string } | null>(null);
   const [derniereDeclaration, setDerniereDeclaration] = useState<Declaration | null>(null);
   const [villePourExpert, setVillePourExpert] = useState("");
 
@@ -267,14 +258,14 @@ function ActiviteJourney({ profile }: { profile: NonNullable<SessionDetail["prof
 
       {etape === "facture" && <EtapeFacture onSuivant={() => setEtape("rapport")} />}
       {etape === "rapport" && (
-        <EtapeRapport
-          onGenere={setDernierRapport}
+        <RapportFiscalPanel
+          onPeriodeGeneree={(debut, fin) => setPeriodeRapport({ debut, fin })}
           onSuivant={() => setEtape("declaration")}
         />
       )}
       {etape === "declaration" && (
         <EtapeDeclaration
-          rapportSource={dernierRapport}
+          periodeSource={periodeRapport}
           onGenere={setDerniereDeclaration}
           onDemanderExpert={(ville) => {
             setVillePourExpert(ville);
@@ -294,359 +285,25 @@ function ActiviteJourney({ profile }: { profile: NonNullable<SessionDetail["prof
 
 // ------------------------------------------------------------------------------- 1. Facture
 
+// Le cycle de vie complet (brouillon -> emission -> reglement / avoir) vit dans son propre
+// composant : cet ecran n'est plus qu'un aiguillage entre les quatre etapes.
 function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
-  const [clientNom, setClientNom] = useState("");
-  const [clientPro, setClientPro] = useState(false);
-  const [lignes, setLignes] = useState<LigneFacture[]>([ligneVide()]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [derniere, setDerniere] = useState<Facture | null>(null);
-  const [historique, setHistorique] = useState<Facture[]>([]);
-
-  useEffect(() => {
-    listerFactures()
-      .then((r) => setHistorique(r.factures))
-      .catch(() => {});
-  }, []);
-
-  function updateLigne(i: number, patch: Partial<LigneFacture>) {
-    setLignes((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!clientNom.trim() || lignes.some((l) => !l.designation.trim())) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const facture = await creerFacture({ client: { nom: clientNom.trim(), est_professionnel: clientPro }, lignes });
-      setDerniere(facture);
-      setHistorique((prev) => [facture, ...prev]);
-      setClientNom("");
-      setLignes([ligneVide()]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur lors de la génération.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="grid lg:grid-cols-12 gap-10 items-start">
-      <div className="lg:col-span-7 space-y-6">
-        <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-8 space-y-5">
-          <div>
-            <label className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Client</label>
-            <input
-              type="text"
-              value={clientNom}
-              onChange={(e) => setClientNom(e.target.value)}
-              placeholder="Nom du client"
-              className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border text-lg focus:outline-none focus:border-ink transition-colors"
-            />
-            <label className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={clientPro} onChange={(e) => setClientPro(e.target.checked)} />
-              Client professionnel (mention TVA intracommunautaire si applicable)
-            </label>
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Prestations</label>
-            {lignes.map((l, i) => (
-              <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                <input
-                  className="col-span-5 px-3 py-2 bg-background border border-transparent rounded-lg text-sm input-boxed"
-                  placeholder="Désignation"
-                  value={l.designation}
-                  onChange={(e) => updateLigne(i, { designation: e.target.value })}
-                />
-                <input
-                  className="col-span-2 px-3 py-2 bg-background border border-transparent rounded-lg text-sm input-boxed"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="Qté"
-                  value={l.quantite}
-                  onChange={(e) => updateLigne(i, { quantite: Number(e.target.value) })}
-                />
-                <input
-                  className="col-span-2 px-3 py-2 bg-background border border-transparent rounded-lg text-sm input-boxed"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="PU HT"
-                  value={l.prix_unitaire_ht}
-                  onChange={(e) => updateLigne(i, { prix_unitaire_ht: Number(e.target.value) })}
-                />
-                <select
-                  className="col-span-3 px-2 py-2 bg-background border border-transparent rounded-lg text-sm input-boxed"
-                  value={l.categorie}
-                  onChange={(e) => updateLigne(i, { categorie: e.target.value as LigneFacture["categorie"] })}
-                >
-                  <option value="prestation">Prestation</option>
-                  <option value="vente">Vente</option>
-                </select>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setLignes((prev) => [...prev, ligneVide()])}
-              className="text-sm text-teal-dark font-medium hover:underline"
-            >
-              + Ajouter une ligne
-            </button>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || !clientNom.trim()}
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-accent px-6 text-sm font-medium text-accent-ink shadow-soft transition-all duration-200 hover:brightness-[1.04] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
-          >
-            {loading ? "Génération…" : "Générer la facture"}
-          </button>
-        </form>
-
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 text-sm text-destructive font-medium">
-            {error}
-          </div>
-        )}
-
-        {derniere && (
-          <section className="bg-card border border-border rounded-2xl p-8 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-xl">Facture {derniere.numero}</h3>
-              <Provenance>facture_generee</Provenance>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Total HT {derniere.total_ht.toFixed(2)} € · TVA {derniere.total_tva.toFixed(2)} € · Total TTC{" "}
-              {derniere.total_ttc.toFixed(2)} €
-            </p>
-            <div className="space-y-2">
-              {derniere.mentions.map((m) => (
-                <div key={m.cle} className="text-xs border-l-2 border-teal-dark/40 pl-3">
-                  <span className="font-medium">{m.libelle} :</span> {m.valeur}
-                  <span className="text-muted-foreground"> — source : {m.source}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => telechargerFacturePdf(derniere.id, derniere.numero)}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
-              >
-                Télécharger le PDF
-              </button>
-              <button
-                type="button"
-                onClick={onSuivant}
-                className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-all duration-200 active:scale-[0.97]"
-              >
-                Étape suivante : rapport →
-              </button>
-            </div>
-          </section>
-        )}
-      </div>
-
-      <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4">
-        <h3 className="rule-label text-accent-ink">
-          Factures émises
-        </h3>
-        {historique.length === 0 ? (
-          <div className="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground text-sm">
-            Aucune facture émise pour l'instant.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {historique.map((f) => (
-              <div key={f.id} className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between card-hover">
-                <div>
-                  <p className="num text-sm font-medium">{f.numero}</p>
-                  <p className="text-xs text-muted-foreground">{f.client.nom} · {f.total_ttc.toFixed(2)} € TTC</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => telechargerFacturePdf(f.id, f.numero)}
-                  className="text-xs text-teal-dark font-medium hover:underline"
-                >
-                  PDF
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------------------- 2. Rapport
-
-function EtapeRapport({
-  onGenere,
-  onSuivant,
-}: {
-  onGenere: (r: RapportActivite) => void;
-  onSuivant: () => void;
-}) {
-  const [dateDebut, setDateDebut] = useState(firstOfMonthIso());
-  const [dateFin, setDateFin] = useState(todayIso());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rapport, setRapport] = useState<RapportActivite | null>(null);
-  const [historique, setHistorique] = useState<RapportActivite[]>([]);
-
-  useEffect(() => {
-    listerRapports()
-      .then((r) => setHistorique(r.rapports))
-      .catch(() => {});
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await genererRapport(dateDebut, dateFin);
-      setRapport(r);
-      onGenere(r);
-      setHistorique((prev) => [r, ...prev]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur lors de la génération du rapport.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="grid lg:grid-cols-12 gap-10 items-start">
-      <div className="lg:col-span-7 space-y-6">
-        <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-8 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Depuis</label>
-              <input
-                type="date"
-                value={dateDebut}
-                onChange={(e) => setDateDebut(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink transition-colors"
-              />
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Jusqu'au</label>
-              <input
-                type="date"
-                value={dateFin}
-                onChange={(e) => setDateFin(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink transition-colors"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-accent px-6 text-sm font-medium text-accent-ink shadow-soft transition-all duration-200 hover:brightness-[1.04] active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
-          >
-            {loading ? "Consolidation…" : "Générer le rapport"}
-          </button>
-        </form>
-
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 text-sm text-destructive font-medium">
-            {error}
-          </div>
-        )}
-
-        {rapport && (
-          <section className="bg-card border border-border rounded-2xl p-8 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-xl">
-                Rapport {rapport.date_debut} → {rapport.date_fin}
-              </h3>
-              <Provenance>rapport_genere</Provenance>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {rapport.chiffres_cles.map((c) => (
-                <div key={c.cle} className="bg-background rounded-xl p-4">
-                  <p className="rule-label text-muted-foreground">{c.libelle}</p>
-                  <p className="num font-medium">{c.valeur}</p>
-                </div>
-              ))}
-            </div>
-            {rapport.signaux_conformite.length > 0 && (
-              <div className="space-y-2">
-                {rapport.signaux_conformite.map((s, i) => (
-                  <div key={i} className="text-xs bg-amber-fiscal/10 border border-amber-fiscal/30 rounded-lg p-3">
-                    <span className="font-semibold">{s.label} :</span> {s.question}
-                  </div>
-                ))}
-              </div>
-            )}
-            <div>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-2">Appréciation</p>
-              <Markdown text={rapport.appreciation} className="text-sm leading-relaxed" />
-            </div>
-            {rapport.sources.length > 0 && (
-              <p className="text-xs text-muted-foreground">Sources : {rapport.sources.join(", ")}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => telechargerRapportPdf(rapport.id, rapport.date_debut, rapport.date_fin)}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
-              >
-                Télécharger le PDF
-              </button>
-              <button
-                type="button"
-                onClick={onSuivant}
-                className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-all duration-200 active:scale-[0.97]"
-              >
-                Étape suivante : déclaration →
-              </button>
-            </div>
-          </section>
-        )}
-      </div>
-
-      <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4">
-        <h3 className="rule-label text-accent-ink">
-          Rapports générés
-        </h3>
-        {historique.length === 0 ? (
-          <div className="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground text-sm">
-            Aucun rapport pour l'instant.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {historique.map((r) => (
-              <div key={r.id} className="bg-card border border-border rounded-2xl p-5 card-hover">
-                <p className="font-semibold text-sm">{r.date_debut} → {r.date_fin}</p>
-                <p className="text-xs text-muted-foreground">{r.total_ttc.toFixed(2)} € TTC · {r.nb_factures} facture(s)</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <FactureCycleVie onSuivant={onSuivant} />;
 }
 
 // ---------------------------------------------------------------------------- 3. Déclaration
 
 function EtapeDeclaration({
-  rapportSource,
+  periodeSource,
   onGenere,
   onDemanderExpert,
 }: {
-  rapportSource: RapportActivite | null;
+  periodeSource: { debut: string; fin: string } | null;
   onGenere: (d: Declaration) => void;
   onDemanderExpert: (villeSuggeree: string) => void;
 }) {
-  const [dateDebut, setDateDebut] = useState(rapportSource?.date_debut ?? firstOfMonthIso());
-  const [dateFin, setDateFin] = useState(rapportSource?.date_fin ?? todayIso());
+  const [dateDebut, setDateDebut] = useState(periodeSource?.debut ?? firstOfMonthIso());
+  const [dateFin, setDateFin] = useState(periodeSource?.fin ?? todayIso());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [declaration, setDeclaration] = useState<Declaration | null>(null);
@@ -664,7 +321,7 @@ function EtapeDeclaration({
     setLoading(true);
     setError(null);
     try {
-      const d = await genererDeclaration(dateDebut, dateFin, rapportSource?.id);
+      const d = await genererDeclaration(dateDebut, dateFin);
       setDeclaration(d);
       setRevue(false);
       onGenere(d);
@@ -707,9 +364,9 @@ function EtapeDeclaration({
               />
             </div>
           </div>
-          {rapportSource && (
+          {periodeSource && (
             <p className="text-xs text-muted-foreground">
-              Consolidée depuis le rapport {rapportSource.date_debut} → {rapportSource.date_fin}.
+              Période reprise du rapport {periodeSource.debut} → {periodeSource.fin}.
             </p>
           )}
           <button
@@ -840,7 +497,10 @@ function EtapeExpertComptable({
   }
 
   const mapPoints: CabinetMapPoint[] = (resultat?.cabinets ?? [])
-    .map((c, i) => {
+    // Type de retour annoté : sans lui, l'objet produit déclare `adresse` comme
+    // requis-mais-nullable, ce que `CabinetMapPoint` (où il est optionnel) ne
+    // satisfait pas — et le prédicat du `filter` devient invalide.
+    .map((c, i): CabinetMapPoint | null => {
       if (c.lat == null || c.lon == null) return null;
       return {
         id: `${c.nom_cabinet}-${i}`,
