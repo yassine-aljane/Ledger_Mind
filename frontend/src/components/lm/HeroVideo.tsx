@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
-import creatorClip from "@/assets/creator-clip.mp4";
-import creatorPoster from "@/assets/creator-hero.jpg";
+import heroClip from "@/assets/hero-workspace.mp4";
+import heroPoster from "@/assets/hero-workspace-poster.jpg";
 
-/** Vidéo du mockup téléphone — relancée après le montage (politiques d'autoplay). */
+/**
+ * Fond vidéo du héros — bureau créateur (laptop + smartphone), sans visage flou.
+ * Clip Pexels libre d'usage ; poster de secours si l'autoplay est bloqué.
+ */
 export function HeroVideo({ className }: { className?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
 
@@ -22,8 +25,8 @@ export function HeroVideo({ className }: { className?: string }) {
     <video
       ref={ref}
       className={className}
-      src={creatorClip}
-      poster={creatorPoster}
+      src={heroClip}
+      poster={heroPoster}
       autoPlay
       loop
       muted
