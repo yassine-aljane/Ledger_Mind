@@ -7,7 +7,6 @@ import {
   Gauge,
   Receipt,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import {
   useEffect,
@@ -96,15 +95,15 @@ const DEMO_QA = [
   },
 ] as const;
 
-const TICKER = [
-  "TVA & franchise",
-  "Seuils micro",
-  "Sponsos marques",
-  "Affiliation",
-  "URSSAF trimestriel",
-  "Factures conformes",
-  "Expert près de chez vous",
-  "Scénario contrat",
+const OFFICIAL_SOURCES: { name: string; logo: string }[] = [
+  { name: "BOFiP", logo: "/sources/bofip.svg" },
+  { name: "Légifrance", logo: "/sources/legifrance.svg" },
+  { name: "URSSAF", logo: "/sources/urssaf.svg" },
+  { name: "impôts.gouv", logo: "/sources/impots.svg" },
+  { name: "service-public", logo: "/sources/service-public.svg" },
+  { name: "INSEE", logo: "/sources/insee.png" },
+  { name: "INPI", logo: "/sources/inpi.svg" },
+  { name: "Sirene", logo: "/sources/sirene.png" },
 ];
 
 function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
@@ -252,27 +251,6 @@ function LiveAssistantDemo() {
   );
 }
 
-function MarqueeStrip({ items, className }: { items: string[]; className?: string }) {
-  const loop = [...items, ...items];
-  return (
-    <div
-      className={cn("overflow-hidden border-y border-border bg-ink text-ink-foreground", className)}
-      aria-hidden
-    >
-      <div className="animate-marquee flex w-max gap-10 py-3.5 whitespace-nowrap">
-        {loop.map((t, i) => (
-          <span key={`${t}-${i}`} className="inline-flex items-center gap-10">
-            <span className="font-display text-sm tracking-wide text-ink-foreground/85 sm:text-base">
-              {t}
-            </span>
-            <span className="text-accent">◆</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -362,8 +340,6 @@ function Landing() {
         </div>
       </section>
 
-      <MarqueeStrip items={TICKER} />
-
       {/* ---------- Démo conversation vivante ---------- */}
       <section id="commencer" className="relative scroll-mt-24 overflow-hidden">
         <div
@@ -407,7 +383,7 @@ function Landing() {
         </div>
       </section>
 
-      {/* ---------- Zigzag des 4 pôles ---------- */}
+      {/* ---------- Pôles en grille 2×2 ---------- */}
       <section id="services" className="scroll-mt-24 border-t border-border">
         <div className="mx-auto max-w-6xl px-5 pt-16 pb-8 sm:pt-20 sm:pb-10">
           <div className="max-w-xl">
@@ -421,48 +397,42 @@ function Landing() {
             </p>
           </div>
 
-          <ol className="relative mt-8 list-none sm:mt-10">
+          <ol className="mt-10 grid list-none gap-8 sm:mt-12 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-10 lg:gap-x-8">
             {SERVICE_GROUPS.map((g, i) => {
               const right = i % 2 === 1;
               return (
-                <li
-                  key={g.title}
-                  className={cn(
-                    "relative z-10 flex py-1.5 transition-[padding] duration-500 ease-out-expo sm:py-2",
-                    "has-[:hover]:py-4 has-[:focus-within]:py-4 sm:has-[:hover]:py-5 sm:has-[:focus-within]:py-5",
-                    right
-                      ? "justify-end lg:pr-[12%]"
-                      : "justify-start lg:pl-[12%]",
-                  )}
-                >
+                <li key={g.title}>
                   <div
-                    className="group relative w-full max-w-md cursor-default outline-none"
+                    className={cn(
+                      "group relative w-full max-w-sm cursor-default outline-none",
+                      right && "sm:ml-6 sm:text-right lg:ml-10",
+                    )}
                     tabIndex={0}
                   >
                     <div
                       className={cn(
                         "flex items-center gap-4 sm:gap-5",
-                        right && "flex-row-reverse text-right",
+                        right && "sm:flex-row-reverse",
                       )}
                     >
                       <span
                         className={cn(
                           "relative z-10 grid size-16 shrink-0 place-items-center rounded-full border-2 border-border bg-background font-mono text-sm font-semibold shadow-soft transition-all duration-500 sm:size-[4.5rem] sm:text-base",
-                          "group-hover:size-[4.75rem] group-hover:border-accent group-hover:bg-accent group-hover:text-accent-foreground group-hover:shadow-lift sm:group-hover:size-20",
+                          "group-hover:border-accent group-hover:bg-accent group-hover:text-accent-foreground group-hover:shadow-lift group-hover:scale-105",
                           "group-focus-visible:border-accent group-focus-visible:bg-accent group-focus-visible:text-accent-foreground",
                         )}
                       >
                         {g.n}
                       </span>
                       <div>
-                        <h3 className="flex items-center gap-2 font-display text-xl tracking-tight sm:text-2xl">
-                          {!right && (
-                            <g.icon className="size-4 text-accent opacity-60 transition-opacity group-hover:opacity-100" />
+                        <h3
+                          className={cn(
+                            "flex items-center gap-2 font-display text-xl tracking-tight sm:text-2xl",
+                            right && "sm:flex-row-reverse",
                           )}
+                        >
+                          <g.icon className="size-4 text-accent opacity-60 transition-opacity group-hover:opacity-100" />
                           {g.title}
-                          {right && (
-                            <g.icon className="size-4 text-accent opacity-60 transition-opacity group-hover:opacity-100" />
-                          )}
                         </h3>
                         <p className="mt-0.5 font-mono text-[0.55rem] uppercase tracking-[0.16em] text-muted-foreground">
                           {g.access}
@@ -481,11 +451,16 @@ function Landing() {
                         <div
                           className={cn(
                             "mt-3 border-t border-border/70 pt-3",
-                            right && "text-right",
+                            right && "sm:text-right",
                           )}
                         >
                           <p className="rule-label mb-2 text-accent-ink">Services</p>
-                          <ul className={cn("flex flex-col gap-1", right && "items-end")}>
+                          <ul
+                            className={cn(
+                              "flex flex-col gap-1",
+                              right && "sm:items-end",
+                            )}
+                          >
                             {g.includes.map((svc) => (
                               <li
                                 key={svc}
@@ -498,7 +473,7 @@ function Landing() {
                           <p
                             className={cn(
                               "mt-2 max-w-xs text-xs leading-relaxed text-muted-foreground",
-                              right && "ml-auto",
+                              right && "sm:ml-auto",
                             )}
                           >
                             {g.description}
@@ -612,9 +587,7 @@ function Landing() {
                 ))}
               </ul>
               <Button asChild variant="accent" className="relative mt-8 w-full rounded-full sm:w-auto">
-                <Link to="/premium">
-                  <Sparkles className="size-4" /> Découvrir Premium
-                </Link>
+                <Link to="/premium">Découvrir Premium</Link>
               </Button>
             </article>
           </div>
@@ -630,22 +603,16 @@ function Landing() {
             <span className="italic text-accent-ink">des textes officiels.</span>
           </h2>
         </div>
-        <div className="border-t border-border bg-secondary/50 py-5" aria-hidden>
-          <div className="animate-marquee flex w-max gap-14 whitespace-nowrap font-display text-3xl text-foreground/15 sm:gap-16 sm:text-5xl">
+        <div className="border-t border-border bg-secondary/50 py-7" aria-hidden>
+          <div className="animate-marquee flex w-max items-center gap-14 whitespace-nowrap sm:gap-20">
             {Array.from({ length: 2 }).flatMap((_, loop) =>
-              [
-                "BOFiP",
-                "Légifrance",
-                "URSSAF",
-                "impôts.gouv",
-                "service-public",
-                "INSEE",
-                "INPI",
-                "Sirene",
-              ].map((w, i) => (
-                <span key={`${loop}-${i}`} className="tracking-tight">
-                  {w}
-                </span>
+              OFFICIAL_SOURCES.map((src, i) => (
+                <img
+                  key={`${loop}-${i}`}
+                  src={src.logo}
+                  alt={src.name}
+                  className="h-9 w-auto max-w-[9rem] shrink-0 object-contain sm:h-11 sm:max-w-[11rem]"
+                />
               )),
             )}
           </div>

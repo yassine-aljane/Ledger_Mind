@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Check, Lock, Sparkles, type LucideIcon } from "lucide-react";
+import { Check, Lock, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { usePlan } from "@/lib/plan";
@@ -71,9 +71,7 @@ export function PremiumLock({ title, eyebrow, pitch, bullets, preview, children 
             ))}
 
             <Button asChild variant="accent" className="mt-4 w-full">
-              <Link to="/premium">
-                <Sparkles /> Passer Premium
-              </Link>
+              <Link to="/premium">Passer Premium</Link>
             </Button>
             {eyebrow && (
               <p className="rule-label pt-2 text-center text-muted-foreground">
