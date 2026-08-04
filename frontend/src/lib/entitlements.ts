@@ -229,24 +229,6 @@ export function useEntitlements(): Entitlements {
     setAuthed(isAuthed());
   }, [isError]);
 
-    // Puis on resynchronise depuis le serveur : le cache peut dater d'avant la fin du parcours,
-    // auquel cas l'utilisateur resterait bloqué derrière « terminez votre parcours ». Un échec
-    // 401 vide la session côté `fetchMe`, ce qui nous ramène proprement à l'état visiteur.
-    let annule = false;
-    if (isAuthed()) {
-      fetchMe()
-        .then((u) => {
-          if (!annule) setUser(u);
-        })
-        .catch(() => {
-          if (!annule) sync();
-        });
-    }
-    return () => {
-      annule = true;
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
   const parcoursDone = isParcoursDone(user);
   const parcoursAcheve = isParcoursAcheve(user);
   const state = accessState(authed, plan, parcoursDone);
