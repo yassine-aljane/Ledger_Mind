@@ -1,0 +1,6 @@
+INFO:     127.0.0.1:54457 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54459 - "GET /api/declarations/echeances HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:63064 - "OPTIONS /api/veille/notifications?non_lues=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51782 - "OPTIONS /api/veille/notifications?non_lues=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63064 - "GET /api/veille/notifications?non_lues=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63064 - "GET /api/veille/notifications?non_lues=true HTTP/1.1" 200 OK

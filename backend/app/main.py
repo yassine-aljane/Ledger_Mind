@@ -13,6 +13,7 @@ from app.api import (
     guidance,
     orchestrator,
     rapport,
+    declarations as declarations_api,
     rapport_fiscal,
     referral,
     verification,
@@ -58,6 +59,7 @@ app.include_router(guidance.router)
 app.include_router(facture.router)
 app.include_router(rapport.router)
 app.include_router(rapport_fiscal.router)
+app.include_router(declarations_api.router)
 app.include_router(declaration.router)
 app.include_router(expert_comptable.router)
 app.include_router(echeancier.router)

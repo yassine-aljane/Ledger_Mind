@@ -1,0 +1,171 @@
+# ============================================================================
+#  OBLIGATIONS DÉCLARATIVES — CASES OFFICIELLES, TFCC, CFE, DES
+# ============================================================================
+#  Complète `seuils.yaml` (plafonds micro, cotisations, franchise TVA) et
+#  `impot_revenu.yaml` (barème, CFP, ACRE). AUCUNE valeur n'est dupliquée :
+#  ce fichier ne porte que ce qui manquait pour PRÉPARER une déclaration.
+#
+#  Règle du projet : aucun taux, seuil ni numéro de case codé en dur dans la
+#  logique. Toute valeur vit ici avec sa source et sa date de vérification.
+#
+#  ⚠️  `verifie: false` signifie NON RECOUPÉ avec la source officielle. Un
+#      brouillon s'appuyant sur une telle valeur DOIT le signaler à
+#      l'utilisateur plutôt que de la présenter comme fiable — c'est une
+#      exigence explicite de la spécification de l'agent.
+# ============================================================================
+
+annee: 2026
+date_verif: "2026-08-04"
+
+# --- Déclaration annuelle de revenus — CERFA n°11222 (2042-C-PRO) ----------
+#  Le montant reporté est TOUJOURS le CA BRUT encaissé, jamais après
+#  abattement : c'est l'administration qui applique l'abattement. Déduire
+#  avant de remplir la case ferait déclarer un revenu deux fois amputé.
+declaration_revenus:
+  formulaire: "2042-C-PRO"
+  cerfa: "11222"
+  montant_attendu: "CA brut encaissé, abattement NON déduit"
+  cases:
+    BIC_VENTE:
+      case: "5KO"
+      libelle: "Vente de marchandises et assimilées (micro-BIC)"
+      abattement_applique_par: "administration"
+    BIC_SERVICE:
+      case: "5KP"
+      libelle: "Prestations de services et locations meublées (micro-BIC)"
+      abattement_applique_par: "administration"
+    BNC:
+      case: "5HQ"
+      libelle: "Revenus imposables des professions libérales (micro-BNC)"
+      abattement_applique_par: "administration"
+  # Échéance variable selon le département ET l'année : à récupérer chaque
+  # année plutôt que codée en dur (exigence de la spécification).
+  echeance: "variable selon le département, généralement fin mai à début juin"
+  echeance_codee_en_dur: false
+  source: "https://www.impots.gouv.fr/particulier/questions/comment-declarer-les-revenus-provenant-de-mon-activite-dauto-entrepreneur"
+  date_verif: "2026-07-30"
+  verifie: true
+
+# --- Déclaration de chiffre d'affaires (URSSAF) ----------------------------
+#  Téléservice, pas un CERFA : le brouillon reproduit les champs de
+#  l'interface. Les trois lignes de CA restent SÉPARÉES en activité mixte —
+#  les fusionner appliquerait un seul taux à des natures différentes.
+declaration_ca_urssaf:
+  teleservice: "autoentrepreneur.urssaf.fr"
+  lignes:
+    BIC_VENTE: "Chiffre d'affaires — vente de marchandises"
+    BIC_SERVICE: "Chiffre d'affaires — prestations de services BIC"
+    BNC: "Chiffre d'affaires — prestations de services BNC"
+  declaration_a_zero_obligatoire: true
+  note_zero: >-
+    La déclaration reste obligatoire même à 0 €. L'omettre expose à une
+    pénalité, alors qu'aucune somme n'est due.
+  source: "https://www.autoentrepreneur.urssaf.fr"
+  date_verif: "2026-08-04"
+  verifie: false
+
+# --- TFCC — Taxe pour frais de chambre consulaire --------------------------
+#  BIC UNIQUEMENT : conséquence directe de l'inscription au RCS/RM. Un BNC
+#  n'est inscrit qu'au RNE, il n'en est donc jamais redevable.
+#
+#  ⚠️  Taux donnés comme approximatifs par la source du projet. NON RECOUPÉS.
+tfcc:
+  BIC_VENTE:
+    taux: 0.00015          # ~0,015 % — CCI, vente de marchandises
+    chambre: "CCI"
+  BIC_SERVICE:
+    taux: 0.00044          # ~0,044 % — CCI, prestations de services
+    chambre: "CCI"
+  BNC:
+    taux: 0.0
+    chambre: null
+    motif_exoneration: "Non inscrit au RCS : la TFCC ne s'applique pas au BNC."
+  assiette: "CA encaissé brut"
+  source: "https://www.autoentrepreneur.urssaf.fr"
+  date_verif: "2026-08-04"
+  verifie: false
+
+# --- CFP — exonération de première année -----------------------------------
+#  Le TAUX de CFP vit dans impot_revenu.yaml. Ici uniquement la règle
+#  d'exonération, que le taux seul ne permet pas d'exprimer.
+cfp_exoneration:
+  premiere_annee_et_ca_inferieur_a: 5000
+  regle: >-
+    CFP nulle si l'entreprise est dans sa première année d'activité ET que le
+    CA annuel cumulé reste inférieur au seuil. Les deux conditions à la fois.
+  source: "https://www.autoentrepreneur.urssaf.fr"
+  date_verif: "2026-08-04"
+  verifie: false
+
+# --- CFE — Cotisation foncière des entreprises -----------------------------
+#  Montant NON calculable ici : il dépend d'un barème voté par chaque commune.
+#  L'agent signale l'échéance, il n'annonce aucun montant.
+cfe:
+  exoneration_premiere_annee: true
+  formulaire_initial: "1447-C-SD"
+  formulaire_initial_note: "Une seule fois à la création ; aucune déclaration périodique ensuite."
+  echeance: "décembre"
+  montant_calculable: false
+  motif_non_calculable: >-
+    Le montant dépend d'un barème communal voté localement, absent de toute
+    table nationale. L'annoncer reviendrait à inventer un chiffre.
+  source: "https://entreprendre.service-public.gouv.fr/vosdroits/F23547"
+  date_verif: "2026-08-04"
+  verifie: false
+
+# --- DES — Déclaration européenne de services ------------------------------
+#  Déclencheur : un encaissement provenant d'une entité établie dans l'UE
+#  (hors France). S'applique MÊME sous franchise de TVA nationale — c'est le
+#  piège propre aux créateurs payés par des plateformes européennes.
+des:
+  declaration_informative: true
+  aucun_paiement: true
+  note_aucun_paiement: >-
+    La DES ne donne lieu à AUCUN paiement : c'est une déclaration informative
+    destinée aux douanes, distincte de la TVA collectée ou déductible.
+  frequence: "mensuelle"
+  echeance: "10e jour ouvrable du mois suivant"
+  numero_tva_intracom_requis: true
+  note_numero_requis: >-
+    Sans numéro de TVA intracommunautaire, certaines plateformes ne peuvent
+    pas activer le paiement : la démarche est à faire AVANT de percevoir.
+  teleservice: "Prodouane"
+  source: "https://www.douane.gouv.fr/demarche/declaration-europeenne-de-services-des"
+  date_verif: "2026-08-04"
+  verifie: false
+  # Contreparties fréquemment rencontrées chez les créateurs, avec leur pays.
+  # Sert d'INDICE de détection, jamais de preuve : la contrepartie réelle
+  # figure sur le justificatif.
+  indices_plateformes_ue:
+    - {motif: "google ireland", pays: "IE", plateforme: "Google / YouTube AdSense"}
+    - {motif: "google adsense", pays: "IE", plateforme: "Google / YouTube AdSense"}
+    - {motif: "adsense", pays: "IE", plateforme: "Google / YouTube AdSense"}
+    - {motif: "meta platforms ireland", pays: "IE", plateforme: "Meta"}
+    - {motif: "tiktok technology", pays: "IE", plateforme: "TikTok"}
+    - {motif: "amazon europe", pays: "LU", plateforme: "Amazon"}
+    - {motif: "spotify ab", pays: "SE", plateforme: "Spotify"}
+    - {motif: "twitch interactive", pays: "NL", plateforme: "Twitch"}
+
+# --- TVA — CERFA n°3310-CA3 ------------------------------------------------
+#  Les SEUILS de franchise vivent dans seuils.yaml (bloc `tva_franchise`).
+#
+#  ⚠️  Les numéros de case du CA3 n'ont PAS été confirmés. La spécification
+#      interdit d'inventer un numéro de case : le brouillon présente donc la
+#      STRUCTURE du formulaire (collectée / déductible / nette) sans prétendre
+#      à des références exactes, et le signale.
+declaration_tva:
+  formulaire: "3310-CA3"
+  cerfa: "3310-CA3"
+  cases_confirmees: false
+  note_cases: >-
+    Les numéros de case exacts du CA3 n'ont pas été recoupés avec le formulaire
+    en vigueur. Le brouillon donne la structure attendue, pas des références de
+    case : reportez les montants sur le formulaire officiel.
+  structure:
+    - {cle: "tva_collectee", libelle: "TVA collectée sur les opérations imposables"}
+    - {cle: "tva_deductible", libelle: "TVA déductible sur les biens et services"}
+    - {cle: "tva_nette", libelle: "TVA nette due (collectée − déductible)"}
+  taux_normal: 0.20
+  source: "https://www.impots.gouv.fr/formulaire/3310-ca3-sd/declaration-de-tva"
+  date_verif: "2026-08-04"
+  verifie: false

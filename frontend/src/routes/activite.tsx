@@ -5,6 +5,7 @@ import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { CabinetsMap } from "@/components/lm/CabinetsMap";
 import { CabinetContactLines, type CabinetMapPoint } from "@/components/lm/cabinets";
 import { FactureCycleVie } from "@/components/lm/FactureCycleVie";
+import { DeclarationsPanel } from "@/components/lm/Declarations";
 import { RapportFiscalPanel } from "@/components/lm/RapportFiscal";
 import { fetchMe, getStoredUser, isAuthed, isSirenVerified } from "@/lib/auth";
 import {
@@ -15,12 +16,7 @@ import {
   type SessionDetail,
 } from "@/lib/api";
 import {
-  genererDeclaration,
-  listerDeclarations,
-  marquerDeclarationRevue,
-  telechargerDeclarationPdf,
   rechercherExpertsComptables,
-  type Declaration,
   type RechercheExpertsComptables,
 } from "@/lib/facturation-api";
 
@@ -215,7 +211,6 @@ function ActiviteJourney({ profile }: { profile: NonNullable<SessionDetail["prof
   // La période du dernier rapport établi préremplit la déclaration : les deux doivent porter
   // sur le même intervalle, sans quoi les montants ne se correspondent plus.
   const [periodeRapport, setPeriodeRapport] = useState<{ debut: string; fin: string } | null>(null);
-  const [derniereDeclaration, setDerniereDeclaration] = useState<Declaration | null>(null);
   const [villePourExpert, setVillePourExpert] = useState("");
 
   return (
@@ -263,20 +258,11 @@ function ActiviteJourney({ profile }: { profile: NonNullable<SessionDetail["prof
           onSuivant={() => setEtape("declaration")}
         />
       )}
-      {etape === "declaration" && (
-        <EtapeDeclaration
-          periodeSource={periodeRapport}
-          onGenere={setDerniereDeclaration}
-          onDemanderExpert={(ville) => {
-            setVillePourExpert(ville);
-            setEtape("expert");
-          }}
-        />
-      )}
+      {etape === "declaration" && <DeclarationsPanel periodeInitiale={periodeRapport} />}
       {etape === "expert" && (
         <EtapeExpertComptable
           villeInitiale={villePourExpert}
-          declarationEnCours={derniereDeclaration}
+          periodeDeclaration={periodeRapport}
         />
       )}
     </AppShell>
@@ -291,189 +277,14 @@ function EtapeFacture({ onSuivant }: { onSuivant: () => void }) {
   return <FactureCycleVie onSuivant={onSuivant} />;
 }
 
-// ---------------------------------------------------------------------------- 3. Déclaration
-
-function EtapeDeclaration({
-  periodeSource,
-  onGenere,
-  onDemanderExpert,
-}: {
-  periodeSource: { debut: string; fin: string } | null;
-  onGenere: (d: Declaration) => void;
-  onDemanderExpert: (villeSuggeree: string) => void;
-}) {
-  const [dateDebut, setDateDebut] = useState(periodeSource?.debut ?? firstOfMonthIso());
-  const [dateFin, setDateFin] = useState(periodeSource?.fin ?? todayIso());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [declaration, setDeclaration] = useState<Declaration | null>(null);
-  const [revue, setRevue] = useState(false);
-  const [historique, setHistorique] = useState<Declaration[]>([]);
-
-  useEffect(() => {
-    listerDeclarations()
-      .then((r) => setHistorique(r.declarations))
-      .catch(() => {});
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const d = await genererDeclaration(dateDebut, dateFin);
-      setDeclaration(d);
-      setRevue(false);
-      onGenere(d);
-      setHistorique((prev) => [d, ...prev]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur lors de la préparation de la déclaration.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleMarquerRevue() {
-    if (!declaration) return;
-    const d = await marquerDeclarationRevue(declaration.id);
-    setDeclaration(d);
-    setRevue(true);
-  }
-
-  return (
-    <div className="grid lg:grid-cols-12 gap-10 items-start">
-      <div className="lg:col-span-7 space-y-6">
-        <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-8 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Depuis</label>
-              <input
-                type="date"
-                value={dateDebut}
-                onChange={(e) => setDateDebut(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink transition-colors"
-              />
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Jusqu'au</label>
-              <input
-                type="date"
-                value={dateFin}
-                onChange={(e) => setDateFin(e.target.value)}
-                className="w-full mt-2 px-0 py-3 bg-transparent border-b border-border focus:outline-none focus:border-ink transition-colors"
-              />
-            </div>
-          </div>
-          {periodeSource && (
-            <p className="text-xs text-muted-foreground">
-              Période reprise du rapport {periodeSource.debut} → {periodeSource.fin}.
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-accent px-6 text-sm font-medium text-accent-ink shadow-soft transition-all duration-200 hover:brightness-[1.04] active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
-          >
-            {loading ? "Préparation…" : "Préparer la déclaration"}
-          </button>
-        </form>
-
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-6 text-sm text-destructive font-medium">
-            {error}
-          </div>
-        )}
-
-        {declaration && (
-          <section className="bg-card border border-border rounded-2xl p-8 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-xl">{declaration.formulaire} — {declaration.regime}</h3>
-              <Provenance>declaration_generee</Provenance>
-            </div>
-            <div className="bg-amber-fiscal/10 border border-amber-fiscal/30 rounded-xl p-4 text-xs">
-              <span className="font-semibold uppercase tracking-widest">
-                {declaration.statut === "brouillon" ? "Brouillon — à relire" : declaration.statut}
-              </span>
-              <p className="mt-1 text-muted-foreground">{declaration.avertissement}</p>
-            </div>
-            <div className="space-y-2">
-              {declaration.lignes.map((l) => (
-                <div key={l.case} className="flex items-start justify-between border-b border-border py-2 text-sm">
-                  <div>
-                    <p className="font-medium">
-                      Case {l.case} — {l.libelle}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Provenance : {l.provenance}</p>
-                  </div>
-                  <span className="num font-medium">{l.montant.toFixed(2)} €</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">Source du formulaire : {declaration.source_formulaire}</p>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => telechargerDeclarationPdf(declaration.id, declaration.date_debut, declaration.date_fin)}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
-              >
-                Télécharger le PDF
-              </button>
-              {!revue ? (
-                <button
-                  type="button"
-                  onClick={handleMarquerRevue}
-                  className="px-5 py-2.5 border border-border rounded-lg text-sm font-medium hover:border-ink transition-all duration-200 active:scale-[0.97]"
-                >
-                  J'ai relu chaque montant
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onDemanderExpert("")}
-                  className="px-5 py-2.5 border border-teal-dark text-teal-dark rounded-lg text-sm font-medium hover:bg-teal-dark hover:text-ink-foreground transition-all duration-200 active:scale-[0.97]"
-                >
-                  Faire vérifier / signer par un expert-comptable →
-                </button>
-              )}
-            </div>
-          </section>
-        )}
-      </div>
-
-      <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4">
-        <h3 className="rule-label text-accent-ink">
-          Déclarations préparées
-        </h3>
-        {historique.length === 0 ? (
-          <div className="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground text-sm">
-            Aucune déclaration préparée pour l'instant.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {historique.map((d) => (
-              <div key={d.id} className="bg-card border border-border rounded-2xl p-5 card-hover">
-                <p className="font-semibold text-sm">{d.date_debut} → {d.date_fin}</p>
-                <p className="text-xs text-muted-foreground">
-                  {d.total_ca_declare.toFixed(2)} € déclarés · {d.statut}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ------------------------------------------------------------------------- 4. Expert-comptable
 
 function EtapeExpertComptable({
   villeInitiale,
-  declarationEnCours,
+  periodeDeclaration,
 }: {
   villeInitiale: string;
-  declarationEnCours: Declaration | null;
+  periodeDeclaration: { debut: string; fin: string } | null;
 }) {
   const [ville, setVille] = useState(villeInitiale);
   const [loading, setLoading] = useState(false);
@@ -519,9 +330,9 @@ function EtapeExpertComptable({
 
   return (
     <div className="space-y-6">
-      {declarationEnCours && (
+      {periodeDeclaration && (
         <p className="text-sm text-muted-foreground">
-          Déclaration {declarationEnCours.date_debut} → {declarationEnCours.date_fin} à faire vérifier.
+          Période {periodeDeclaration.debut} → {periodeDeclaration.fin} à faire vérifier.
         </p>
       )}
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-8 flex gap-4 items-end">
