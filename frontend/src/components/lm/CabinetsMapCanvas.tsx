@@ -15,7 +15,7 @@ import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CabinetContactLines, type CabinetMapPoint } from "@/components/lm/CabinetsMap";
+import { CabinetContactLines, type CabinetMapPoint } from "@/components/lm/cabinets";
 import "leaflet/dist/leaflet.css";
 
 export type CabinetsMapCanvasProps = {
