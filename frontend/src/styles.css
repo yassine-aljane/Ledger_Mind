@@ -90,8 +90,12 @@
   /* Dataviz (« Ma situation ») — voir le bloc :root pour la justification des pas choisis. */
   --color-dv-serie-1: var(--dv-serie-1);
   --color-dv-serie-2: var(--dv-serie-2);
+  --color-dv-serie-3: var(--dv-serie-3);
+  --color-dv-serie-4: var(--dv-serie-4);
   --color-dv-wash-1: var(--dv-wash-1);
   --color-dv-wash-2: var(--dv-wash-2);
+  --color-dv-wash-3: var(--dv-wash-3);
+  --color-dv-wash-4: var(--dv-wash-4);
   --color-dv-track: var(--dv-track);
   --color-dv-grid: var(--dv-grid);
   --color-dv-muted: var(--dv-muted);
@@ -184,9 +188,22 @@
      séparation protan est juste au-dessus du plancher, la marge est mince. */
   --dv-serie-1: oklch(0.6 0.13 158);
   --dv-serie-2: oklch(0.62 0.135 65);
+  /* Pas 3 et 4 — ajoutés pour les scénarios, qui comparent jusqu'à quatre séries là où
+     « Ma situation » n'en avait que deux. Validés en TOUTES PAIRES (et pas seulement en
+     paires adjacentes) : un empilement met chaque segment au contact de tous les autres.
+     Résultat sur carte #fefdfa : bande de clarté OK, chroma OK, pire paire toutes
+     confusions ΔE 8.2 protan, vision normale 19.4, contraste ≥ 3:1 — tous les tests
+     passent. Une prune plus chaude (H 350) a été essayée d'abord et REJETÉE : ΔE 5.7
+     deutan contre le vert. Les teintes de statut (destructive, warning) restent
+     réservées : aucune série ne s'en approche, sans quoi une variante se lirait comme
+     une alerte. Toute retouche doit repasser le validateur en `--pairs all`. */
+  --dv-serie-3: oklch(0.52 0.16 262);
+  --dv-serie-4: oklch(0.55 0.17 340);
   /* Lavis d'aire : la teinte de la série à ~10 %, jamais un aplat saturé. */
   --dv-wash-1: oklch(0.6 0.13 158 / 0.12);
   --dv-wash-2: oklch(0.62 0.135 65 / 0.12);
+  --dv-wash-3: oklch(0.52 0.16 262 / 0.12);
+  --dv-wash-4: oklch(0.55 0.17 340 / 0.12);
   /* Piste des jauges : pas clair de la MÊME rampe, pour que l'état se lise sur toute la barre. */
   --dv-track: oklch(0.92 0.03 158);
   --dv-grid: oklch(0.9 0.014 95);
@@ -251,8 +268,18 @@
      séparateurs de 2 px. Ne pas retirer ces encodages secondaires. */
   --dv-serie-1: oklch(0.545 0.13 162);
   --dv-serie-2: oklch(0.663 0.155 68);
+  /* Pas sombres 3 et 4 — RE-CHOISIS pour fond encre, jamais une inversion automatique des
+     pas clairs. Validés en toutes paires sur carte #0e2017 : bande L 0.48–0.67 OK, chroma
+     OK, vision normale 21.0, contraste ≥ 3:1. Le pire ΔE daltonisme reste celui du couple
+     historique vert/safran (7.8 protan) : il est PRÉEXISTANT, ces deux pas ne le dégradent
+     pas, et il n'est admissible que grâce aux encodages secondaires (légende, étiquettes
+     directes, séparateurs de 2 px) — ne pas les retirer. */
+  --dv-serie-3: oklch(0.62 0.15 262);
+  --dv-serie-4: oklch(0.6 0.18 340);
   --dv-wash-1: oklch(0.545 0.13 162 / 0.2);
   --dv-wash-2: oklch(0.663 0.155 68 / 0.2);
+  --dv-wash-3: oklch(0.62 0.15 262 / 0.2);
+  --dv-wash-4: oklch(0.6 0.18 340 / 0.2);
   --dv-track: oklch(0.32 0.04 160);
   --dv-grid: oklch(1 0 0 / 12%);
   --dv-muted: oklch(0.45 0.02 155);

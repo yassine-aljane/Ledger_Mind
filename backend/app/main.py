@@ -16,6 +16,7 @@ from app.api import (
     declarations as declarations_api,
     rapport_fiscal,
     referral,
+    simulation,
     verification,
 )
 
@@ -64,6 +65,8 @@ app.include_router(declaration.router)
 app.include_router(expert_comptable.router)
 app.include_router(echeancier.router)
 app.include_router(veille.router)
+# Scénarios « et si… » : expose le moteur `app.agents.impots` à l'écran de simulation.
+app.include_router(simulation.router)
 
 
 _scheduler = None
