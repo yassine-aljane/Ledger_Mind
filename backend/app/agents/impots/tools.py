@@ -122,6 +122,102 @@ def calculer_cotisations(
     return _arrondir(resultat)
 
 
+def calculer_prelevements_periode(
+    activites: List[Dict[str, Any]],
+    caisse_bnc: str = "REGIME_GENERAL",
+    acre_active: bool = False,
+    premiere_annee: bool = False,
+    ca_annuel_cumule: Optional[float] = None,
+    option_versement_liberatoire: bool = False,
+) -> Dict[str, Any]:
+    """Tous les prélèvements dus sur une PÉRIODE déclarative, poste par poste.
+
+    Complète `calculer_cotisations` avec les deux prélèvements propres à la déclaration
+    périodique : la TFCC et le versement libératoire. Chaque poste porte son taux et son
+    assiette, pour que le brouillon de déclaration soit vérifiable ligne à ligne.
+
+    La CFP connaît une exonération que le taux seul n'exprime pas : première année ET CA
+    annuel cumulé sous le seuil. Les DEUX conditions à la fois — l'une sans l'autre ne
+    dispense de rien.
+    """
+    entrees = [ActiviteCA(**a) for a in activites]
+    caisse = CaisseBNC(caisse_bnc)
+    postes: List[Dict[str, Any]] = []
+
+    seuil_cfp = C.seuil_cfp_premiere_annee()
+    cfp_exoneree = bool(
+        premiere_annee and ca_annuel_cumule is not None and ca_annuel_cumule < seuil_cfp
+    )
+
+    for activite in entrees:
+        cat = activite.categorie
+        caisse_ligne = caisse if cat is CategorieFiscale.bnc else None
+
+        taux_soc = C.taux_social(cat, caisse_ligne)
+        cotisations = activite.ca * taux_soc
+        if acre_active:
+            cotisations *= 1 - float(C.acre()["reduction"])
+
+        taux_cfp = C.taux_cfp(cat, caisse_ligne)
+        taux_tfcc = C.taux_tfcc(cat)
+
+        # Montants au centime, TAUX en pleine précision : arrondir 0,00044 à deux décimales
+        # afficherait « 0,00 % » pour la TFCC et « 0,00 % » pour la CFP, rendant le brouillon
+        # invérifiable alors que les montants, eux, seraient justes.
+        poste = {
+            "categorie": cat.value,
+            "ca": round(activite.ca, 2),
+            "cotisations_sociales": round(cotisations, 2),
+            "taux_cotisations": taux_soc,
+            "cfp": 0.0 if cfp_exoneree else round(activite.ca * taux_cfp, 2),
+            "taux_cfp": taux_cfp,
+            "cfp_exoneree": cfp_exoneree,
+            "tfcc": round(activite.ca * taux_tfcc, 2),
+            "taux_tfcc": taux_tfcc,
+            "tfcc_applicable": taux_tfcc > 0,
+        }
+        if option_versement_liberatoire:
+            taux_vl = C.taux_versement_liberatoire(cat)
+            poste["versement_liberatoire"] = round(activite.ca * taux_vl, 2)
+            poste["taux_versement_liberatoire"] = taux_vl
+        postes.append(poste)
+
+    def total(cle: str) -> float:
+        return round(sum(p.get(cle) or 0 for p in postes), 2)
+
+    resultat: Dict[str, Any] = {
+        "postes": postes,
+        "ca_total": round(sum(a.ca for a in entrees), 2),
+        "cotisations_sociales": total("cotisations_sociales"),
+        "cfp": total("cfp"),
+        "tfcc": total("tfcc"),
+        "cfp_exoneree": cfp_exoneree,
+        "seuil_cfp_premiere_annee": seuil_cfp,
+        "acre_appliquee": acre_active,
+        "total_a_payer": round(
+            total("cotisations_sociales") + total("cfp") + total("tfcc"), 2
+        ),
+        "provenance": C.provenance() | {
+            "declarations": {
+                "fichier": "data/declarations.yaml",
+                "annee": C.declarations().get("annee"),
+                "date_verif": C.declarations().get("date_verif"),
+                # La TFCC et l'exonération de CFP proviennent de valeurs NON recoupées :
+                # le brouillon doit le dire plutôt que de les présenter comme sûres.
+                "tfcc_verifie": bool(C.tfcc_bloc().get("verifie")),
+                "cfp_exoneration_verifiee": bool(C.cfp_exoneration().get("verifie")),
+            }
+        },
+    }
+    if option_versement_liberatoire:
+        resultat["versement_liberatoire"] = total("versement_liberatoire")
+        resultat["total_a_payer"] = round(
+            resultat["total_a_payer"] + resultat["versement_liberatoire"], 2
+        )
+    # PAS de `_arrondir` global ici : il écraserait les taux avec les montants.
+    return resultat
+
+
 def calculer_ir_bareme(
     revenu_net_imposable: float, parts_fiscales: float, en_couple: bool = False
 ) -> Dict[str, Any]:
@@ -267,6 +363,8 @@ OUTILS: List[OutilFiscal] = [
     OutilFiscal("simuler_impots", simuler_impots, _resume(simuler_impots)),
     OutilFiscal("calculer_base_imposable", calculer_base_imposable, _resume(calculer_base_imposable)),
     OutilFiscal("calculer_cotisations", calculer_cotisations, _resume(calculer_cotisations)),
+    OutilFiscal("calculer_prelevements_periode", calculer_prelevements_periode,
+                _resume(calculer_prelevements_periode)),
     OutilFiscal("calculer_ir_bareme", calculer_ir_bareme, _resume(calculer_ir_bareme)),
     OutilFiscal("verifier_plafonds", verifier_plafonds, _resume(verifier_plafonds)),
     OutilFiscal("parametres_categorie", parametres_categorie, _resume(parametres_categorie)),
