@@ -104,11 +104,31 @@ def lister_nouveautes(ids: list[str]) -> dict[str, Nouveaute]:
     return {d["id"]: Nouveaute.model_validate(d) for d in docs}
 
 
-def nouveautes_actives(limite: int = 200) -> list[Nouveaute]:
-    """Le catalogue courant, la plus récente d'abord."""
+def nouveautes_actives(limite: int = 200, inclure_perimees: bool = False) -> list[Nouveaute]:
+    """Le catalogue courant, la plus récente d'abord.
+
+    Les périmées sont exclues par défaut. Sans ce filtre, le fil ne fait qu'accumuler : une
+    publication de l'an dernier reste affichée indéfiniment, et l'écran finit par paraître
+    figé alors que la collecte, elle, fonctionne.
+    """
     ensure_schema()
-    docs = nouveautes().find().sort("date_collecte", DESCENDING).limit(limite)
+    filtre: dict = {} if inclure_perimees else {"perime": False}
+    docs = nouveautes().find(filtre).sort("date_collecte", DESCENDING).limit(limite)
     return [Nouveaute.model_validate(d) for d in docs]
+
+
+def stats_catalogue() -> dict:
+    """État du catalogue partagé — sert à distinguer « rien ne vous concerne » de « rien n'a
+    encore été collecté ». Ce sont deux situations opposées, et les confondre dans un même
+    écran vide rend la veille indébogable pour l'utilisateur comme pour nous."""
+    ensure_schema()
+    col = nouveautes()
+    dernier = list(col.find({}, {"date_collecte": 1}).sort("date_collecte", DESCENDING).limit(1))
+    return {
+        "total": col.count_documents({}),
+        "actualites": col.count_documents({"nature": "actualite", "perime": False}),
+        "derniere_collecte": dernier[0]["date_collecte"] if dernier else None,
+    }
 
 
 def marquer_perimees(max_jours: int) -> int:
@@ -167,11 +187,20 @@ def marquer_lue(uid: str, nouveaute_id: str) -> bool:
     return res.modified_count > 0
 
 
-def marquer_tout_lu(uid: str) -> int:
+def marquer_tout_lu(uid: str, ids: list[str] | None = None) -> int:
+    """Éteint les notifications non lues.
+
+    `ids` restreint aux nouveautés RÉELLEMENT affichées. Sans cette restriction, ouvrir le
+    panneau en mode « obligations seules » éteignait aussi le compteur des informations que
+    l'écran n'avait jamais montrées : l'utilisateur perdait une alerte sans l'avoir vue.
+    """
     ensure_schema()
-    res = notifications().update_many(
-        {"uid": uid, "lue": False}, {"$set": {"lue": True, "date_lue": maintenant()}}
-    )
+    filtre: dict = {"uid": uid, "lue": False}
+    if ids is not None:
+        if not ids:
+            return 0
+        filtre["nouveaute_id"] = {"$in": ids}
+    res = notifications().update_many(filtre, {"$set": {"lue": True, "date_lue": maintenant()}})
     return res.modified_count
 
 

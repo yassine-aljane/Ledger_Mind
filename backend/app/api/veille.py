@@ -9,13 +9,14 @@ l'agent pédagogue. Ce sont deux sujets différents, et les deux coexistent volo
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.api.deps import get_current_user
 from app.core.conversation_store import async_get_profil
 from app.schemas.auth import UserPublic
 from app.veille import agent, store
+from app.veille.profil import construire_profil
 
 router = APIRouter(prefix="/api/veille", tags=["veille"])
 
@@ -23,6 +24,11 @@ router = APIRouter(prefix="/api/veille", tags=["veille"])
 class PreferencesRequest(BaseModel):
     active: bool | None = None
     mode: str | None = None
+
+
+class LuesRequest(BaseModel):
+    #: Restreint l'extinction aux nouveautés réellement affichées. `None` = tout éteindre.
+    ids: list[str] | None = None
 
 
 async def _profil_guidance(user: UserPublic) -> dict | None:
@@ -35,6 +41,7 @@ async def _profil_guidance(user: UserPublic) -> dict | None:
 
 @router.get("")
 async def fil_de_veille(
+    taches: BackgroundTasks,
     contexte: bool = Query(
         True,
         description="Inclure les nouveautés de contexte, trop faibles pour être notifiées.",
@@ -48,25 +55,54 @@ async def fil_de_veille(
     Un profil incomplet donne simplement moins de nouveautés retenues.
     """
     guidance = await _profil_guidance(user)
+    taches.add_task(agent.assurer_catalogue)
+    profil = construire_profil(user, guidance)
     return {
         "nouveautes": agent.pour_utilisateur(user, guidance, inclure_contexte=contexte),
         "preferences": store.get_preferences(user.id).model_dump(),
+        # De quoi distinguer, dans l'écran vide, « rien ne vous concerne » de « rien n'a
+        # encore été collecté » — deux causes opposées qu'un même message rendait
+        # indiscernables, et qui expliquaient l'impression de veille figée.
+        "catalogue": store.stats_catalogue(),
+        "profil_incomplet": profil.est_vide,
+        "champs_connus": sorted(profil.champs_connus),
     }
 
 
 @router.get("/notifications")
 async def mes_notifications(
+    taches: BackgroundTasks,
     non_lues: bool = Query(False, description="Ne renvoyer que les notifications non lues."),
     user: UserPublic = Depends(get_current_user),
 ):
-    """Le lot de notifications, enrichi du contenu de chaque nouveauté."""
+    """Le lot de notifications, enrichi du contenu de chaque nouveauté.
+
+    La distribution est faite ICI aussi, et pas seulement dans le fil. C'est le correctif
+    décisif : les lignes de notification n'étaient créées qu'à l'ouverture du panneau, laquelle
+    les marquait aussitôt lues. La cloche interrogeait donc une table qui, pour un compte
+    récent, ne pouvait jamais contenir autre chose que du déjà-lu — le compteur était
+    structurellement condamné à zéro. `distribuer` est déterministe et sans réseau : l'appeler
+    à chaque sondage ne coûte que quelques requêtes Mongo.
+    """
+    guidance = await _profil_guidance(user)
+    agent.distribuer(construire_profil(user, guidance))
+    taches.add_task(agent.assurer_catalogue)
+
     notifs = store.notifications_de(user.id, non_lues_seulement=non_lues)
     contenus = store.lister_nouveautes([n["nouveaute_id"] for n in notifs])
     sortie = []
+    non_lues_reelles = 0
     for n in notifs:
         contenu = contenus.get(n["nouveaute_id"])
         if contenu is None:
             continue  # nouveauté purgée : on n'affiche pas une notification vide
+        # Le compteur doit compter EXACTEMENT ce que le panneau affichera. Une nouveauté périmée
+        # ou dont l'échéance est passée disparaît du fil : la laisser dans le décompte donnerait
+        # une pastille impossible à éteindre, puisque rien à l'écran ne permettrait de la lire.
+        if contenu.perime or contenu.echeance_depassee:
+            continue
+        if not n.get("lue"):
+            non_lues_reelles += 1
         sortie.append(
             {
                 **contenu.model_dump(),
@@ -77,7 +113,7 @@ async def mes_notifications(
                 "lue": n.get("lue", False),
             }
         )
-    return {"notifications": sortie, "non_lues": sum(1 for n in notifs if not n.get("lue"))}
+    return {"notifications": sortie, "non_lues": non_lues_reelles}
 
 
 @router.post("/notifications/{nouveaute_id}/lue")
@@ -88,8 +124,11 @@ async def marquer_lue(nouveaute_id: str, user: UserPublic = Depends(get_current_
 
 
 @router.post("/notifications/lues")
-async def marquer_tout_lu(user: UserPublic = Depends(get_current_user)):
-    return {"marquees": store.marquer_tout_lu(user.id)}
+async def marquer_tout_lu(
+    body: LuesRequest | None = None, user: UserPublic = Depends(get_current_user)
+):
+    """Éteint les non-lues. Un corps `{"ids": [...]}` restreint aux nouveautés affichées."""
+    return {"marquees": store.marquer_tout_lu(user.id, body.ids if body else None)}
 
 
 @router.get("/preferences")
