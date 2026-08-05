@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from app.agents.guidance.roadmap import seuils as seuils_projet
-from app.core.paths import IMPOT_REVENU_YAML
+from app.core.paths import DECLARATIONS_YAML, IMPOT_REVENU_YAML
 
 
 class ConstanteManquante(KeyError):
@@ -73,8 +73,9 @@ def _ir() -> Dict[str, Any]:
 
 
 def reload() -> None:
-    """Vide les caches des deux fichiers (tests, ou modification à chaud)."""
+    """Vide les caches des trois fichiers (tests, ou modification à chaud)."""
     _ir.cache_clear()
+    _declarations.cache_clear()
     seuils_projet.reload()
 
 
@@ -129,6 +130,42 @@ def taux_cfp(categorie: CategorieFiscale, caisse: Optional[CaisseBNC] = None) ->
     else:
         cle = _CLE_CFP[categorie]
     return float(_exiger(cfp.get(cle), f"cfp.{cle}"))
+
+
+@lru_cache(maxsize=1)
+def _declarations() -> Dict[str, Any]:
+    """Constantes propres aux obligations déclaratives (data/declarations.yaml)."""
+    return yaml.safe_load(DECLARATIONS_YAML.read_text(encoding="utf-8"))
+
+
+def declarations() -> Dict[str, Any]:
+    return _declarations()
+
+
+def taux_tfcc(categorie: CategorieFiscale) -> float:
+    """Taxe pour frais de chambre consulaire — BIC uniquement.
+
+    Un BNC n'est inscrit qu'au RNE, jamais au RCS : la TFCC ne le concerne pas. Renvoyer 0
+    est donc un RÉSULTAT, pas une valeur manquante.
+    """
+    bloc = _exiger(_declarations().get("tfcc"), "tfcc")
+    return float(_exiger(bloc.get(categorie.value, {}).get("taux"), f"tfcc.{categorie.value}"))
+
+
+def tfcc_bloc() -> Dict[str, Any]:
+    return _exiger(_declarations().get("tfcc"), "tfcc")
+
+
+def cfp_exoneration() -> Dict[str, Any]:
+    """Règle d'exonération de CFP la première année. Le TAUX vit dans `cfp`."""
+    return _exiger(_declarations().get("cfp_exoneration"), "cfp_exoneration")
+
+
+def seuil_cfp_premiere_annee() -> float:
+    return float(_exiger(
+        cfp_exoneration().get("premiere_annee_et_ca_inferieur_a"),
+        "cfp_exoneration.premiere_annee_et_ca_inferieur_a",
+    ))
 
 
 # -- Versement libératoire ---------------------------------------------------

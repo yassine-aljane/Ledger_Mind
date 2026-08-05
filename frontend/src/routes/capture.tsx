@@ -9,6 +9,7 @@ import {
   FileQuestion,
   FileSignature,
   FileText,
+  Gift,
   HelpCircle,
   Loader2,
   Send,
@@ -35,16 +36,19 @@ import { isAuthed } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { DocumentChatDrawer } from "@/components/lm/DocumentChatDrawer";
 import { DocumentInspector } from "@/components/lm/DocumentInspector";
-import { GiftCadeauDrop } from "@/components/lm/GiftCadeauDrop";
+import { CadeauDeclaration } from "@/components/lm/CadeauDeclaration";
 import {
   analyzeCapture,
   answerCapture,
   deleteCaptureDocument,
+  fetchCaptureCadeaux,
   fetchCaptureContrats,
   fetchCaptureInvoices,
   fetchCaptureVirements,
   formatMoney,
+  libelleCadeau,
   type CaptureAnalyzeResult,
+  type CaptureCadeauItem,
   type CaptureContratItem,
   type CaptureInvoiceItem,
   type CapturePending,
@@ -116,8 +120,8 @@ function StatusIcon({ status }: { status: ItemStatus }) {
   return <CircleDashed className="size-4 shrink-0 text-muted-foreground/60" />;
 }
 
-// -------- Fusion facture/virement/contrat pour un affichage unifié --------
-type DocKind = "facture" | "virement" | "contrat";
+// -------- Fusion facture/virement/contrat/cadeau pour un affichage unifié --------
+type DocKind = "facture" | "virement" | "contrat" | "cadeau";
 
 type UnifiedDoc = {
   document_id: string;
@@ -134,11 +138,13 @@ const KIND_LABEL: Record<DocKind, string> = {
   facture: "Facture",
   virement: "Virement",
   contrat: "Contrat",
+  cadeau: "Cadeau",
 };
 
 function KindIcon({ kind }: { kind: DocKind }) {
   if (kind === "virement") return <ArrowLeftRight />;
   if (kind === "contrat") return <FileSignature />;
+  if (kind === "cadeau") return <Gift />;
   return <FileText />;
 }
 
@@ -154,6 +160,7 @@ function unifyDocs(
   invoices: CaptureInvoiceItem[],
   virements: CaptureVirementItem[],
   contrats: CaptureContratItem[],
+  cadeaux: CaptureCadeauItem[],
 ): UnifiedDoc[] {
   const fromInvoices: UnifiedDoc[] = invoices.map((inv) => ({
     document_id: inv.document_id,
@@ -190,7 +197,18 @@ function unifyDocs(
     amount_eur: c.contract.amount_eur ?? null,
     created_at: c.created_at ?? null,
   }));
-  return [...fromInvoices, ...fromVirements, ...fromContrats].sort((a, b) =>
+  const fromCadeaux: UnifiedDoc[] = cadeaux.map((c) => ({
+    document_id: c.document_id,
+    kind: "cadeau",
+    label: libelleCadeau(c.cadeau),
+    subtitle: `Avantage en nature · ${c.cadeau.date_reception ?? "date inconnue"}`,
+    // La valeur RETENUE, jamais l'estimation : la liste affiche ce qui sera déclaré.
+    amount: c.cadeau.valeur_ttc ?? null,
+    currency: c.cadeau.devise ?? "EUR",
+    amount_eur: c.cadeau.valeur_eur ?? null,
+    created_at: c.created_at ?? null,
+  }));
+  return [...fromInvoices, ...fromVirements, ...fromContrats, ...fromCadeaux].sort((a, b) =>
     (b.created_at ?? "").localeCompare(a.created_at ?? ""),
   );
 }
@@ -208,6 +226,7 @@ function CapturePage() {
   const [invoices, setInvoices] = useState<CaptureInvoiceItem[]>([]);
   const [virements, setVirements] = useState<CaptureVirementItem[]>([]);
   const [contrats, setContrats] = useState<CaptureContratItem[]>([]);
+  const [cadeaux, setCadeaux] = useState<CaptureCadeauItem[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [chatDoc, setChatDoc] = useState<{ id: string; label: string } | null>(null);
   const [toDelete, setToDelete] = useState<UnifiedDoc | null>(null);
@@ -217,14 +236,16 @@ function CapturePage() {
   // Références stables : le moteur de file les liste en dépendances, et des
   // fonctions recréées à chaque rendu le relanceraient en boucle.
   const reloadLists = useCallback(async () => {
-    const [inv, vir, con] = await Promise.all([
+    const [inv, vir, con, cad] = await Promise.all([
       fetchCaptureInvoices(),
       fetchCaptureVirements(),
       fetchCaptureContrats(),
+      fetchCaptureCadeaux(),
     ]);
     setInvoices(inv);
     setVirements(vir);
     setContrats(con);
+    setCadeaux(cad);
   }, []);
 
   useEffect(() => {
@@ -377,7 +398,7 @@ function CapturePage() {
     }
   }
 
-  const unified = unifyDocs(invoices, virements, contrats);
+  const unified = unifyDocs(invoices, virements, contrats, cadeaux);
   const openDoc = unified.find((d) => d.document_id === openId);
   const analysing = queue.find((it) => it.status === "analyse");
   const done = queue.filter((it) => TERMINAL.includes(it.status)).length;
@@ -400,88 +421,86 @@ function CapturePage() {
           <section className="space-y-3">
             <h2 className="rule-label text-accent-ink">Déposer</h2>
 
-            <div className="animate-rise overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-              <div
-                className="flex border-b border-border p-1.5"
-                role="tablist"
-                aria-label="Type de dépôt"
+            <div
+              className="flex rounded-2xl border border-border bg-card p-1.5 shadow-soft"
+              role="tablist"
+              aria-label="Type de dépôt"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={depositMode === "documents"}
+                onClick={() => setDepositMode("documents")}
+                className={cn(
+                  "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  depositMode === "documents"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={depositMode === "documents"}
-                  onClick={() => setDepositMode("documents")}
-                  className={cn(
-                    "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-                    depositMode === "documents"
-                      ? "bg-secondary text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Documents
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={depositMode === "cadeau"}
-                  onClick={() => setDepositMode("cadeau")}
-                  className={cn(
-                    "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-                    depositMode === "cadeau"
-                      ? "bg-secondary text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Cadeau / dotation
-                </button>
-              </div>
-
-              {depositMode === "documents" ? (
-                <label
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragging(false);
-                    enqueue(e.dataTransfer.files);
-                  }}
-                  className={cn(
-                    "flex min-h-56 cursor-pointer flex-col items-center justify-center p-8 text-center transition-all duration-200",
-                    dragging ? "bg-accent/10" : "hover:bg-accent/5",
-                  )}
-                >
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    multiple
-                    accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.xls"
-                    className="sr-only"
-                    onChange={(e) => enqueue(e.target.files)}
-                  />
-                  <div
-                    className={cn(
-                      "mb-4 grid size-12 place-items-center rounded-2xl transition-colors",
-                      dragging ? "bg-accent/25 text-accent-ink" : "bg-accent/15 text-accent-ink",
-                    )}
-                  >
-                    <UploadCloud className="size-5" />
-                  </div>
-                  <p className="text-sm font-medium">
-                    {dragging ? "Relâchez pour analyser" : "Glissez vos documents ici"}
-                  </p>
-                  <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
-                    Factures, virements, contrats · PDF ou image · 20 Mo max
-                  </p>
-                </label>
-              ) : (
-                <GiftCadeauDrop onFiles={enqueue} variant="panel" />
-              )}
+                Documents
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={depositMode === "cadeau"}
+                onClick={() => setDepositMode("cadeau")}
+                className={cn(
+                  "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  depositMode === "cadeau"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Cadeau / dotation
+              </button>
             </div>
+
+            {depositMode === "documents" ? (
+              <label
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  enqueue(e.dataTransfer.files);
+                }}
+                className={cn(
+                  "flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-border bg-card p-8 text-center shadow-soft transition-all duration-200",
+                  dragging ? "bg-accent/10" : "hover:bg-accent/5",
+                )}
+              >
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.xls"
+                  className="sr-only"
+                  onChange={(e) => enqueue(e.target.files)}
+                />
+                <div
+                  className={cn(
+                    "mb-4 grid size-12 place-items-center rounded-2xl transition-colors",
+                    dragging ? "bg-accent/25 text-accent-ink" : "bg-accent/15 text-accent-ink",
+                  )}
+                >
+                  <UploadCloud className="size-5" />
+                </div>
+                <p className="text-sm font-medium">
+                  {dragging ? "Relâchez pour analyser" : "Glissez vos documents ici"}
+                </p>
+                <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
+                  Factures, virements, contrats · PDF ou image · 20 Mo max
+                </p>
+              </label>
+            ) : (
+              <CadeauDeclaration onDeclare={() => void reloadLists()} />
+            )}
           </section>
 
           {queue.length > 0 && (
@@ -593,7 +612,9 @@ function CapturePage() {
             </section>
           )}
 
-          {/* Une question suspend la file jusqu'à la réponse. */}
+          {/* Une question suspend la file jusqu'à la réponse. Elle reste collée au suivi
+              de traitement dont elle fait partie : c'est une étape du dépôt de
+              justificatifs, pas un bloc indépendant. */}
           {asking?.pending && (
             <form
               onSubmit={handleHitlSubmit}
@@ -643,6 +664,7 @@ function CapturePage() {
               </div>
             </form>
           )}
+
         </div>
 
         {/* Colonne bibliothèque */}
@@ -696,7 +718,9 @@ function CapturePage() {
                                   ? "info"
                                   : doc.kind === "contrat"
                                     ? "warning"
-                                    : "success"
+                                    : doc.kind === "cadeau"
+                                      ? "accent"
+                                      : "success"
                               }
                             >
                               <KindIcon kind={doc.kind} />

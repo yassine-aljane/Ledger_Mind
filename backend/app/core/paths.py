@@ -23,4 +23,8 @@ IMPOT_REVENU_YAML = DATA_DIR / "impot_revenu.yaml"
 # de franchise TVA restent dans seuils.yaml : rien n'est dupliqué.
 FACTURATION_YAML = DATA_DIR / "facturation.yaml"
 SOURCES_YAML = DATA_DIR / "sources.yaml"
+# Cases officielles des formulaires, TFCC, CFE, DES — ce qu'il faut pour PRÉPARER
+# une déclaration. Les seuils et taux de calcul restent dans les deux fichiers
+# ci-dessus : rien n'y est dupliqué.
+DECLARATIONS_YAML = DATA_DIR / "declarations.yaml"
 REGIMES_DIR = DATA_DIR / "regimes"

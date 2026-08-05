@@ -15,7 +15,7 @@ import pytest
 from app.veille import agent
 from app.veille.modele import Criteres, Nouveaute, Source, cle_dedup, maintenant
 from app.veille.profil import ProfilVeille
-from app.veille.scoring import SEUIL_NOTIFICATION, evaluer, notifiable
+from app.veille.scoring import SEUIL_NOTIFICATION, est_universelle, evaluer, notifiable
 
 
 def _nouveaute(**kwargs) -> Nouveaute:
@@ -169,11 +169,27 @@ def test_mode_obligatoire_seulement_filtre_le_reste():
     assert notifiable(evaluer(obligation, profil), obligation, "obligatoire_seulement") is True
 
 
-def test_un_profil_vide_ne_declenche_aucune_notification():
-    """Sans champ discriminant, notifier reviendrait à envoyer de la veille générique."""
-    resultat = agent.distribuer(ProfilVeille(uid="u-vide"))
-    assert resultat["notifiees"] == 0
-    assert "incomplet" in resultat["raison"]
+def test_une_obligation_universelle_est_notifiee_meme_sans_profil():
+    """« La facturation électronique devient obligatoire » ne vise ni régime ni catégorie :
+    elle s'impose à tous. La retenir parce que le profil est vide prive l'utilisateur de
+    l'information la plus utile qu'on ait à lui donner."""
+    obligation = _nouveaute(impact="action_obligatoire", criteres=Criteres())
+    profil_vide = ProfilVeille(uid="u-vide")
+    assert est_universelle(obligation) is True
+    assert notifiable(evaluer(obligation, profil_vide), obligation, "tout") is True
+
+
+def test_une_mesure_ciblee_nest_pas_notifiee_a_un_profil_vide():
+    """En revanche, une mesure restreinte à un régime ne doit pas partir en aveugle."""
+    ciblee = _nouveaute(impact="action_obligatoire", criteres=Criteres(tax_categories=["BIC"]))
+    assert est_universelle(ciblee) is False
+
+
+def test_une_information_universelle_reste_non_notifiee():
+    """Universelle ne suffit pas : il faut aussi que ce soit une OBLIGATION."""
+    info = _nouveaute(impact="information", criteres=Criteres())
+    profil_vide = ProfilVeille(uid="u-vide")
+    assert notifiable(evaluer(info, profil_vide), info, "tout") is False
 
 
 @pytest.mark.asyncio
@@ -243,3 +259,35 @@ def test_la_nature_par_defaut_est_reference():
     candidat = {"titre": "T", "url": "https://impots.gouv.fr/a", "source": "DGFiP", "autorite": 2}
     item = agent._construire(candidat, {"resume": "R", "criteres": {}}, "c1")
     assert item.nature == "reference"
+
+
+def test_criteres_enumerant_tout_valent_absence_de_restriction():
+    """Le modèle préfère souvent l'exhaustivité au vide : « facturation électronique » revient
+    avec tax_categories=[BIC,BNC] et les trois régimes de TVA. C'est le même sens — tout le
+    monde — et le code doit le lire ainsi plutôt que d'exiger une forme précise."""
+    exhaustive = _nouveaute(
+        impact="action_obligatoire",
+        criteres=Criteres(
+            tax_categories=["BIC", "BNC"],
+            regimes_tva=["franchise", "reel_simplifie", "reel_normal"],
+            activites=["tous"],
+            international=False,
+        ),
+    )
+    assert est_universelle(exhaustive) is True
+    assert notifiable(evaluer(exhaustive, ProfilVeille(uid="u")), exhaustive, "tout") is True
+
+
+def test_international_false_nexclut_personne():
+    """`international=False` veut dire « pas spécifique à l'international », pas « interdit aux
+    profils internationaux ». Le traiter comme une restriction écartait à tort tous ceux qui
+    facturent hors de France."""
+    n = _nouveaute(criteres=Criteres(international=False))
+    assert evaluer(n, _profil(international=True)).retenue is True
+    assert evaluer(n, _profil(international=False)).retenue is True
+
+
+def test_international_true_reste_une_vraie_restriction():
+    n = _nouveaute(criteres=Criteres(international=True))
+    assert evaluer(n, _profil(international=True)).retenue is True
+    assert evaluer(n, _profil(international=False)).retenue is False

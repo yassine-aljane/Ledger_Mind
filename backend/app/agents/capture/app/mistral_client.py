@@ -158,6 +158,47 @@ class MistralClient:
 
         return self._call_with_fallback(_call, model, fallback_model, what="chat_json")
 
+    # -- Vision ----------------------------------------------------------------
+    def chat_vision_json(
+        self, model: str, system: str, user: str, image: bytes, mime: str,
+        *, temperature: float = 0.0, fallback_model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Analyse une IMAGE et renvoie un JSON structuré.
+
+        Distinct d'`ocr` : l'OCR lit du texte, alors qu'il s'agit ici de
+        reconnaître un OBJET sur une photo (un bijou, un sac, un cosmétique)
+        où il n'y a le plus souvent aucun texte à lire. Le SDK attend alors un
+        message multimodal — une liste de parties `text` + `image_url` — et non
+        une simple chaîne.
+        """
+        b64 = base64.b64encode(image).decode("ascii")
+        img_mime = mime if (mime or "").startswith("image/") else "image/jpeg"
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": system},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user},
+                    {"type": "image_url", "image_url": f"data:{img_mime};base64,{b64}"},
+                ],
+            },
+        ]
+
+        def _call(m: str):
+            resp = self._client.chat.complete(
+                model=m,
+                messages=messages,
+                temperature=temperature,
+                response_format={"type": "json_object"},
+            )
+            content = (resp.choices[0].message.content or "").strip()
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError as exc:
+                raise MistralError(f"Réponse JSON malformée du modèle : {exc}") from exc
+
+        return self._call_with_fallback(_call, model, fallback_model, what="chat_vision_json")
+
     def _call_with_fallback(self, call, model: str, fallback_model: Optional[str], *, what: str):
         """Tente `model` (avec retries) ; en cas d'échec transitoire, bascule
         une fois sur `fallback_model` s'il est fourni et différent."""
