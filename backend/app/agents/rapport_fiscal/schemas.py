@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from app.agents.cadeaux_fiscaux import CadeauRecette
+
 # Comment un encaissement a été rattaché à une facture.
 MethodeRapprochement = Literal[
     "numero_facture",   # le n° figure dans le motif ou la référence : certain
@@ -188,6 +190,16 @@ class SourcesRapport(BaseModel):
     total_depenses_eur: float = 0.0
     revenu_contractuel_engage_eur: float = 0.0
 
+    # -- Avantages en nature --------------------------------------------------
+    # Contrairement aux contrats et aux dépenses, ceux-ci ENTRENT dans l'assiette :
+    # un produit reçu en contrepartie d'un post est une recette, pas un contexte.
+    cadeaux_declares: int = 0
+    cadeaux: List[CadeauRecette] = Field(default_factory=list)
+    recettes_en_nature_eur: float = 0.0
+    # Cadeaux connus mais non comptés (devise non convertie, date manquante) : ils sont
+    # exposés pour que l'écart avec l'espace Justificatifs soit explicable.
+    cadeaux_ecartes: List[CadeauRecette] = Field(default_factory=list)
+
 
 class DemandeRapport(BaseModel):
     date_debut: str
@@ -213,11 +225,16 @@ class RapportFiscal(BaseModel):
     date_fin: str
     genere_le: str
 
-    # Assiette retenue — l'ENCAISSÉ, toujours.
+    # Assiette retenue — l'ENCAISSÉ, toujours. Encaissé en numéraire ET en nature : un
+    # produit reçu en contrepartie d'une prestation est une recette au même titre qu'un
+    # virement, et c'est ce total qui porte abattement, cotisations, impôt et plafonds.
     ca_retenu: float
     base_de_calcul: str = Field(
         description="Phrase expliquant CE QUI a été compté, et pourquoi"
     )
+    # Détail des deux composantes de l'assiette, pour que `ca_retenu` se vérifie à vue.
+    ca_encaisse_numeraire: float = 0.0
+    recettes_en_nature: float = 0.0
     # Indicateur, pas assiette : montre l'écart entre ce qui a été facturé sur la période et
     # ce qui est réellement rentré. Ne sert à aucun calcul d'impôt.
     ca_facture_periode: float = 0.0

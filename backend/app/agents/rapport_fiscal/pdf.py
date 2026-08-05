@@ -160,6 +160,15 @@ def rapport_to_pdf(rapport: RapportFiscal) -> bytes:
     # --- Assiette ------------------------------------------------------------
     titre_section("Assiette retenue")
     ligne_cle_valeur("Chiffre d'affaires encaissé", eur(rapport.ca_retenu), gras=True)
+    # Décomposition numéraire / nature dès qu'un avantage entre dans l'assiette : sans
+    # elle, le total ne se retrouve sur aucun relevé bancaire et paraît faux.
+    if rapport.recettes_en_nature > 0:
+        ligne_cle_valeur("dont encaissé en numéraire", eur(rapport.ca_encaisse_numeraire))
+        ligne_cle_valeur(
+            "dont reçu en nature (cadeaux et dotations)",
+            eur(rapport.recettes_en_nature),
+            aide=f"{rapport.sources.cadeaux_declares} pièce(s) déclarée(s)",
+        )
     rap = rapport.rapprochement
     if rap:
         ligne_cle_valeur("dont rattaché avec certitude à une facture", eur(rap.ca_encaisse_certain))
@@ -168,8 +177,10 @@ def rapport_to_pdf(rapport: RapportFiscal) -> bytes:
             ligne_cle_valeur("dont rattaché par montant et date (à confirmer)", eur(incertain))
 
     # Indicateur d'écart, jamais assiette : facturer n'est pas encaisser.
+    # Comparé au seul encaissé EN NUMÉRAIRE : un avantage en nature n'a jamais été facturé,
+    # l'inclure ici creuserait un écart qui ne traduirait aucun impayé.
     ligne_cle_valeur("Chiffre d'affaires facturé sur la période", eur(rapport.ca_facture_periode))
-    ecart = round(rapport.ca_facture_periode - rapport.ca_retenu, 2)
+    ecart = round(rapport.ca_facture_periode - rapport.ca_encaisse_numeraire, 2)
     if abs(ecart) > 0.01:
         ligne_cle_valeur(
             "Écart facturé − encaissé",

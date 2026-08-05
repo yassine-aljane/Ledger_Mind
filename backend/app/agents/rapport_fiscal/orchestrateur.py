@@ -12,6 +12,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List
 
+from app.agents import cadeaux_fiscaux
 from app.agents.facture import store as facture_store
 from app.agents.impots import tools as moteur
 from app.agents.impots.constantes import CategorieFiscale
@@ -267,6 +268,48 @@ def _prorata(
     }
 
 
+def _alertes_cadeaux(pieces: SourcesRapport) -> List[Alerte]:
+    """Ce que les avantages en nature pèsent dans l'assiette — et ce qui en est écarté.
+
+    Contrairement aux contrats et aux dépenses, ces montants ENTRENT dans le calcul :
+    l'alerte ne signale pas une exclusion, elle rend visible une inclusion que l'utilisateur
+    ne verra sur aucun relevé bancaire.
+    """
+    alertes: List[Alerte] = []
+
+    if pieces.recettes_en_nature_eur > 0:
+        alertes.append(Alerte(
+            niveau="info",
+            titre=(
+                f"{_eur(pieces.recettes_en_nature_eur)} de recettes en nature "
+                f"({pieces.cadeaux_declares} cadeau(x) déclaré(s))"
+            ),
+            message=(
+                "Un produit reçu en contrepartie d'une prestation — post, story, placement — "
+                "est une rémunération en nature, pas un cadeau au sens fiscal. Sa valeur "
+                "marchande entre au livre des recettes comme un encaissement : elle est "
+                "COMPRISE dans le chiffre d'affaires retenu ci-dessus, et pèse donc sur "
+                "l'abattement, les cotisations, l'impôt et le plafond du régime. Aucun "
+                "virement ne lui correspond sur votre relevé bancaire : c'est normal."
+            ),
+        ))
+
+    if pieces.cadeaux_ecartes:
+        details = ", ".join(f"« {c.libelle} »" for c in pieces.cadeaux_ecartes[:3])
+        alertes.append(Alerte(
+            niveau="vigilance",
+            titre=f"{len(pieces.cadeaux_ecartes)} avantage(s) en nature non compté(s)",
+            message=(
+                f"{details} n'ont pas pu être retenus : date de réception manquante, ou "
+                "valeur libellée dans une devise dont la contre-valeur en euros n'a pas été "
+                "établie. Ces recettes sont donc ABSENTES des montants ci-dessus. Complétez "
+                "ces pièces dans vos justificatifs pour que le calcul soit exact."
+            ),
+        ))
+
+    return alertes
+
+
 def _alertes_pieces(pieces: SourcesRapport) -> List[Alerte]:
     """Ce que les contrats et les dépenses révèlent, sans jamais toucher à l'assiette."""
     alertes: List[Alerte] = []
@@ -339,12 +382,30 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
     tous_virements = _virements(uid)
 
     resultat_rappro = rappro.rapprocher(factures, tous_virements, debut, fin)
-    ca_retenu = resultat_rappro.ca_encaisse
     ca_par_categorie = dict(resultat_rappro.ca_par_categorie)
+
+    # -- Recettes en nature : elles font partie de l'assiette, pas du contexte -----------
+    # Un cadeau de marque rémunère une prestation déjà rendue. C'est un encaissement, à
+    # cela près qu'il ne transite par aucun compte bancaire — il n'apparaît donc dans
+    # AUCUN virement, et le rapprochement ne peut pas le voir. Il faut l'ajouter ici,
+    # sans quoi cotisations, abattement, impôt, plafond micro et seuils de franchise de
+    # TVA seraient tous calculés sur une base amputée.
+    collecte_cadeaux = cadeaux_fiscaux.collecter(uid, debut, fin)
+    recettes_nature = collecte_cadeaux.total_eur
+    if recettes_nature > 0:
+        # Rattachées à la nature « prestation » : le créateur n'a cédé aucune marchandise,
+        # il a été payé en biens pour un service. La catégorie fiscale précise (BIC
+        # services ou BNC) reste décidée par `_activites`, comme pour une facture.
+        nature = cadeaux_fiscaux.NATURE_FISCALE
+        ca_par_categorie[nature] = round(ca_par_categorie.get(nature, 0.0) + recettes_nature, 2)
+
+    ca_encaisse_numeraire = resultat_rappro.ca_encaisse
+    ca_retenu = round(ca_encaisse_numeraire + recettes_nature, 2)
     base = (
-        "CA ENCAISSÉ : seuls les virements reçus, rapprochés d'une facture et datés de la "
-        "période, sont comptés. Une facture non payée ne compte pas — elle comptera lors de "
-        "son encaissement."
+        "CA ENCAISSÉ, en numéraire ET en nature : les virements reçus, rapprochés d'une "
+        "facture et datés de la période, PLUS les avantages en nature déclarés sur la même "
+        "période (un produit reçu en contrepartie d'une prestation est une recette). Une "
+        "facture non payée ne compte pas — elle comptera lors de son encaissement."
     )
 
     # -- Pièces de contexte : elles éclairent, elles n'entrent pas dans l'assiette --------
@@ -364,6 +425,10 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
         depenses=depenses,
         total_depenses_eur=sources.total_eur(depenses),
         revenu_contractuel_engage_eur=sources.total_eur(commerciaux),
+        cadeaux_declares=collecte_cadeaux.nb_retenus,
+        cadeaux=collecte_cadeaux.retenus,
+        recettes_en_nature_eur=recettes_nature,
+        cadeaux_ecartes=collecte_cadeaux.non_convertis + collecte_cadeaux.sans_date,
     )
 
     # Une période couvrant l'année civile entière permet seule de conclure sur les seuils
@@ -408,6 +473,13 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
     etat_prorata = _prorata(contexte, profil, controle_plafonds)
 
     hypotheses = [base]
+    if recettes_nature > 0:
+        hypotheses.append(
+            f"Les {_eur(recettes_nature)} d'avantages en nature déclarés sur la période sont "
+            "comptés dans le chiffre d'affaires, à leur valeur marchande retenue et convertie "
+            "en euros. Ils sont rattachés aux prestations de services : le créateur ne cède "
+            "aucune marchandise, il est rémunéré en biens pour un service rendu."
+        )
     if ca_retenu <= 0:
         hypotheses.append(
             "Aucun chiffre d'affaires encaissé sur la période. Les calculs fiscaux ont bien "
@@ -437,6 +509,8 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
         genere_le=datetime.now(timezone.utc).isoformat(),
         ca_retenu=ca_retenu,
         base_de_calcul=base,
+        ca_encaisse_numeraire=ca_encaisse_numeraire,
+        recettes_en_nature=recettes_nature,
         ca_facture_periode=_ca_facture_sur_la_periode(factures, debut, fin),
         rapprochement=resultat_rappro,
         sources=pieces,
@@ -451,6 +525,7 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
         alertes=(
             _alertes(resultat_rappro, simulation, contexte)
             + _alerte_acre(etat_acre)
+            + _alertes_cadeaux(pieces)
             + _alertes_pieces(pieces)
             + tva_flag.alertes_tva(ca_par_categorie, annee_complete)
         ),

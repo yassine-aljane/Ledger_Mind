@@ -30,4 +30,18 @@ def detecter_signaux(brut: dict, ca_declare_annuel: float | None) -> list[Signal
                 ),
             ))
 
+    # Un avantage en nature visible dans Justificatifs mais absent de l'assiette doit se
+    # dire : sinon le total du rapport ne se raccroche pas à ce que l'utilisateur voit,
+    # et il conclura à une erreur de calcul plutôt qu'à une pièce incomplète.
+    for ecarte in brut.get("cadeaux_ecartes") or []:
+        signaux.append(SignalConformite(
+            label="Avantage en nature non compté dans les recettes",
+            question=(
+                f"« {ecarte['libelle']} » n'a pas été retenu dans les recettes de la période "
+                f"({ecarte['motif']}). Un cadeau reçu en contrepartie d'une prestation est un "
+                "revenu imposable : voulez-vous compléter cette pièce pour qu'elle entre au "
+                "calcul ?"
+            ),
+        ))
+
     return signaux

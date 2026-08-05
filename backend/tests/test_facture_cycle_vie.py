@@ -539,3 +539,55 @@ def test_le_pdf_se_genere_avec_acompte_avoir_et_iban():
         statut="emise", date_emission=date.today(), facture_origine_numero="FA-2026-000002",
     )
     assert facture_to_pdf(avoir).startswith(b"%PDF")
+
+
+# -- Documents antérieurs à l'ajout des champs de règlement ------------------
+# `net_a_payer` et `montant_regle` ont été ajoutés au modèle bien après les premières
+# factures. Les routes de lecture renvoient le document Mongo tel quel, sans le repasser
+# par le modèle : sans complétion, ces clés sortent absentes alors que le contrat d'API
+# les annonce obligatoires, et l'écran de facturation casse entièrement là-dessus.
+def _ecrire_facture_ancienne(**champs) -> None:
+    """Écrit directement en base une facture d'avant l'ajout des champs de règlement."""
+    document = {
+        "uid": "u1", "id": "vieille-facture", "numero": "FA-2025-000001",
+        "type_document": "facture", "statut": "emise", "date_emission": "2025-06-01",
+        "client": {"nom": "Client SARL", "est_professionnel": True},
+        "lignes": [], "total_ht": 1000.0, "total_tva": 0.0, "total_ttc": 1000.0,
+    }
+    document.update(champs)
+    store.get_db()["factures_emises"].insert_one(document)
+
+
+def test_une_facture_ancienne_ressort_avec_ses_montants_de_reglement():
+    _ecrire_facture_ancienne()
+
+    document = store.obtenir("u1", "vieille-facture")
+
+    # Sans acompte enregistré, le net à payer EST le total TTC : ce n'est pas une valeur
+    # inventée, c'est la définition du champ.
+    assert document["net_a_payer"] == pytest.approx(1000.0)
+    assert document["montant_regle"] == pytest.approx(0.0)
+
+
+def test_l_acompte_d_une_facture_ancienne_est_deduit_du_net_a_payer():
+    _ecrire_facture_ancienne(acompte={"montant_ttc": 300.0, "facture_numero": "FA-2025-000000"})
+
+    assert store.obtenir("u1", "vieille-facture")["net_a_payer"] == pytest.approx(700.0)
+
+
+def test_le_listing_complete_aussi_les_factures_anciennes():
+    """C'est le listing qui alimente l'écran de facturation — donc celui qui cassait."""
+    _ecrire_facture_ancienne()
+
+    for document in store.lister("u1"):
+        assert document["net_a_payer"] is not None
+        assert document["montant_regle"] is not None
+
+
+def test_un_montant_deja_regle_n_est_jamais_ecrase():
+    """La complétion ne comble que l'absence : elle ne doit rien réécrire."""
+    _ecrire_facture_ancienne(net_a_payer=850.0, montant_regle=400.0)
+
+    document = store.obtenir("u1", "vieille-facture")
+    assert document["net_a_payer"] == pytest.approx(850.0)
+    assert document["montant_regle"] == pytest.approx(400.0)

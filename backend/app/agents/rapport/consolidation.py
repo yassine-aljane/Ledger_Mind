@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from app.agents import cadeaux_fiscaux
 from app.agents.facture import store as facture_store
 from app.agents.guidance.roadmap import analyse_juridique as AJ
 from app.agents.guidance.roadmap import comparateur as C
@@ -26,32 +27,14 @@ def factures_periode(uid: str, debut: date, fin: date) -> list[dict]:
     return facture_store.lister_emises(uid, depuis=debut.isoformat(), jusqua=fin.isoformat())
 
 
-def cadeaux_periode(uid: str, debut: date, fin: date) -> list[dict]:
-    """Cadeaux en nature déclarés sur la période, lus depuis l'espace Justificatifs.
+def cadeaux_periode(uid: str, debut: date, fin: date) -> cadeaux_fiscaux.CollecteCadeaux:
+    """Cadeaux en nature déclarés sur la période.
 
-    Jamais bloquant : l'indisponibilité de Mongo ne doit pas empêcher la production
-    d'un rapport qui reste juste sur la partie facturée. On renvoie alors une liste
-    vide, et l'absence d'avantages se lit comme telle dans le rapport.
+    Délégué à `cadeaux_fiscaux` : le rapport d'activité, le rapport fiscal et le
+    brouillon de déclaration doivent voir EXACTEMENT les mêmes avantages, avec la
+    même règle de rattachement et la même conversion en euros.
     """
-    try:
-        from app.services.capture_runtime import get_runtime
-
-        db = get_runtime()["deps"].db
-        docs = db.list_cadeaux(uid)
-    except Exception:  # noqa: BLE001 — dépendance externe, jamais fatale ici
-        return []
-
-    debut_iso, fin_iso = debut.isoformat(), fin.isoformat()
-    retenus: list[dict] = []
-    for d in docs:
-        c = d.get("cadeau") or {}
-        recu = c.get("date_reception")
-        # Sans date, impossible de rattacher le cadeau à un exercice : on l'écarte
-        # plutôt que de le compter dans une période au hasard.
-        if not recu or not (debut_iso <= recu <= fin_iso):
-            continue
-        retenus.append(c)
-    return retenus
+    return cadeaux_fiscaux.collecter(uid, debut, fin)
 
 
 def consolider(uid: str, debut: date, fin: date) -> dict:
@@ -78,13 +61,9 @@ def consolider(uid: str, debut: date, fin: date) -> dict:
     # (datés, valorisés, confirmés par l'utilisateur) plutôt que depuis l'estimation
     # unique du profil. Celle-ci ne subsiste qu'en repli, pour les dossiers antérieurs
     # à la déclaration pièce par pièce.
-    cadeaux = cadeaux_periode(uid, debut, fin)
-    if cadeaux:
-        # `valeur_eur` d'abord : la déclaration se fait en euros, et un cadeau valorisé
-        # en devise étrangère ne doit pas entrer au bilan à sa valeur faciale.
-        avantages_nature = round(
-            sum(float(c.get("valeur_eur") or c.get("valeur_ttc") or 0.0) for c in cadeaux), 2
-        )
+    collecte = cadeaux_periode(uid, debut, fin)
+    if collecte.retenus:
+        avantages_nature = collecte.total_eur
         source_avantages = "cadeaux déclarés"
     else:
         avantages_nature = profil_partage.get("remuneration_nature")
@@ -97,8 +76,17 @@ def consolider(uid: str, debut: date, fin: date) -> dict:
         "ht_prestations": round(ht_prestations, 2),
         "ht_ventes": round(ht_ventes, 2),
         "avantages_nature": avantages_nature,
-        "nb_cadeaux": len(cadeaux),
+        "nb_cadeaux": collecte.nb_retenus,
         "source_avantages": source_avantages,
+        # Avantages connus mais NON comptés, avec leur motif : les taire donnerait un
+        # total qui ne se raccroche pas à ce que l'utilisateur voit dans Justificatifs.
+        "cadeaux_ecartes": [
+            {"libelle": c.libelle, "motif": "devise étrangère non convertie"}
+            for c in collecte.non_convertis
+        ] + [
+            {"libelle": c.libelle, "motif": "date de réception manquante"}
+            for c in collecte.sans_date
+        ],
         # Base de recettes au sens fiscal : un avantage en nature est un revenu, il
         # entre au livre des recettes comme un encaissement. C'est donc CE total, et
         # non le seul CA facturé, qui situe l'utilisateur face au plafond de son régime.

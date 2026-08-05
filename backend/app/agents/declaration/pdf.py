@@ -80,6 +80,14 @@ def declaration_to_pdf(declaration: Declaration) -> bytes:
         pdf.set_font(font, "", 8)
         pdf.set_text_color(*MUTED)
         pdf.multi_cell(0, 4.5, texte(f"Provenance : {ligne.provenance}"))
+        # La part reçue en nature se justifie autrement qu'une facture — ni numéro, ni
+        # virement au relevé. En cas de contrôle, c'est cette ligne qui dit où regarder.
+        if ligne.montant_nature > 0:
+            pdf.set_x(16)
+            pdf.multi_cell(0, 4.5, texte(
+                f"dont {_eur(ligne.montant_facture)} facturés et "
+                f"{_eur(ligne.montant_nature)} reçus en nature"
+            ))
         pdf.set_text_color(*INK)
         pdf.ln(1)
 
@@ -92,6 +100,20 @@ def declaration_to_pdf(declaration: Declaration) -> bytes:
              fill=True, ln=1)
     pdf.set_text_color(*INK)
     pdf.ln(3)
+
+    # Ce que le brouillon NE contient PAS : une omission silencieuse dans un document
+    # destiné à être recopié sur impots.gouv.fr deviendrait une omission déclarative.
+    if declaration.cadeaux_ecartes:
+        pdf.set_x(16)
+        pdf.set_font(font, "B", 9)
+        pdf.cell(0, 6, texte("Avantages en nature NON repris dans les cases ci-dessus"), ln=1)
+        pdf.set_font(font, "", 8)
+        pdf.set_text_color(*MUTED)
+        for motif in declaration.cadeaux_ecartes:
+            pdf.set_x(16)
+            pdf.multi_cell(0, 4.5, texte(f"— {motif}"))
+        pdf.set_text_color(*INK)
+        pdf.ln(3)
 
     pdf.set_x(16)
     pdf.set_font(font, "B", 10)

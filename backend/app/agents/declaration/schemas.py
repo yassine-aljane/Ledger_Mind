@@ -24,6 +24,12 @@ class LigneDeclaration(BaseModel):
     montant: float
     provenance: str  # ex. "3 factures (FA-2026-000001, ...002, ...004)"
     factures_ids: list[str]
+    # Avantages en nature entrant dans cette case. Une case peut réunir du facturé et du
+    # reçu en nature : les deux sont des recettes, mais leur trace n'est pas la même —
+    # un cadeau n'a ni numéro de facture ni virement à produire en cas de contrôle.
+    cadeaux_ids: list[str] = Field(default_factory=list)
+    montant_facture: float = 0.0
+    montant_nature: float = 0.0
 
 
 class Declaration(BaseModel):
@@ -39,6 +45,13 @@ class Declaration(BaseModel):
 
     lignes: list[LigneDeclaration]
     total_ca_declare: float
+    # Part du total venant d'avantages en nature. Isolée parce qu'elle ne se justifie pas
+    # de la même façon : ni facture, ni virement — la valeur marchande retenue engage
+    # l'utilisateur, qui l'a confirmée pièce par pièce.
+    total_recettes_nature: float = 0.0
+    # Avantages connus mais non repris (date manquante, devise non convertie), avec leur
+    # motif. Un brouillon incomplet doit dire ce qu'il ne contient pas.
+    cadeaux_ecartes: list[str] = Field(default_factory=list)
 
     cotisations_urssac_estimees: float
     cotisations_urssac_taux: float
