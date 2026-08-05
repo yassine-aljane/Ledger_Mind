@@ -9,6 +9,7 @@ import {
   FileQuestion,
   FileSignature,
   FileText,
+  Gift,
   HelpCircle,
   Loader2,
   Send,
@@ -35,15 +36,19 @@ import { isAuthed } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { DocumentChatDrawer } from "@/components/lm/DocumentChatDrawer";
 import { DocumentInspector } from "@/components/lm/DocumentInspector";
+import { CadeauDeclaration } from "@/components/lm/CadeauDeclaration";
 import {
   analyzeCapture,
   answerCapture,
   deleteCaptureDocument,
+  fetchCaptureCadeaux,
   fetchCaptureContrats,
   fetchCaptureInvoices,
   fetchCaptureVirements,
   formatMoney,
+  libelleCadeau,
   type CaptureAnalyzeResult,
+  type CaptureCadeauItem,
   type CaptureContratItem,
   type CaptureInvoiceItem,
   type CapturePending,
@@ -115,8 +120,8 @@ function StatusIcon({ status }: { status: ItemStatus }) {
   return <CircleDashed className="size-4 shrink-0 text-muted-foreground/60" />;
 }
 
-// -------- Fusion facture/virement/contrat pour un affichage unifié --------
-type DocKind = "facture" | "virement" | "contrat";
+// -------- Fusion facture/virement/contrat/cadeau pour un affichage unifié --------
+type DocKind = "facture" | "virement" | "contrat" | "cadeau";
 
 type UnifiedDoc = {
   document_id: string;
@@ -133,11 +138,13 @@ const KIND_LABEL: Record<DocKind, string> = {
   facture: "Facture",
   virement: "Virement",
   contrat: "Contrat",
+  cadeau: "Cadeau",
 };
 
 function KindIcon({ kind }: { kind: DocKind }) {
   if (kind === "virement") return <ArrowLeftRight />;
   if (kind === "contrat") return <FileSignature />;
+  if (kind === "cadeau") return <Gift />;
   return <FileText />;
 }
 
@@ -153,6 +160,7 @@ function unifyDocs(
   invoices: CaptureInvoiceItem[],
   virements: CaptureVirementItem[],
   contrats: CaptureContratItem[],
+  cadeaux: CaptureCadeauItem[],
 ): UnifiedDoc[] {
   const fromInvoices: UnifiedDoc[] = invoices.map((inv) => ({
     document_id: inv.document_id,
@@ -189,7 +197,18 @@ function unifyDocs(
     amount_eur: c.contract.amount_eur ?? null,
     created_at: c.created_at ?? null,
   }));
-  return [...fromInvoices, ...fromVirements, ...fromContrats].sort((a, b) =>
+  const fromCadeaux: UnifiedDoc[] = cadeaux.map((c) => ({
+    document_id: c.document_id,
+    kind: "cadeau",
+    label: libelleCadeau(c.cadeau),
+    subtitle: `Avantage en nature · ${c.cadeau.date_reception ?? "date inconnue"}`,
+    // La valeur RETENUE, jamais l'estimation : la liste affiche ce qui sera déclaré.
+    amount: c.cadeau.valeur_ttc ?? null,
+    currency: c.cadeau.devise ?? "EUR",
+    amount_eur: c.cadeau.valeur_eur ?? null,
+    created_at: c.created_at ?? null,
+  }));
+  return [...fromInvoices, ...fromVirements, ...fromContrats, ...fromCadeaux].sort((a, b) =>
     (b.created_at ?? "").localeCompare(a.created_at ?? ""),
   );
 }
@@ -206,6 +225,7 @@ function CapturePage() {
   const [invoices, setInvoices] = useState<CaptureInvoiceItem[]>([]);
   const [virements, setVirements] = useState<CaptureVirementItem[]>([]);
   const [contrats, setContrats] = useState<CaptureContratItem[]>([]);
+  const [cadeaux, setCadeaux] = useState<CaptureCadeauItem[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [chatDoc, setChatDoc] = useState<{ id: string; label: string } | null>(null);
   const [toDelete, setToDelete] = useState<UnifiedDoc | null>(null);
@@ -215,14 +235,16 @@ function CapturePage() {
   // Références stables : le moteur de file les liste en dépendances, et des
   // fonctions recréées à chaque rendu le relanceraient en boucle.
   const reloadLists = useCallback(async () => {
-    const [inv, vir, con] = await Promise.all([
+    const [inv, vir, con, cad] = await Promise.all([
       fetchCaptureInvoices(),
       fetchCaptureVirements(),
       fetchCaptureContrats(),
+      fetchCaptureCadeaux(),
     ]);
     setInvoices(inv);
     setVirements(vir);
     setContrats(con);
+    setCadeaux(cad);
   }, []);
 
   useEffect(() => {
@@ -374,7 +396,7 @@ function CapturePage() {
     }
   }
 
-  const unified = unifyDocs(invoices, virements, contrats);
+  const unified = unifyDocs(invoices, virements, contrats, cadeaux);
   const openDoc = unified.find((d) => d.document_id === openId);
   const analysing = queue.find((it) => it.status === "analyse");
   const done = queue.filter((it) => TERMINAL.includes(it.status)).length;
@@ -553,7 +575,9 @@ function CapturePage() {
             </section>
           )}
 
-          {/* Une question suspend la file jusqu'à la réponse. */}
+          {/* Une question suspend la file jusqu'à la réponse. Elle reste collée au suivi
+              de traitement dont elle fait partie : c'est une étape du dépôt de
+              justificatifs, pas un bloc indépendant. */}
           {asking?.pending && (
             <form
               onSubmit={handleHitlSubmit}
@@ -603,6 +627,13 @@ function CapturePage() {
               </div>
             </form>
           )}
+
+          {/* Le bloc cadeau ferme la colonne, APRÈS tout le flux des justificatifs
+              (dépôt → traitement → confirmation de lecture). Un cadeau n'est pas un
+              document à lire : il ne passe ni par la file d'analyse ni par cette
+              confirmation, et s'intercaler au milieu couperait la chaîne en deux. Son
+              propre suivi d'analyse se rend sous lui, dans le composant. */}
+          <CadeauDeclaration onDeclare={() => void reloadLists()} />
         </div>
 
         {/* Factures et virements vivent dans une seule liste, triée par date d'ajout : du
@@ -657,7 +688,9 @@ function CapturePage() {
                                   ? "info"
                                   : doc.kind === "contrat"
                                     ? "warning"
-                                    : "success"
+                                    : doc.kind === "cadeau"
+                                      ? "accent"
+                                      : "success"
                               }
                             >
                               <KindIcon kind={doc.kind} />

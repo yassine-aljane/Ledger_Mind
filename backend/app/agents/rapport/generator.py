@@ -53,9 +53,25 @@ async def generer_rapport(uid: str, requete: PeriodeRequest, objectif: str | Non
                    source=analyse["cotisations_source"]),
     ]
     if brut["avantages_nature"]:
+        nb = brut.get("nb_cadeaux") or 0
+        origine = brut.get("source_avantages") or "profil déclaré"
         chiffres_cles.append(ChiffreCle(
-            cle="avantages_nature", libelle="Avantages en nature (profil)",
+            cle="avantages_nature",
+            libelle=(
+                f"Avantages en nature ({nb} cadeau{'x' if nb > 1 else ''} déclaré"
+                f"{'s' if nb > 1 else ''})" if nb else "Avantages en nature (profil)"
+            ),
             valeur=f"{brut['avantages_nature']:.2f} €",
+            source=origine,
+        ))
+        # La base qui sert réellement aux seuils et aux cotisations doit figurer
+        # noir sur blanc : sans elle, un lecteur rapprocherait le pourcentage de
+        # seuil du seul CA facturé et croirait à une erreur de calcul.
+        chiffres_cles.append(ChiffreCle(
+            cle="recettes_totales",
+            libelle="Recettes retenues (CA facturé + avantages en nature)",
+            valeur=f"{brut['recettes_totales']:.2f} €",
+            source="base de calcul des seuils et cotisations",
         ))
 
     resume = (

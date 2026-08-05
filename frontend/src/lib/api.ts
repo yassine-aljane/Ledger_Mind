@@ -547,10 +547,76 @@ export type CaptureContratItem = {
   has_file?: boolean;
 };
 
-/** Vue complète d'un document déjà traité — facture, virement et contrat réunis. */
+/**
+ * Cadeau ou avantage en nature reçu d'une marque (« gifting »).
+ *
+ * Deux valeurs coexistent volontairement : `valeur_ttc` est celle qui sera DÉCLARÉE
+ * — saisie ou confirmée par l'utilisateur — tandis que `valeur_estimee` et sa
+ * fourchette ne sont qu'une suggestion tirée de la photo. Ne jamais présenter la
+ * seconde comme un montant acquis.
+ */
+export type CaptureCadeau = {
+  description?: string | null;
+  marque?: string | null;
+  date_reception?: string | null;
+  valeur_ttc?: number | null;
+  devise?: string | null;
+  valeur_eur?: number | null;
+  exchange_rate?: number | null;
+  rate_date?: string | null;
+  rate_source?: string | null;
+  objet_identifie?: string | null;
+  valeur_estimee?: number | null;
+  fourchette_min?: number | null;
+  fourchette_max?: number | null;
+  confiance?: string | null;
+  source_estimation?: string | null;
+  /** true si la valeur retenue s'écarte de l'estimation automatique. */
+  valeur_corrigee?: boolean | null;
+  contrepartie?: string | null;
+};
+
+/**
+ * Titre d'un cadeau : « objet reconnu — marque ».
+ *
+ * Volontairement court et identique partout (liste, en-tête de fiche, titre de la
+ * fiche). La description complète peut faire deux lignes — elle a sa place DANS la
+ * fiche, pas en titre, où elle se retrouvait tronquée et répétée trois fois.
+ */
+export function libelleCadeau(c: CaptureCadeau): string {
+  const objet = c.objet_identifie?.trim() || c.description?.trim() || "Cadeau reçu";
+  const marque = c.marque?.trim();
+  return marque ? `${objet} — ${marque}` : objet;
+}
+
+export type CaptureCadeauItem = {
+  document_id: string;
+  cadeau: CaptureCadeau;
+  analysis?: string | null;
+  incoherences?: string[] | null;
+  created_at?: string | null;
+  filename?: string | null;
+  has_file?: boolean;
+};
+
+/** Suggestion issue de la photo — n'engage rien tant que l'utilisateur n'a pas validé. */
+export type CaptureEstimationCadeau = {
+  objet_identifie?: string | null;
+  description?: string | null;
+  marque?: string | null;
+  valeur_estimee?: number | null;
+  fourchette_min?: number | null;
+  fourchette_max?: number | null;
+  confiance: "haute" | "moyenne" | "faible";
+  message: string;
+  avertissement: string;
+  source_estimation: string;
+};
+
+/** Vue complète d'un document déjà traité — facture, virement, contrat et cadeau réunis. */
 export type CaptureDocumentDetail = {
   document_id: string;
-  document_type: "facture" | "virement" | "contrat";
+  document_type: "facture" | "virement" | "contrat" | "cadeau";
   filename?: string | null;
   mime?: string | null;
   has_file: boolean;
@@ -574,6 +640,7 @@ export type CaptureDocumentDetail = {
   payment_days_until?: number | null;
   transfer?: CaptureVirement | null;
   contract?: CaptureContract | null;
+  cadeau?: CaptureCadeau | null;
 };
 
 export type CaptureDocumentMessage = {
@@ -644,6 +711,83 @@ export async function fetchCaptureVirements(): Promise<CaptureVirementItem[]> {
 export async function fetchCaptureContrats(): Promise<CaptureContratItem[]> {
   const response = await fetch(`${API_BASE}/api/capture/contrats`, {
     headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export async function fetchCaptureCadeaux(): Promise<CaptureCadeauItem[]> {
+  const response = await fetch(`${API_BASE}/api/capture/cadeaux`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+/**
+ * Demande une estimation de valeur à partir d'une photo. N'enregistre RIEN.
+ *
+ * Le résultat est une proposition à relire : c'est `declarerCadeau` qui engage,
+ * et elle exige que l'utilisateur ait confirmé le montant.
+ */
+export async function estimerCadeau(photo: File): Promise<CaptureEstimationCadeau> {
+  const form = new FormData();
+  form.append("file", photo);
+  const response = await fetch(`${API_BASE}/api/capture/cadeau/estimer`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.json();
+}
+
+export type DeclarationCadeau = {
+  description: string;
+  marque?: string | null;
+  date_reception?: string | null;
+  /** Valeur marchande RETENUE — relue par l'utilisateur, c'est elle qui est déclarée. */
+  valeur_ttc: number;
+  devise?: string;
+  contrepartie?: string | null;
+  photo?: File | null;
+  /** Suggestion d'origine, conservée telle quelle pour tracer l'arbitrage humain. */
+  estimation?: CaptureEstimationCadeau | null;
+};
+
+export type CadeauDeclareResult = {
+  document_id: string;
+  cadeau: CaptureCadeau;
+  duplicate_skipped: boolean;
+};
+
+export async function declarerCadeau(input: DeclarationCadeau): Promise<CadeauDeclareResult> {
+  const form = new FormData();
+  form.append("description", input.description);
+  form.append("valeur_ttc", String(input.valeur_ttc));
+  form.append("devise", input.devise ?? "EUR");
+  // Le serveur refuse la déclaration sans cette attestation : elle n'est posée
+  // qu'ici, au moment où l'utilisateur valide le formulaire qu'il a sous les yeux.
+  form.append("valeur_confirmee", "true");
+  if (input.marque) form.append("marque", input.marque);
+  if (input.date_reception) form.append("date_reception", input.date_reception);
+  if (input.contrepartie) form.append("contrepartie", input.contrepartie);
+  if (input.photo) form.append("file", input.photo);
+
+  const est = input.estimation;
+  if (est) {
+    if (est.valeur_estimee != null) form.append("valeur_estimee", String(est.valeur_estimee));
+    if (est.fourchette_min != null) form.append("fourchette_min", String(est.fourchette_min));
+    if (est.fourchette_max != null) form.append("fourchette_max", String(est.fourchette_max));
+    if (est.confiance) form.append("confiance", est.confiance);
+    if (est.objet_identifie) form.append("objet_identifie", est.objet_identifie);
+    if (est.source_estimation) form.append("source_estimation", est.source_estimation);
+  }
+
+  const response = await fetch(`${API_BASE}/api/capture/cadeau`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
   });
   if (!response.ok) throw new Error(await parseError(response));
   return response.json();
