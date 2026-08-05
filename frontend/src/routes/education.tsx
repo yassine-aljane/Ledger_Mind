@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, CloudOff, Save, Sparkles } from "lucide-react";
+import { ArrowRight, CloudOff, Save } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
 import { FiscalAssistant } from "@/components/lm/FiscalAssistant";
 import { Button } from "@/components/ui/button";
@@ -9,76 +9,63 @@ export const Route = createFileRoute("/education")({
   head: () => ({
     meta: [
       { title: "Assistant fiscal — LedgerMind" },
-      { name: "description", content: "Des fiches courtes, en français simple, pour tout comprendre." },
+      {
+        name: "description",
+        content:
+          "Posez une question fiscale. Réponses en français simple, ancrées sur BOFiP, Légifrance et URSSAF.",
+      },
       { property: "og:title", content: "Assistant fiscal — LedgerMind" },
       {
         property: "og:description",
-        content: "Des fiches courtes, en français simple, pour tout comprendre.",
+        content:
+          "Posez une question fiscale. Réponses en français simple, ancrées sur BOFiP, Légifrance et URSSAF.",
       },
     ],
   }),
   component: EducationPage,
 });
 
-/**
- * Ce que change le fait d'avoir un compte, ici, concrètement.
- *
- * L'Éducation est ouverte à tous — mais sans compte, les échanges sont rattachés à un
- * identifiant anonyme propre au navigateur : ils disparaissent en changeant d'appareil ou en
- * vidant le stockage. Avec un compte, même gratuit, l'historique est rattaché à l'utilisateur
- * et le suit partout. C'est le bénéfice réel du palier connecté, et il mérite d'être dit
- * plutôt que découvert en perdant une conversation.
- */
 function BandeauContexte() {
   const { state, loading } = useEntitlements();
-  if (loading) return null;
+  if (loading || state === "premium_complet" || state === "premium_parcours") return null;
 
   if (state === "invite") {
     return (
-      <div className="animate-rise mb-8 flex flex-col justify-between gap-4 rounded-2xl border border-dashed border-border bg-card p-5 sm:flex-row sm:items-center">
+      <div className="animate-rise mb-6 flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex items-start gap-3">
-          <CloudOff className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium">Vos échanges ne sont pas conservés</p>
-            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-              Sans compte, cette conversation reste attachée à ce navigateur : elle disparaîtra si
-              vous changez d&apos;appareil. Le compte gratuit suffit à la retrouver.
-            </p>
-          </div>
+          <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground">
+            <CloudOff className="size-3.5" />
+          </span>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            <span className="font-medium text-foreground">Sans compte</span> — la conversation reste
+            sur ce navigateur.
+          </p>
         </div>
-        <Button asChild className="shrink-0">
+        <Button asChild size="sm" className="shrink-0 rounded-full">
           <Link to="/auth">
-            Créer un compte gratuit <ArrowRight />
+            Créer un compte <ArrowRight className="size-3.5" />
           </Link>
         </Button>
       </div>
     );
   }
 
-  if (state === "free") {
-    return (
-      <div className="animate-rise mb-8 flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-5 shadow-soft sm:flex-row sm:items-center">
-        <div className="flex items-start gap-3">
-          <Save className="mt-0.5 size-4 shrink-0 text-success-ink" />
-          <div>
-            <p className="text-sm font-medium">Vos conversations sont enregistrées</p>
-            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-              Elles sont rattachées à votre compte : vous les retrouverez sur n&apos;importe quel
-              appareil. Pour passer de comprendre à agir — diagnostic, échéances, documents —
-              il faut la formule Premium.
-            </p>
-          </div>
-        </div>
-        <Button asChild variant="accent" className="shrink-0">
-          <Link to="/premium">
-            <Sparkles /> Découvrir Premium
-          </Link>
-        </Button>
+  return (
+    <div className="animate-rise mb-6 flex flex-col gap-3 overflow-hidden rounded-2xl bg-ink px-4 py-3.5 text-ink-foreground sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-ink-foreground/10 text-accent">
+          <Save className="size-3.5" />
+        </span>
+        <p className="text-sm leading-relaxed text-ink-foreground/70">
+          <span className="font-medium text-ink-foreground">Historique sauvé</span> — Premium pour
+          passer à l&apos;action.
+        </p>
       </div>
-    );
-  }
-
-  return null;
+      <Button asChild size="sm" variant="accent" className="shrink-0 rounded-full">
+        <Link to="/premium">Découvrir Premium</Link>
+      </Button>
+    </div>
+  );
 }
 
 function EducationPage() {
@@ -88,11 +75,12 @@ function EducationPage() {
         eyebrow="Assistant fiscal"
         title={
           <>
-            Apprenez à votre rythme, <span className="italic font-normal">sans jargon.</span>
+            Posez.{" "}
+            <span className="italic font-normal text-accent-ink">On cite les textes.</span>
           </>
         }
+        description="Réponses en français simple, ancrées sur BOFiP, Légifrance et URSSAF."
       />
-
       <BandeauContexte />
       <FiscalAssistant />
     </AppShell>

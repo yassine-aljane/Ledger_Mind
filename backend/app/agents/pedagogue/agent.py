@@ -79,8 +79,8 @@ jamais « micro-entrepreneur » et « régime réel » sur le formulaire 2042-C-
 """
 
 CORPUS_VIDE = (
-    "Ma base documentaire est vide pour l'instant. Lancez l'ingestion du corpus "
-    "(`python -m backend.scripts.seed_corpus`) puis réessayez."
+    "Ma base documentaire n'est pas encore prête. Réessayez dans un instant — "
+    "si le problème continue, l'équipe doit réamorcer l'index des textes officiels."
 )
 
 RECHERCHE_INDISPONIBLE = (
