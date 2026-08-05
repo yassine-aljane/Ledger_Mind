@@ -55,6 +55,16 @@ export type Nouveaute = {
   champs_profil_declencheurs: string[];
   notifiee: boolean;
   lue: boolean;
+  /** Quand cette nouveauté a été portée à la connaissance de CET utilisateur. `null` si elle
+   *  n'a jamais atteint le seuil de notification — c'est du contexte, pas une alerte. */
+  date_notifiee: string | null;
+};
+
+/** État du catalogue partagé — distingue « rien ne vous concerne » de « rien n'a été collecté ». */
+export type StatsCatalogue = {
+  total: number;
+  actualites: number;
+  derniere_collecte: string | null;
 };
 
 export type PreferencesVeille = {
@@ -67,6 +77,10 @@ export type PreferencesVeille = {
 export type FilVeille = {
   nouveautes: Nouveaute[];
   preferences: PreferencesVeille;
+  catalogue: StatsCatalogue;
+  /** Aucun champ discriminant connu : on ne peut rien personnaliser honnêtement. */
+  profil_incomplet: boolean;
+  champs_connus: string[];
 };
 
 /** `contexte: false` restreint aux nouveautés assez fortes pour avoir été notifiées. */
@@ -87,8 +101,21 @@ export function marquerVeilleLue(nouveauteId: string) {
   });
 }
 
-export function marquerToutVeilleLu() {
-  return request<{ marquees: number }>("/notifications/lues", { method: "POST" });
+/**
+ * Éteint les non-lues. `ids` restreint aux nouveautés RÉELLEMENT affichées — sans quoi ouvrir
+ * le panneau en mode « obligations seules » éteignait aussi le compteur d'informations que
+ * l'écran n'avait jamais montrées.
+ */
+export function marquerToutVeilleLu(ids?: string[]) {
+  return request<{ marquees: number }>("/notifications/lues", {
+    method: "POST",
+    body: JSON.stringify({ ids: ids ?? null }),
+  });
+}
+
+/** Déclenche une collecte immédiate (réseau + LLM côté serveur). */
+export function lancerCollecteVeille() {
+  return request<{ cycle_id: string; nouvelles: number }>("/run", { method: "POST" });
 }
 
 export function majPreferencesVeille(body: {

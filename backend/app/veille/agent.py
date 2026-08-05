@@ -13,7 +13,7 @@ est déjà en base : pas d'appel réseau, pas de coût, pas de variabilité d'un
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.llm import chat_json_with_system
 from app.veille import store
@@ -316,6 +316,54 @@ async def collecter_et_qualifier() -> dict:
     }
 
 
+# ------------------------------------------------------------------ Amorçage du catalogue
+
+#: Au-delà, on retente une collecte au premier accès. Le planificateur (`start_scheduler`) ne
+#: passe qu'une fois par jour à heure fixe : un serveur redémarré dans la journée — le cas normal
+#: en développement — ne collecte jamais, et le catalogue reste figé sur ce qu'un lancement
+#: manuel avait produit. D'où cet amorçage paresseux, qui rend l'écran vivant sans planificateur.
+DELAI_RAFRAICHISSEMENT_H = 12
+
+#: Verrou de processus : deux requêtes simultanées ne doivent pas lancer deux collectes.
+_collecte_en_cours = False
+#: Dernière TENTATIVE (réussie ou non). Sans elle, un MCP indisponible ferait retenter à chaque
+#: appel — donc à chaque sondage de la cloche, toutes les cinq minutes.
+_derniere_tentative: datetime | None = None
+
+
+def catalogue_a_rafraichir() -> bool:
+    """Vrai si le catalogue est vide ou trop ancien, et qu'aucune collecte n'est en cours."""
+    if _collecte_en_cours:
+        return False
+    limite = datetime.now() - timedelta(hours=DELAI_RAFRAICHISSEMENT_H)
+    if _derniere_tentative and _derniere_tentative > limite:
+        return False
+    stats = store.stats_catalogue()
+    if stats["actualites"] == 0:
+        return True
+    derniere = stats["derniere_collecte"]
+    return not derniere or derniere < limite.isoformat(timespec="seconds")
+
+
+async def assurer_catalogue() -> dict | None:
+    """Collecte si nécessaire. Conçue pour être appelée en tâche de fond, jamais attendue.
+
+    Une exception ici ne doit rien casser : la veille reste consultable avec ce qu'elle a déjà.
+    """
+    global _collecte_en_cours, _derniere_tentative
+    if not catalogue_a_rafraichir():
+        return None
+    _collecte_en_cours = True
+    _derniere_tentative = datetime.now()
+    try:
+        return await collecter_et_qualifier()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Amorçage du catalogue de veille impossible : %s", exc)
+        return None
+    finally:
+        _collecte_en_cours = False
+
+
 def distribuer(profil: ProfilVeille) -> dict:
     """Étape 3 : confronte le catalogue à un profil et enregistre les notifications dues.
 
@@ -401,6 +449,11 @@ def pour_utilisateur(user, profil_guidance: dict | None = None, inclure_contexte
                 "champs_profil_declencheurs": verdict.champs_declencheurs,
                 "notifiee": notif is not None,
                 "lue": bool(notif and notif.get("lue")),
+                # La date de notification est la SEULE marque durable de nouveauté : l'état
+                # « non lu » s'éteint dès la première ouverture du panneau, si bien qu'en
+                # rouvrant trente secondes plus tard, plus rien ne distinguerait ce qui vient
+                # d'arriver de ce qui traîne depuis un mois.
+                "date_notifiee": (notif or {}).get("date_notifiee"),
             }
         )
 
@@ -420,4 +473,6 @@ def pour_utilisateur(user, profil_guidance: dict | None = None, inclure_contexte
 async def run_cycle() -> dict:
     """Un cycle complet, planifié : collecte et qualification. La distribution se fait à la
     lecture, pour rester juste même si le profil de l'utilisateur a changé entre-temps."""
+    global _derniere_tentative
+    _derniere_tentative = datetime.now()
     return await collecter_et_qualifier()
