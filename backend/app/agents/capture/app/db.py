@@ -42,6 +42,10 @@ class DuplicateContratError(Exception):
     """Levée quand l'insertion viole l'index unique de déduplication (contrat)."""
 
 
+class DuplicateCadeauError(Exception):
+    """Levée quand l'insertion viole l'index unique de déduplication (cadeau en nature)."""
+
+
 class Database:
     def __init__(self, client: MongoClient, db_name: str):
         self._client = client
@@ -49,6 +53,7 @@ class Database:
         self.invoices = self._db["invoices"]
         self.virements = self._db["virements"]      # justificatifs de virement
         self.contrats = self._db["contrats"]        # contrats et conventions signés
+        self.cadeaux = self._db["cadeaux"]          # cadeaux / avantages en nature reçus
         self.chat_sessions = self._db["chat_sessions"]
         self.fx_rates = self._db["fx_rates"]        # cache de taux de change (devise, date)
         self._files_bucket: Any = None              # GridFSBucket, ouvert à la demande
@@ -104,6 +109,19 @@ class Database:
                 ("amount", ASCENDING),
             ],
             name="uniq_contrat_dedup_key",
+        )
+        # Cadeaux en nature : listing par utilisateur + déduplication par utilisateur.
+        self._ensure_index(self.cadeaux, [("user_id", ASCENDING)], name="idx_cadeau_user_id")
+        self._ensure_unique_index(
+            self.cadeaux,
+            [
+                ("user_id", ASCENDING),
+                ("marque", ASCENDING),
+                ("description", ASCENDING),
+                ("date_reception", ASCENDING),
+                ("valeur_ttc", ASCENDING),
+            ],
+            name="uniq_cadeau_dedup_key",
         )
         # Historique de chat par (user_id, document_id).
         self._ensure_unique_index(
@@ -230,10 +248,34 @@ class Database:
             out.append(d)
         return out
 
+    # -- Persistance cadeaux en nature ---------------------------------------
+    def find_duplicate_cadeau(self, user_id: str, dedup_key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Cherche un cadeau existant du même utilisateur avec la même clé."""
+        query = {"user_id": user_id, **{k: dedup_key.get(k) for k in (
+            "marque", "description", "date_reception", "valeur_ttc")}}
+        return self.cadeaux.find_one(query)
+
+    def insert_cadeau(self, doc: Dict[str, Any]) -> str:
+        payload = dict(doc)
+        payload.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+        try:
+            res = self.cadeaux.insert_one(payload)
+            return str(res.inserted_id)
+        except DuplicateKeyError as exc:  # course entre check et insert
+            raise DuplicateCadeauError(str(exc)) from exc
+
+    def list_cadeaux(self, user_id: str) -> List[Dict[str, Any]]:
+        cursor = self.cadeaux.find({"user_id": user_id}).sort("created_at", ASCENDING)
+        out: List[Dict[str, Any]] = []
+        for d in cursor:
+            d.pop("_id", None)
+            out.append(d)
+        return out
+
     def get_document_by_id(self, user_id: str, document_id: str) -> Optional[Dict[str, Any]]:
-        """Retrouve un document (facture, virement OU contrat) pour le Q&A."""
+        """Retrouve un document (facture, virement, contrat OU cadeau) pour le Q&A."""
         query = {"user_id": user_id, "document_id": document_id}
-        for collection in (self.invoices, self.virements, self.contrats):
+        for collection in (self.invoices, self.virements, self.contrats, self.cadeaux):
             d = collection.find_one(query)
             if d:
                 d.pop("_id", None)
@@ -265,14 +307,14 @@ class Database:
         métier, la pièce d'origine dans GridFS, l'historique de discussion, et
         — côté appelant — l'entrée du fil d'activité de l'utilisateur.
 
-        Les trois collections sont interrogées sans court-circuit : un même
+        Les quatre collections sont interrogées sans court-circuit : un même
         `document_id` ne devrait exister que dans une seule, mais un reliquat
         ne doit pas survivre à la suppression.
         """
         query = {"user_id": user_id, "document_id": document_id}
         supprimes = sum(
             collection.delete_one(query).deleted_count
-            for collection in (self.invoices, self.virements, self.contrats)
+            for collection in (self.invoices, self.virements, self.contrats, self.cadeaux)
         )
 
         if not supprimes:

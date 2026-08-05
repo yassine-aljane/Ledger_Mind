@@ -19,6 +19,10 @@ load_dotenv()
 MODEL_OCR = "mistral-ocr-latest"          # OCR des factures
 MODEL_LARGE = "mistral-large-latest"      # extraction / analyse / Q&A / traduction
 MODEL_SMALL = "mistral-small-latest"      # classification (moins coûteux)
+# Reconnaissance d'objet sur photo (cadeaux en nature) : il ne s'agit pas de lire
+# du texte — l'OCR ne sert à rien sur la photo d'un bijou — mais d'identifier
+# l'objet lui-même, ce qui demande un modèle multimodal.
+MODEL_VISION = "pixtral-12b-latest"
 
 # Catégories de dépense autorisées (FR-10). Toute autre valeur est invalide.
 EXPENSE_CATEGORIES: List[str] = [

@@ -119,15 +119,16 @@ def evaluer(nouveaute: Nouveaute, profil: ProfilVeille) -> Verdict:
             return _exclue("activité non concernée")
 
     # --- International
-    if criteres.international is not None:
-        if profil.international is not None:
-            if criteres.international == profil.international:
-                if criteres.international:
-                    score += _POIDS["international"]
-                    raisons.append(_LIBELLES["international"])
-                    champs.append("international_clients")
-            else:
-                return _exclue("périmètre international différent")
+    # Seul `True` restreint : la mesure ne vise QUE ceux qui facturent hors de France.
+    # `False` veut dire « pas spécifique à l'international » — ça n'exclut personne, et le
+    # traiter comme une restriction écartait à tort tous les profils ayant des clients étrangers.
+    if criteres.international is True:
+        if profil.international is True:
+            score += _POIDS["international"]
+            raisons.append(_LIBELLES["international"])
+            champs.append("international_clients")
+        elif profil.international is False:
+            return _exclue("mesure réservée aux facturations hors de France")
 
     # Une mesure sans aucun critère est générale : elle vaut d'être consultable, pas notifiée.
     if not raisons:
@@ -170,10 +171,54 @@ def evaluer(nouveaute: Nouveaute, profil: ProfilVeille) -> Verdict:
     )
 
 
+#: Une mesure qui ÉNUMÈRE toutes les valeurs possibles d'un critère ne restreint rien.
+#:
+#: Le prompt demande de laisser un critère vide quand il n'y a pas de restriction, mais le
+#: modèle préfère souvent l'exhaustivité : « facturation électronique » revient avec
+#: tax_categories=[BIC,BNC] et regimes_tva=[franchise,reel_simplifie,reel_normal]. C'est le
+#: même sens — « tout le monde » — et le code doit le lire ainsi plutôt que d'exiger une forme.
+_TOUTES_CATEGORIES = frozenset({"BNC", "BIC"})
+_TOUS_REGIMES_TVA = frozenset({"franchise", "reel_simplifie", "reel_normal"})
+
+
+def _sans_restriction(valeurs: list[str], exhaustif: frozenset[str]) -> bool:
+    """Vrai si le critère est vide, ou s'il couvre déjà tout l'univers des valeurs."""
+    return not valeurs or exhaustif.issubset(set(valeurs))
+
+
+def est_universelle(nouveaute: Nouveaute) -> bool:
+    """Vrai si la mesure ne restreint son application à personne en particulier.
+
+    « La facturation électronique devient obligatoire au 1er septembre » ne vise ni un régime,
+    ni une catégorie, ni un seuil : elle concerne tout le monde. La retenir sous prétexte que
+    le profil de l'utilisateur est incomplet serait exactement l'inverse du service rendu.
+    """
+    c = nouveaute.criteres
+    return (
+        not c.regimes
+        and not c.seuils
+        and not [a for a in c.activites if a != "tous"]
+        # `international=False` signifie « pas réservé à l'international » — donc aucune
+        # restriction. Seul `True` en est une.
+        and c.international is not True
+        and _sans_restriction(c.tax_categories, _TOUTES_CATEGORIES)
+        and _sans_restriction(c.regimes_tva, _TOUS_REGIMES_TVA)
+    )
+
+
 def notifiable(verdict: Verdict, nouveaute: Nouveaute, mode: str) -> bool:
     """Un verdict suffisamment fort, compte tenu du mode choisi par l'utilisateur."""
-    if not verdict.retenue or verdict.score < SEUIL_NOTIFICATION:
+    if not verdict.retenue:
         return False
+
+    # Une OBLIGATION universelle passe quel que soit le score : personne ne peut y échapper,
+    # et le score est bas précisément parce qu'aucun critère ne la rattache à quelqu'un.
+    universelle_obligatoire = (
+        nouveaute.impact == "action_obligatoire" and est_universelle(nouveaute)
+    )
+    if not universelle_obligatoire and verdict.score < SEUIL_NOTIFICATION:
+        return False
+
     if mode == "obligatoire_seulement":
         return nouveaute.impact == "action_obligatoire"
     return True

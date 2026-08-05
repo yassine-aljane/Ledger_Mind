@@ -436,19 +436,81 @@ def classify_expense(ocr_text: str, invoice: Dict):
 
 
 # --- Q&A sur une facture déjà traitée (ancrage OCR + historique, sans RAG) ---
-def qa_answer(ocr_text: str, invoice: Dict, history: List[Dict[str, str]], question: str):
+_QA_NATURE = {
+    "facture": "une facture",
+    "virement": "un virement bancaire",
+    "contrat": "un contrat",
+    "cadeau": "un cadeau reçu d'une marque (avantage en nature)",
+}
+
+# Consigne de MISE EN FORME de la réponse du chat.
+#
+# La réponse s'affiche dans un panneau latéral étroit (~340 px) : les titres markdown
+# y sont hors d'échelle, et le modèle avait tendance à empiler « ### 1. », « ### 2. »
+# au fil du texte, ce qui produisait un pavé illisible. On lui demande donc une
+# structure plate — une phrase de réponse, puis des puces courtes — plutôt que des
+# sections. Le gras reste autorisé : c'est ce qui fait ressortir les montants.
+_QA_FORMAT = (
+    "FORMAT DE RÉPONSE — à respecter strictement :\n"
+    "- Commence par UNE phrase qui répond directement à la question, sans préambule.\n"
+    "- Développe ensuite en puces courtes (« - »), une idée par puce, deux lignes maximum.\n"
+    "- Mets en **gras** les montants, taux et échéances — rien d'autre.\n"
+    "- N'utilise JAMAIS de titres markdown (#, ##, ###) ni de numérotation « 1. », « 2. ».\n"
+    "- Pas d'emoji, pas de tableau, pas de bloc de code.\n"
+    "- Termine par une puce « À retenir : … » seulement si elle ajoute quelque chose.\n"
+    "- Reste sous 150 mots : ce panneau est étroit, une réponse longue n'est pas lue."
+)
+
+
+def qa_answer(
+    ocr_text: str,
+    structured: Dict,
+    history: List[Dict[str, str]],
+    question: str,
+    *,
+    document_type: str = "facture",
+    analysis: str | None = None,
+):
+    """Prompt de Q&A sur une pièce déjà analysée.
+
+    Le type est passé explicitement : formuler la consigne autour du « texte OCR de la
+    facture » sur un cadeau conduisait le modèle à répondre « aucune information dans le
+    texte OCR » alors que tous les champs utiles étaient là — un cadeau est une PHOTO
+    d'objet, il n'a par construction aucun texte à lire.
+
+    La synthèse rédigée est jointe aux champs : c'est elle qui porte le raisonnement
+    fiscal (pourquoi la pièce est un revenu, ce qu'il faut en faire), et les questions
+    des utilisateurs portent le plus souvent là-dessus.
+    """
+    nature = _QA_NATURE.get(document_type, "un document")
     system = (
-        "Tu réponds en français aux questions d'un utilisateur sur UN document "
-        "déjà analysé (facture ou virement bancaire). Tu t'appuies UNIQUEMENT "
-        "sur le texte OCR de ce document et sur l'historique de conversation "
-        "fournis. Si l'information n'y figure pas, dis-le clairement : n'invente "
+        f"Tu réponds en français aux questions d'un utilisateur sur UNE pièce déjà "
+        f"analysée — ici {nature}. Tu t'appuies UNIQUEMENT sur les éléments fournis "
+        "ci-dessous : champs extraits, synthèse rédigée, texte de la pièce et historique "
+        "de conversation. Si l'information n'y figure pas, dis-le clairement : n'invente "
         "rien, ne va chercher aucune source externe."
     )
+    if document_type == "cadeau":
+        system += (
+            " Cette pièce est une PHOTO d'objet : elle ne contient aucun texte, et cette "
+            "absence n'est PAS un manque d'information. Les champs extraits et la synthèse "
+            "font foi — ne dis jamais que le texte du document est vide pour refuser de "
+            "répondre. Rappelle au besoin qu'un cadeau reçu d'une marque en contrepartie "
+            "d'une prestation est un revenu en nature, déclarable à sa valeur marchande."
+        )
+
+    system += "\n\n" + _QA_FORMAT
+
     hist = "\n".join(f"{m.get('role')}: {m.get('content')}" for m in history) or "(aucun)"
-    user = (
-        f"Champs extraits : {invoice}\n\n"
-        f"Texte OCR de la facture :\n{ocr_text}\n\n"
-        f"Historique de conversation :\n{hist}\n\n"
-        f"Question de l'utilisateur : {question}"
-    )
-    return system, user
+
+    blocs = [f"Champs extraits : {structured}"]
+    if analysis:
+        blocs.append(f"Synthèse rédigée lors de l'analyse :\n{analysis}")
+    # Sur un cadeau, aucune section OCR : une rubrique vide invite le modèle à conclure
+    # au manque d'information, ce qui est précisément le contraire de la réalité.
+    if ocr_text:
+        blocs.append(f"Texte du document :\n{ocr_text}")
+    blocs.append(f"Historique de conversation :\n{hist}")
+    blocs.append(f"Question de l'utilisateur : {question}")
+
+    return system, "\n\n".join(blocs)

@@ -137,6 +137,64 @@ class Contract(BaseModel):
         }
 
 
+class Cadeau(BaseModel):
+    """Cadeau / avantage en nature reçu d'une marque (« gifting »).
+
+    Ce n'est fiscalement PAS un cadeau : un partenariat rémunéré en produits ou en
+    services est un revenu en nature. Il se déclare à sa valeur marchande — le prix
+    public TTC de l'objet à l'état neuf — et entre au livre des recettes comme un
+    encaissement en numéraire.
+
+    D'où la séparation, tenue dans tout ce modèle, entre :
+      - `valeur_ttc` : la valeur RETENUE, celle qui sera déclarée. Elle engage
+        l'utilisateur, qui l'a saisie ou confirmée.
+      - `valeur_estimee` et sa fourchette : une SUGGESTION issue d'une photo. Une
+        image ne donne jamais un prix certain (contrefaçon, série, état, taille…),
+        et la présenter comme un montant sûr ferait porter à l'utilisateur une
+        erreur de déclaration qui n'est pas la sienne.
+    Les deux sont persistées côte à côte : on doit pouvoir dire a posteriori si un
+    montant déclaré venait de la machine ou de l'humain.
+    """
+
+    description: Optional[str] = None        # nature de l'objet reçu
+    marque: Optional[str] = None             # marque / client à l'origine du cadeau
+    date_reception: Optional[str] = None     # ISO 'YYYY-MM-DD'
+
+    # --- Valeur retenue (déclarée) ---
+    valeur_ttc: Optional[float] = None
+    devise: Optional[str] = None
+    valeur_eur: Optional[float] = None
+    exchange_rate: Optional[float] = None
+    rate_date: Optional[str] = None
+    rate_source: Optional[str] = None
+
+    # --- Suggestion automatique depuis la photo ---
+    objet_identifie: Optional[str] = None
+    valeur_estimee: Optional[float] = None
+    fourchette_min: Optional[float] = None
+    fourchette_max: Optional[float] = None
+    confiance: Optional[str] = None          # 'haute' | 'moyenne' | 'faible'
+    source_estimation: Optional[str] = None  # ex. 'vision-mistral'
+    # True dès que la valeur retenue diffère de l'estimation : trace de l'arbitrage.
+    valeur_corrigee: Optional[bool] = None
+
+    contrepartie: Optional[str] = None       # ce qui est attendu en échange (post, story…)
+
+    def dedup_key(self) -> Dict[str, Any]:
+        """Clé d'unicité : même marque, même objet, même jour, même valeur.
+
+        Deux cadeaux distincts d'une même marque le même jour restent possibles —
+        d'où l'inclusion de la description ET de la valeur, plutôt qu'une clé
+        marque+date qui les confondrait.
+        """
+        return {
+            "marque": self.marque,
+            "description": self.description,
+            "date_reception": self.date_reception,
+            "valeur_ttc": self.valeur_ttc,
+        }
+
+
 class BankTransfer(BaseModel):
     """Virement bancaire (cadre France). Champs absents/illisibles = None (FR-08).
 
@@ -354,12 +412,42 @@ class ContratListItem(BaseModel):
     has_file: bool = False
 
 
+class CadeauListItem(BaseModel):
+    document_id: str
+    cadeau: Cadeau
+    analysis: Optional[str] = None
+    incoherences: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    filename: Optional[str] = None
+    has_file: bool = False
+
+
+class EstimationCadeau(BaseModel):
+    """Sortie de l'estimation par vision — une suggestion, jamais une déclaration.
+
+    `message` porte la phrase affichée à l'utilisateur : elle est construite côté
+    serveur pour que l'avertissement suive toujours la valeur, quel que soit le
+    client qui l'affiche.
+    """
+
+    objet_identifie: Optional[str] = None
+    description: Optional[str] = None
+    marque: Optional[str] = None
+    valeur_estimee: Optional[float] = None
+    fourchette_min: Optional[float] = None
+    fourchette_max: Optional[float] = None
+    confiance: str = "faible"                # 'haute' | 'moyenne' | 'faible'
+    message: str
+    avertissement: str
+    source_estimation: str = "vision-mistral"
+
+
 class DocumentDetail(BaseModel):
     """Vue complète d'un document déjà traité, pour la consultation a posteriori.
 
-    Réunit facture, virement et contrat derrière un seul contrat d'API :
-    `document_type` indique lequel de `invoice` / `transfer` / `contract` est
-    rempli.
+    Réunit facture, virement, contrat et cadeau derrière un seul contrat d'API :
+    `document_type` indique lequel de `invoice` / `transfer` / `contract` /
+    `cadeau` est rempli.
     """
 
     document_id: str
@@ -391,3 +479,5 @@ class DocumentDetail(BaseModel):
     transfer: Optional[BankTransfer] = None
     # Rempli si document_type == 'contrat'
     contract: Optional[Contract] = None
+    # Rempli si document_type == 'cadeau'
+    cadeau: Optional[Cadeau] = None
