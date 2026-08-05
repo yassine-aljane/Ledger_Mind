@@ -49,6 +49,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="mt-3 text-sm text-muted-foreground">
           Un incident est survenu. Vous pouvez réessayer.
         </p>
+        {import.meta.env.DEV ? (
+          <pre className="mt-4 max-h-64 overflow-auto rounded-lg border border-border bg-card p-3 text-left text-xs whitespace-pre-wrap text-destructive">
+            {error.message}
+            {error.stack ? `\n\n${error.stack}` : null}
+          </pre>
+        ) : null}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {

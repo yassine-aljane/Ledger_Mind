@@ -22,7 +22,10 @@ _initialized = False
 
 
 def _jeux():
-    return get_db()["declarations_generees"]
+    # Collection distincte de `declarations_generees` (agent `declaration` au singulier) :
+    # les deux documents n'ont ni le même schéma ni les mêmes champs, et les mélanger
+    # faisait remonter un jeu de brouillons là où l'API promet une `Declaration`.
+    return get_db()["jeux_declarations"]
 
 
 def _ensure_schema() -> None:

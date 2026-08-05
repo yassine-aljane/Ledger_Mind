@@ -480,18 +480,32 @@ export function indiceSante(
 
 // --------------------------------------------------------------------------------- Format
 
-export function formatCompact(n: number): string {
+/**
+ * Placeholder affiché quand un montant manque. Un enregistrement incomplet côté API ne
+ * doit jamais faire tomber tout l'écran dans l'`ErrorComponent` du routeur : on montre
+ * un tiret à la place du chiffre, le reste de la page continue de s'afficher.
+ */
+const VALEUR_ABSENTE = "—";
+
+function estNombre(n: number | null | undefined): n is number {
+  return typeof n === "number" && Number.isFinite(n);
+}
+
+export function formatCompact(n: number | null | undefined): string {
+  if (!estNombre(n)) return VALEUR_ABSENTE;
   const abs = Math.abs(n);
   if (abs >= 1_000_000) return `${(n / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
   if (abs >= 10_000) return `${(n / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} k`;
   return n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
 }
 
-export function formatEuros(n: number): string {
+export function formatEuros(n: number | null | undefined): string {
+  if (!estNombre(n)) return VALEUR_ABSENTE;
   return `${n.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €`;
 }
 
-export function formatPct(n: number): string {
+export function formatPct(n: number | null | undefined): string {
+  if (!estNombre(n)) return VALEUR_ABSENTE;
   const signe = n > 0 ? "+" : "";
   return `${signe}${n.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
 }
