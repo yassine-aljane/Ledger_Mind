@@ -351,6 +351,14 @@ function DashboardPage() {
     [synthese, rapports, declarations, seuil],
   );
 
+  // `/api/declaration` a longtemps partagé sa collection Mongo avec l'agent « jeux de
+  // déclarations », dont les documents n'ont ni `total_ca_declare` ni `statut`. On ne
+  // rend la carte que pour un enregistrement réellement exploitable.
+  const derniereDeclaration = useMemo(
+    () => declarations.find((d) => d != null && typeof d.total_ca_declare === "number") ?? null,
+    [declarations],
+  );
+
   // Un dossier qui ne contient que des brouillons n'a rien à consolider : la synthèse
   // les exclut, donc l'écran doit rester sur son état vide plutôt que d'afficher des
   // graphiques à zéro.
@@ -647,7 +655,7 @@ function DashboardPage() {
           )}
 
           {aDesDonnees && <CarteSante sante={sante} />}
-          {declarations.length > 0 && <CarteDeclaration declaration={declarations[0]} />}
+          {derniereDeclaration && <CarteDeclaration declaration={derniereDeclaration} />}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <Stat
