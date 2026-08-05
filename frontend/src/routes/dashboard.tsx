@@ -281,12 +281,29 @@ function DashboardPage() {
             setLoading(false);
           }
         } catch {
+          // L'identifiant mémorisé peut appartenir à un AUTRE compte (403) ou avoir disparu
+          // (404) : `fetchSessionDetail` vient alors de l'oublier. On redemande donc au
+          // serveur une session qui nous appartient VRAIMENT avant de renoncer — sans cette
+          // seconde tentative, un identifiant périmé vidait le tableau de bord à chaque
+          // rechargement, sans rien expliquer.
+          let recharge: SessionDetail | null = null;
+          try {
+            const miennes = await fetchMySessions();
+            const valide = miennes.find((s) => s.session_id !== sessionId)?.session_id
+              ?? miennes[0]?.session_id;
+            if (valide && valide !== sessionId) {
+              storeSessionId(valide);
+              recharge = await fetchSessionDetail(valide);
+            }
+          } catch {
+            /* aucune session exploitable : on retombe sur le cache ci-dessous */
+          }
+
           // Une session issue de la seule guidance (pas encore de SIREN vérifié) n'existe pas
           // côté orchestrateur : ce n'est pas une erreur pour l'utilisateur, juste un dossier
-          // partiel. On retombe sur le résultat mis en cache par l'écran de diagnostic.
-          const cached = loadCachedDiagnosticResult();
+          // partiel. On retombe alors sur le résultat mis en cache par l'écran de diagnostic.
           if (!cancelled) {
-            setDetail(cached);
+            setDetail(recharge ?? loadCachedDiagnosticResult());
             setLoading(false);
           }
         }
