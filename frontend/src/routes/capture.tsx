@@ -219,6 +219,7 @@ function CapturePage() {
   const detailsRef = useRef<HTMLDivElement>(null);
   const runningRef = useRef(false);
   const [dragging, setDragging] = useState(false);
+  const [depositMode, setDepositMode] = useState<"documents" | "cadeau">("documents");
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [hitlAnswer, setHitlAnswer] = useState("");
   const [hitlSending, setHitlSending] = useState(false);
@@ -339,9 +340,10 @@ function CapturePage() {
     })();
   }, [queue, patch, applyResult, reloadLists]);
 
-  function enqueue(files: FileList | null) {
+  function enqueue(files: FileList | File[] | null) {
     if (!files?.length) return;
-    const added: QueueItem[] = Array.from(files).map((file, i) => ({
+    const list = Array.isArray(files) ? files : Array.from(files);
+    const added: QueueItem[] = list.map((file, i) => ({
       key: `${Date.now()}-${i}-${file.name}`,
       name: file.name,
       file,
@@ -397,7 +399,6 @@ function CapturePage() {
   }
 
   const unified = unifyDocs(invoices, virements, contrats, cadeaux);
-  const openDoc = unified.find((d) => d.document_id === openId);
   const analysing = queue.find((it) => it.status === "analyse");
   const done = queue.filter((it) => TERMINAL.includes(it.status)).length;
   const busy = queue.some((it) => !TERMINAL.includes(it.status));
@@ -411,60 +412,95 @@ function CapturePage() {
             Déposez, on <span className="italic font-normal">s'occupe du reste.</span>
           </>
         }
-        description="PDF ou image — l'agent capture extrait, qualifie et classe chaque facture ou virement automatiquement."
+        description="Factures, virements, contrats et cadeaux — extrait, classé, prêt à justifier."
       />
 
-      {/* Dépôt à gauche, pièces déjà traitées à droite : les deux moitiés de l'écran. */}
       <div className="grid items-start gap-8 lg:grid-cols-2">
         <div className="space-y-5">
-          <h2 className="rule-label text-accent-ink">Déposer des documents</h2>
+          <section className="space-y-3">
+            <h2 className="rule-label text-accent-ink">Déposer</h2>
 
-          <label
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={(e) => {
-              // `dragleave` se déclenche aussi en survolant les enfants : on ne
-              // retire l'état que si le curseur quitte réellement la zone.
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              enqueue(e.dataTransfer.files);
-            }}
-            className={cn(
-              "animate-rise flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed bg-card p-10 text-center transition-all duration-200",
-              dragging
-                ? "border-accent bg-accent/10 ring-2 ring-accent/30"
-                : "border-border hover:border-accent hover:bg-accent/5",
-            )}
-          >
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.xls"
-              className="sr-only"
-              onChange={(e) => enqueue(e.target.files)}
-            />
             <div
-              className={cn(
-                "mb-5 grid size-14 place-items-center rounded-2xl transition-colors",
-                dragging ? "bg-accent/25 text-accent-ink" : "bg-accent/15 text-accent-ink",
-              )}
+              className="flex rounded-2xl border border-border bg-card p-1.5 shadow-soft"
+              role="tablist"
+              aria-label="Type de dépôt"
             >
-              <UploadCloud className="size-6" />
+              <button
+                type="button"
+                role="tab"
+                aria-selected={depositMode === "documents"}
+                onClick={() => setDepositMode("documents")}
+                className={cn(
+                  "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  depositMode === "documents"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Documents
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={depositMode === "cadeau"}
+                onClick={() => setDepositMode("cadeau")}
+                className={cn(
+                  "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  depositMode === "cadeau"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Cadeau / dotation
+              </button>
             </div>
-            <p className="text-base font-medium">
-              {dragging ? "Relâchez pour analyser" : "Glissez vos documents ici"}
-            </p>
-            <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-              factures, virements et contrats · plusieurs fichiers à la fois · le type est
-              reconnu automatiquement · 20 Mo par pièce
-            </p>
-          </label>
+
+            {depositMode === "documents" ? (
+              <label
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  enqueue(e.dataTransfer.files);
+                }}
+                className={cn(
+                  "flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-border bg-card p-8 text-center shadow-soft transition-all duration-200",
+                  dragging ? "bg-accent/10" : "hover:bg-accent/5",
+                )}
+              >
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.xls"
+                  className="sr-only"
+                  onChange={(e) => enqueue(e.target.files)}
+                />
+                <div
+                  className={cn(
+                    "mb-4 grid size-12 place-items-center rounded-2xl transition-colors",
+                    dragging ? "bg-accent/25 text-accent-ink" : "bg-accent/15 text-accent-ink",
+                  )}
+                >
+                  <UploadCloud className="size-5" />
+                </div>
+                <p className="text-sm font-medium">
+                  {dragging ? "Relâchez pour analyser" : "Glissez vos documents ici"}
+                </p>
+                <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
+                  Factures, virements, contrats · PDF ou image · 20 Mo max
+                </p>
+              </label>
+            ) : (
+              <CadeauDeclaration onDeclare={() => void reloadLists()} />
+            )}
+          </section>
 
           {queue.length > 0 && (
             <section className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-soft">
@@ -628,16 +664,9 @@ function CapturePage() {
             </form>
           )}
 
-          {/* Le bloc cadeau ferme la colonne, APRÈS tout le flux des justificatifs
-              (dépôt → traitement → confirmation de lecture). Un cadeau n'est pas un
-              document à lire : il ne passe ni par la file d'analyse ni par cette
-              confirmation, et s'intercaler au milieu couperait la chaîne en deux. Son
-              propre suivi d'analyse se rend sous lui, dans le composant. */}
-          <CadeauDeclaration onDeclare={() => void reloadLists()} />
         </div>
 
-        {/* Factures et virements vivent dans une seule liste, triée par date d'ajout : du
-            point de vue de l'utilisateur, ce sont « ses documents », pas deux registres. */}
+        {/* Colonne bibliothèque */}
         <div className="space-y-5">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="rule-label text-accent-ink">Mes documents</h2>
@@ -747,11 +776,10 @@ function CapturePage() {
           ref={detailsRef}
           className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft"
         >
-          <div className="mb-5 flex items-start justify-between gap-3 border-b border-border pb-4">
-            <div className="min-w-0">
-              <p className="rule-label text-muted-foreground">Détails du document</p>
-              <p className="truncate text-sm font-medium">{openDoc?.label ?? "Document"}</p>
-            </div>
+          {/* Pas de titre ici : la fiche s'annonce elle-même, juste dessous, avec sa
+              pastille de nature. Le répéter donnait deux fois la même ligne. */}
+          <div className="mb-5 flex items-center justify-between gap-3 border-b border-border pb-4">
+            <p className="rule-label text-muted-foreground">Détails du document</p>
             <Button
               variant="outline"
               size="sm"

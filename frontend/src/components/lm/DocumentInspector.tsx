@@ -582,6 +582,18 @@ export function DocumentInspector({ documentId, onChat }: Props) {
   const ct = detail.contract;
   const gift = detail.cadeau;
 
+  /**
+   * Sous-titre de la fiche : la description longue du cadeau.
+   *
+   * Écartée si le titre en est déjà tiré — sans objet reconnu, `libelleCadeau` se rabat
+   * sur la description, et on l'écrirait alors deux fois de suite.
+   */
+  const descriptionCadeau = gift?.description?.trim();
+  const sousTitre =
+    isCadeau && descriptionCadeau && !label.startsWith(descriptionCadeau)
+      ? descriptionCadeau
+      : null;
+
   // Un IBAN signalé par un contrôle est mis en évidence dans la fiche.
   const flagged = (value: string | null | undefined) =>
     Boolean(value && detail.incoherences?.some((i) => i.includes(value)));
@@ -838,16 +850,21 @@ export function DocumentInspector({ documentId, onChat }: Props) {
 
   return (
     <div className="animate-rise space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <Badge
-            variant={
-              isVirement ? "info" : isContrat ? "warning" : isCadeau ? "accent" : "success"
-            }
-          >
-            {isVirement ? "Virement" : isContrat ? "Contrat" : isCadeau ? "Cadeau" : "Facture"}
-          </Badge>
-          <h2 className="truncate text-lg">{label}</h2>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <Badge
+              variant={
+                isVirement ? "info" : isContrat ? "warning" : isCadeau ? "accent" : "success"
+              }
+            >
+              {isVirement ? "Virement" : isContrat ? "Contrat" : isCadeau ? "Cadeau" : "Facture"}
+            </Badge>
+            <h2 className="truncate text-lg">{label}</h2>
+          </div>
+          {/* La description complète prend la deuxième ligne — le titre reste
+              « objet reconnu — marque » et n'est écrit qu'une fois. */}
+          {sousTitre && <p className="line-clamp-2 text-sm text-muted-foreground">{sousTitre}</p>}
         </div>
         {onChat && (
           <Button variant="outline" size="sm" onClick={() => onChat(label)}>
