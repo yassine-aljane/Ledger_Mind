@@ -421,88 +421,86 @@ function CapturePage() {
           <section className="space-y-3">
             <h2 className="rule-label text-accent-ink">Déposer</h2>
 
-            <div className="animate-rise overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-              <div
-                className="flex border-b border-border p-1.5"
-                role="tablist"
-                aria-label="Type de dépôt"
+            <div
+              className="flex rounded-2xl border border-border bg-card p-1.5 shadow-soft"
+              role="tablist"
+              aria-label="Type de dépôt"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={depositMode === "documents"}
+                onClick={() => setDepositMode("documents")}
+                className={cn(
+                  "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  depositMode === "documents"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={depositMode === "documents"}
-                  onClick={() => setDepositMode("documents")}
-                  className={cn(
-                    "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-                    depositMode === "documents"
-                      ? "bg-secondary text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Documents
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={depositMode === "cadeau"}
-                  onClick={() => setDepositMode("cadeau")}
-                  className={cn(
-                    "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-                    depositMode === "cadeau"
-                      ? "bg-secondary text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Cadeau / dotation
-                </button>
-              </div>
-
-              {depositMode === "documents" ? (
-                <label
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragging(false);
-                    enqueue(e.dataTransfer.files);
-                  }}
-                  className={cn(
-                    "flex min-h-56 cursor-pointer flex-col items-center justify-center p-8 text-center transition-all duration-200",
-                    dragging ? "bg-accent/10" : "hover:bg-accent/5",
-                  )}
-                >
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    multiple
-                    accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.xls"
-                    className="sr-only"
-                    onChange={(e) => enqueue(e.target.files)}
-                  />
-                  <div
-                    className={cn(
-                      "mb-4 grid size-12 place-items-center rounded-2xl transition-colors",
-                      dragging ? "bg-accent/25 text-accent-ink" : "bg-accent/15 text-accent-ink",
-                    )}
-                  >
-                    <UploadCloud className="size-5" />
-                  </div>
-                  <p className="text-sm font-medium">
-                    {dragging ? "Relâchez pour analyser" : "Glissez vos documents ici"}
-                  </p>
-                  <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
-                    Factures, virements, contrats · PDF ou image · 20 Mo max
-                  </p>
-                </label>
-              ) : (
-                <GiftCadeauDrop onFiles={enqueue} variant="panel" />
-              )}
+                Documents
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={depositMode === "cadeau"}
+                onClick={() => setDepositMode("cadeau")}
+                className={cn(
+                  "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  depositMode === "cadeau"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Cadeau / dotation
+              </button>
             </div>
+
+            {depositMode === "documents" ? (
+              <label
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  enqueue(e.dataTransfer.files);
+                }}
+                className={cn(
+                  "flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-border bg-card p-8 text-center shadow-soft transition-all duration-200",
+                  dragging ? "bg-accent/10" : "hover:bg-accent/5",
+                )}
+              >
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.xls"
+                  className="sr-only"
+                  onChange={(e) => enqueue(e.target.files)}
+                />
+                <div
+                  className={cn(
+                    "mb-4 grid size-12 place-items-center rounded-2xl transition-colors",
+                    dragging ? "bg-accent/25 text-accent-ink" : "bg-accent/15 text-accent-ink",
+                  )}
+                >
+                  <UploadCloud className="size-5" />
+                </div>
+                <p className="text-sm font-medium">
+                  {dragging ? "Relâchez pour analyser" : "Glissez vos documents ici"}
+                </p>
+                <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
+                  Factures, virements, contrats · PDF ou image · 20 Mo max
+                </p>
+              </label>
+            ) : (
+              <CadeauDeclaration onDeclare={() => void reloadLists()} />
+            )}
           </section>
 
           {queue.length > 0 && (
@@ -667,12 +665,6 @@ function CapturePage() {
             </form>
           )}
 
-          {/* Le bloc cadeau ferme la colonne, APRÈS tout le flux des justificatifs
-              (dépôt → traitement → confirmation de lecture). Un cadeau n'est pas un
-              document à lire : il ne passe ni par la file d'analyse ni par cette
-              confirmation, et s'intercaler au milieu couperait la chaîne en deux. Son
-              propre suivi d'analyse se rend sous lui, dans le composant. */}
-          <CadeauDeclaration onDeclare={() => void reloadLists()} />
         </div>
 
         {/* Colonne bibliothèque */}
