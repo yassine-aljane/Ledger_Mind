@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,6 +9,7 @@ import {
   Check,
   ExternalLink,
   Loader2,
+  RefreshCw,
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -30,10 +32,12 @@ import {
 import {
   fetchFilVeille,
   fetchNotificationsVeille,
+  lancerCollecteVeille,
   majPreferencesVeille,
   marquerToutVeilleLu,
   type Nouveaute,
   type PreferencesVeille,
+  type StatsCatalogue,
 } from "@/lib/veille-api";
 import { usePlan } from "@/lib/plan";
 import { cn } from "@/lib/utils";
@@ -48,6 +52,9 @@ import {
 } from "@/lib/echeancier-api";
 
 type Vue = "agenda" | "veille" | "historique";
+
+/** Signal « le compteur a changé » — la vue Veille l'émet, la cloche l'écoute. */
+const EVT_VEILLE_LUE = "lm.veille.lue";
 
 const COULEUR_STATUT: Record<Echeance["statut"], string> = {
   en_retard: "bg-destructive",
@@ -652,20 +659,70 @@ const AUTORITE_LABEL: Record<number, string> = {
   3: "Presse spécialisée",
 };
 
-function VeilleCard({ n }: { n: Nouveaute }) {
+/**
+ * Trois âges, trois traitements visuels — c'est tout l'intérêt d'une veille : distinguer d'un
+ * coup d'œil ce qui vient de tomber de ce qui traîne depuis un mois.
+ *
+ *   `nouveau` — notifié et jamais lu à l'arrivée sur l'écran : liseré safran plein + pastille
+ *   `recent`  — notifié dans les 7 jours, déjà lu : liseré bleu discret, sans pastille
+ *   `ancien`  — le reste : bordure normale
+ */
+type AgeVeille = "nouveau" | "recent" | "ancien";
+
+const FENETRE_RECENTE_J = 7;
+
+function joursDepuis(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return (Date.now() - t) / 86_400_000;
+}
+
+function ageDe(n: Nouveaute, nouveaux: Set<string> | null): AgeVeille {
+  if (nouveaux?.has(n.id)) return "nouveau";
+  const jours = joursDepuis(n.date_notifiee);
+  if (jours !== null && jours <= FENETRE_RECENTE_J) return "recent";
+  return "ancien";
+}
+
+const BORDURE_AGE: Record<AgeVeille, string> = {
+  // Le repère porte sur la BORDURE, pas sur le fond : un aplat coloré rendrait le résumé moins
+  // lisible, alors que c'est justement lui qu'on vient lire.
+  nouveau: "border-accent/60 shadow-[0_0_0_1px_var(--accent)] ring-1 ring-accent/20",
+  recent: "border-info/40",
+  ancien: "border-border",
+};
+
+function VeilleCard({ n, age = "ancien" }: { n: Nouveaute; age?: AgeVeille }) {
   const impact = IMPACT_VEILLE[n.impact] ?? IMPACT_VEILLE.information;
   const source = n.sources[0];
   return (
-    <div className="card-hover animate-rise space-y-3 rounded-2xl border border-border bg-card p-5 shadow-soft">
+    <div
+      className={cn(
+        "card-hover animate-rise space-y-3 rounded-2xl border bg-card p-5 shadow-soft",
+        BORDURE_AGE[age],
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <Badge variant={impact.variante}>{impact.label}</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={impact.variante}>{impact.label}</Badge>
+          {age === "nouveau" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 font-mono text-[0.55rem] font-semibold uppercase tracking-[0.12em] text-accent-foreground">
+              <Sparkles className="size-2.5" /> Nouveau
+            </span>
+          )}
+          {age === "recent" && (
+            <span className="rule-label rounded-full border border-info/40 px-2 py-0.5 text-info-ink">
+              Cette semaine
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {n.echeance && (
             <span className="num text-xs text-muted-foreground">
               Avant le {new Date(`${n.echeance}T00:00:00`).toLocaleDateString("fr-FR")}
             </span>
           )}
-          {!n.lue && n.notifiee && <span className="size-1.5 rounded-full bg-accent" />}
         </div>
       </div>
 
@@ -705,11 +762,48 @@ function VeilleCard({ n }: { n: Nouveaute }) {
   );
 }
 
+/**
+ * Les identifiants repérés comme neufs, mémorisés pour la durée de l'onglet.
+ *
+ * Sans cette mémoire, le repère « Nouveau » ne survivait pas à une fermeture du panneau : le
+ * Sheet démonte son contenu, la photo était reprise à zéro, et comme tout venait d'être marqué
+ * lu, plus rien n'apparaissait comme neuf trente secondes après. `sessionStorage` plutôt que
+ * `localStorage` : « nouveau depuis que je suis arrivé » n'a pas de sens d'un jour à l'autre.
+ */
+const CLE_NOUVEAUX = "lm.veille.nouveaux";
+
+function lireNouveauxMemorises(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const brut = window.sessionStorage.getItem(CLE_NOUVEAUX);
+    return new Set<string>(brut ? (JSON.parse(brut) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function memoriserNouveaux(ids: Set<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(CLE_NOUVEAUX, JSON.stringify([...ids]));
+  } catch {
+    /* quota ou mode privé : le repère est un confort, pas une donnée */
+  }
+}
+
 function VueVeille() {
   const [nouveautes, setNouveautes] = useState<Nouveaute[]>([]);
   const [prefs, setPrefs] = useState<PreferencesVeille | null>(null);
+  const [catalogue, setCatalogue] = useState<StatsCatalogue | null>(null);
+  const [profilIncomplet, setProfilIncomplet] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [collecteEnCours, setCollecteEnCours] = useState(false);
+  // Ce qui était non lu à l'ARRIVÉE sur l'écran. On le fige : la lecture marque aussitôt tout
+  // comme lu côté serveur, si bien que `n.lue` ne peut plus servir à distinguer quoi que ce
+  // soit une fois la page affichée. Sans cette photo, le liseré « Nouveau » ne s'afficherait
+  // jamais — le compteur et le repère visuel se détruiraient l'un l'autre.
+  const [nouveauxIds, setNouveauxIds] = useState<Set<string>>(lireNouveauxMemorises);
 
   function charger() {
     setLoading(true);
@@ -717,7 +811,23 @@ function VueVeille() {
       .then((fil) => {
         setNouveautes(fil.nouveautes);
         setPrefs(fil.preferences);
+        setCatalogue(fil.catalogue ?? null);
+        setProfilIncomplet(Boolean(fil.profil_incomplet));
         setErreur(null);
+
+        const neufs = fil.nouveautes.filter((n) => n.notifiee && !n.lue).map((n) => n.id);
+        if (neufs.length > 0) {
+          setNouveauxIds((precedent) => {
+            const fusion = new Set([...precedent, ...neufs]);
+            memoriserNouveaux(fusion);
+            return fusion;
+          });
+          // Une fois la photo prise, et SEULEMENT après, on éteint le compteur — et seulement
+          // sur ce qui est réellement affiché.
+          marquerToutVeilleLu(neufs)
+            .then(() => window.dispatchEvent(new CustomEvent(EVT_VEILLE_LUE)))
+            .catch(() => {});
+        }
       })
       .catch((e) => setErreur(e instanceof Error ? e.message : "Erreur de chargement."))
       .finally(() => setLoading(false));
@@ -731,6 +841,23 @@ function VueVeille() {
     charger();
   }
 
+  async function collecter() {
+    setCollecteEnCours(true);
+    try {
+      const res = await lancerCollecteVeille();
+      toast.success(
+        res.nouvelles > 0
+          ? `${res.nouvelles} nouveauté${res.nouvelles > 1 ? "s" : ""} collectée${res.nouvelles > 1 ? "s" : ""}`
+          : "Collecte terminée — rien de neuf chez les sources officielles.",
+      );
+      charger();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Collecte impossible.");
+    } finally {
+      setCollecteEnCours(false);
+    }
+  }
+
   if (loading) return <EtatChargement>Chargement de la veille…</EtatChargement>;
 
   if (erreur) {
@@ -742,6 +869,7 @@ function VueVeille() {
   }
 
   const nonLues = nouveautes.filter((n) => n.notifiee && !n.lue).length;
+  const catalogueVide = (catalogue?.actualites ?? 0) === 0;
 
   return (
     <div className="space-y-4">
@@ -771,7 +899,8 @@ function VueVeille() {
             size="sm"
             variant="ghost"
             onClick={async () => {
-              await marquerToutVeilleLu();
+              await marquerToutVeilleLu(nouveautes.map((n) => n.id));
+              window.dispatchEvent(new CustomEvent(EVT_VEILLE_LUE));
               charger();
             }}
           >
@@ -780,17 +909,64 @@ function VueVeille() {
         )}
       </div>
 
+      {/* Un profil sans champ discriminant reçoit les mêmes obligations universelles que tout le
+          monde : la veille paraît alors identique d'un compte à l'autre, et on ne comprend pas
+          pourquoi. Le dire est plus honnête que de laisser croire à un écran figé. */}
+      {profilIncomplet && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-accent/8 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <span className="font-medium text-foreground">Veille non personnalisée.</span> Sans
+            régime ni catégorie fiscale connus, vous ne recevez que les obligations qui
+            s&apos;imposent à tous.
+          </p>
+          <Button asChild size="sm" variant="outline" className="shrink-0">
+            <Link to="/onboarding/verification">Compléter mon profil</Link>
+          </Button>
+        </div>
+      )}
+
       {nouveautes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm leading-relaxed text-muted-foreground">
-          Aucune nouveauté réglementaire pour votre situation pour l&apos;instant — vous ne verrez
-          ici que ce qui change réellement quelque chose pour vous.
+        <div className="space-y-4 rounded-2xl border border-dashed border-border p-8 text-center">
+          {/* Deux causes opposées derrière un même écran vide. Les confondre rendait la veille
+              impossible à diagnostiquer : « rien ne me concerne » et « rien n'a été collecté »
+              appellent des gestes différents. */}
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {catalogueVide
+              ? "Le catalogue de veille est vide : aucune collecte n'a encore abouti sur les sources officielles."
+              : "Aucune nouveauté réglementaire pour votre situation pour l'instant — vous ne verrez ici que ce qui change réellement quelque chose pour vous."}
+          </p>
+          {catalogueVide && (
+            <Button size="sm" variant="outline" onClick={collecter} disabled={collecteEnCours}>
+              {collecteEnCours ? (
+                <>
+                  <Loader2 className="animate-spin" /> Collecte en cours…
+                </>
+              ) : (
+                <>
+                  <RefreshCw /> Lancer une collecte
+                </>
+              )}
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
           {nouveautes.map((n) => (
-            <VeilleCard key={n.id} n={n} />
+            <VeilleCard key={n.id} n={n} age={ageDe(n, nouveauxIds)} />
           ))}
         </div>
+      )}
+
+      {catalogue?.derniere_collecte && (
+        <p className="rule-label pt-1 text-center text-muted-foreground">
+          Dernière collecte&nbsp;:{" "}
+          {new Date(catalogue.derniere_collecte).toLocaleDateString("fr-FR", {
+            day: "numeric",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </p>
       )}
     </div>
   );
@@ -822,18 +998,42 @@ export function CentreActionsButton({
   const [nonLues, setNonLues] = useState(0);
   const plan = usePlan();
 
+  // Point de comparaison du toast. Dans un `ref`, pas dans une variable de l'effet : l'effet se
+  // rejoue à chaque ouverture ou fermeture du panneau, ce qui remettait le repère à `null` et
+  // empêchait à tout jamais la détection d'une arrivée. `null` = première lecture, on affiche le
+  // compteur sans rien annoncer — sinon chaque connexion sonnerait pour du déjà-connu.
+  const precedent = useRef<number | null>(null);
+
   // Compteur de nouveautés non lues : sans lui, une veille qui trouve quelque chose reste
   // invisible tant que personne n'ouvre le panneau — donc invisible pour de bon.
   // La lecture est sans coût côté serveur (rien qu'une requête Mongo, aucun appel LLM).
   useEffect(() => {
     if (plan !== "premium" || !estCloche) return;
     let annule = false;
+
     const rafraichir = () =>
       fetchNotificationsVeille(true)
         .then((r) => {
-          if (!annule) setNonLues(r.non_lues);
+          if (annule) return;
+          if (precedent.current !== null && r.non_lues > precedent.current) {
+            const arrivees = r.non_lues - precedent.current;
+            toast.info(
+              arrivees > 1
+                ? `${arrivees} nouveautés réglementaires vous concernent`
+                : "Une nouveauté réglementaire vous concerne",
+              { description: "Ouvrez la veille pour la consulter." },
+            );
+          }
+          precedent.current = r.non_lues;
+          setNonLues(r.non_lues);
         })
         .catch(() => {});
+
+    const remiseAZero = () => {
+      precedent.current = 0;
+      setNonLues(0);
+    };
+    window.addEventListener(EVT_VEILLE_LUE, remiseAZero);
     rafraichir();
     // Le cycle de veille tourne côté serveur : on resynchronise périodiquement plutôt que
     // d'attendre un rechargement de page.
@@ -841,6 +1041,7 @@ export function CentreActionsButton({
     return () => {
       annule = true;
       clearInterval(timer);
+      window.removeEventListener(EVT_VEILLE_LUE, remiseAZero);
     };
   }, [plan, ouvert, estCloche]);
 

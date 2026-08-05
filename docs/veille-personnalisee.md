@@ -45,11 +45,24 @@ sur le chemin de lecture : ni latence, ni coût, ni variation d'un chargement à
 **Le plafond ne fait rien disparaître.** Au-delà de 20, les nouveautés restent consultables dans
 l'onglet Veille ; seule la notification est retenue.
 
-**Un profil vide ne notifie rien.** Sans champ discriminant, envoyer des notifications reviendrait
-à diffuser une lettre d'information générique.
+**Un profil vide ne reçoit que l'universel.** Sans champ discriminant, on ne notifie que les
+mesures qui ne restreignent leur application à personne (`est_universelle`). Se taire complètement
+priverait l'utilisateur de l'information la plus utile qu'on ait à lui donner — une obligation qui
+s'impose à tous — mais lui envoyer des mesures ciblées reviendrait à diffuser une lettre
+d'information générique.
 
-**Rien n'est supprimé.** Au-delà de 180 jours, une nouveauté est marquée `perime` et affichée avec
-un avertissement — jamais retirée.
+**La distribution a lieu à CHAQUE lecture**, aussi bien sur le fil que sur `/notifications`. C'est
+ce qui permet à un compte créé après la collecte de recevoir ses notifications. Elle est
+déterministe et sans réseau : quelques requêtes Mongo, aucun appel LLM.
+
+**Rien n'est supprimé.** Au-delà de 180 jours, une nouveauté est marquée `perime`. Elle sort du fil
+et du décompte — la laisser visible faisait paraître l'écran figé, et la laisser dans le compteur
+donnait une pastille impossible à éteindre — mais elle reste en base, consultable via
+`nouveautes_actives(inclure_perimees=True)`.
+
+**Le compteur compte ce que l'écran montre.** Une nouveauté périmée ou dont l'échéance est passée
+est exclue des deux à la fois. Toute divergence entre les deux produit une pastille qu'aucun geste
+de l'utilisateur ne peut éteindre.
 
 ## Ce qui n'est PAS garanti
 
@@ -91,16 +104,22 @@ derrière l'agent pédagogue. Sujet différent, coexistence volontaire.
 
 ## Exploitation
 
-La veille reste **désactivée par défaut** (`VEILLE_ENABLED=false`) : elle sort sur le réseau et
-appelle le LLM. Pour l'activer :
-
 ```bash
-VEILLE_ENABLED=true
+VEILLE_ENABLED=true   # défaut
 VEILLE_CRON_HOUR=6
 ```
 
-Le planificateur enchaîne alors le cycle historique (corpus RAG + contrôle des seuils) puis le
-cycle personnalisé. `POST /api/veille/run` déclenche un cycle à la main, pour diagnostic.
+Le planificateur enchaîne le cycle historique (corpus RAG + contrôle des seuils) puis le cycle
+personnalisé. `POST /api/veille/run` déclenche un cycle à la main, pour diagnostic.
+
+**Amorçage paresseux.** Le planificateur ne passe qu'une fois par jour, à heure fixe. Un serveur
+redémarré dans la journée — le cas normal en développement — ne collectait donc jamais, et le
+catalogue restait figé sur ce qu'un lancement manuel avait produit : la veille paraissait
+statique et identique d'un compte à l'autre. À la première lecture, si le catalogue est vide ou
+vieux de plus de `DELAI_RAFRAICHISSEMENT_H` (12 h), une collecte part en tâche de fond. Deux
+garde-fous : un verrou de processus contre les cycles concurrents, et la mémoire de la dernière
+**tentative** — sans elle, un MCP indisponible ferait relancer une collecte à chaque sondage de la
+cloche, toutes les cinq minutes.
 
 ## Points ouverts
 

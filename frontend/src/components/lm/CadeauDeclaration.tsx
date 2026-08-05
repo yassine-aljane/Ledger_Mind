@@ -1,12 +1,32 @@
 /**
  * Déclaration d'un cadeau / avantage en nature reçu d'une marque (« gifting »).
  *
- * La photo passe au modèle de vision, qui extrait objet, marque et valeur.
- * L'utilisateur RELIT et confirme — il ne remplit pas à la main sauf correction.
+ * Human-in-the-loop assumé de bout en bout : la photo passe au modèle de vision, qui
+ * PROPOSE un objet et une valeur ; l'utilisateur relit, corrige, puis déclare. Rien
+ * n'est enregistré tant qu'il n'a pas validé, et le serveur refuse une déclaration
+ * qui ne porte pas sa confirmation.
+ *
+ * D'où deux partis pris d'interface :
+ *  - la suggestion s'affiche dans un encart distinct du formulaire, jamais comme un
+ *    champ déjà « bon » : le lecteur doit voir d'un coup d'œil ce qui vient de la
+ *    machine et ce qu'il a saisi lui-même ;
+ *  - le niveau de confiance est écrit en toutes lettres, pas seulement porté par une
+ *    couleur, et une confiance basse ne pré-remplit pas le montant.
  */
 
-import { useState } from "react";
-import { CheckCircle2, Gift, Info, Loader2, Pencil, X, XCircle } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  Camera,
+  Check,
+  CheckCircle2,
+  Gift,
+  Info,
+  Loader2,
+  TriangleAlert,
+  X,
+  XCircle,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GiftCadeauDrop } from "@/components/lm/GiftCadeauDrop";
 import { cn } from "@/lib/utils";
@@ -27,13 +47,18 @@ const CONFIANCE_LABEL: Record<string, string> = {
   faible: "confiance faible",
 };
 
-/** Pastille de confiance : la couleur porte le niveau, le texte le nomme. */
-const TON_CONFIANCE: Record<string, string> = {
-  haute: "bg-success",
-  moyenne: "bg-warning",
-  faible: "bg-destructive",
-};
-
+/**
+ * Montant pré-rempli dans le champ, quelle que soit la confiance.
+ *
+ * Le champ reste entièrement modifiable et l'encart d'avertissement demeure au-dessus :
+ * partir d'un chiffre à corriger fait gagner du temps sur la quasi-totalité des cas, là
+ * où un champ vide oblige à retaper une valeur que le modèle vient d'afficher.
+ *
+ * À défaut de valeur unique, on prend le MILIEU de la fourchette : c'est le seul point
+ * qu'on puisse en tirer sans privilégier arbitrairement le bas ou le haut. Le libellé
+ * sous le champ dit d'où vient le chiffre, pour qu'un milieu de fourchette large ne
+ * passe jamais pour un prix constaté.
+ */
 function valeurPreRemplie(est: CaptureEstimationCadeau): string {
   if (est.valeur_estimee != null) return String(Math.round(est.valeur_estimee));
   if (est.fourchette_min != null && est.fourchette_max != null) {
@@ -120,15 +145,6 @@ function AnalysePhoto({ nom, phase }: { nom: string; phase: PhasePhoto }) {
   );
 }
 
-function LigneExtrait({ label, valeur }: { label: string; valeur: string }) {
-  return (
-    <div className="border-b border-border/60 py-2.5 last:border-0 sm:grid sm:grid-cols-[7rem_1fr] sm:items-baseline sm:gap-4">
-      <dt className="rule-label text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm leading-relaxed text-foreground sm:mt-0">{valeur}</dd>
-    </div>
-  );
-}
-
 export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
   const [photo, setPhoto] = useState<File | null>(null);
   const [apercu, setApercu] = useState<string | null>(null);
@@ -141,8 +157,6 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
   const [dateReception, setDateReception] = useState(todayIso());
   const [valeur, setValeur] = useState("");
   const [contrepartie, setContrepartie] = useState("");
-  const [corriger, setCorriger] = useState(false);
-  const [noteOuverte, setNoteOuverte] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,8 +173,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
     setDateReception(todayIso());
     setValeur("");
     setContrepartie("");
-    setCorriger(false);
-    setNoteOuverte(false);
+    if (photoRef.current) photoRef.current.value = "";
   }
 
   async function handlePhoto(fichier: File | null) {
@@ -251,184 +264,164 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
   const extraitPret = phasePhoto === "termine" && Boolean(estimation);
 
   return (
-    <div className="space-y-5">
-      {/* Avant import, la carte entière réagit au survol comme la zone de dépôt
-          « Documents » — même lavis accent, jusque sur la partie claire du haut. */}
-      <div
-        className={cn(
-          "overflow-hidden rounded-2xl border border-border bg-card shadow-soft",
-          !photo && "transition-colors duration-200 hover:bg-accent/5",
+    <>
+      {/* Même réaction au survol que la zone de dépôt voisine : les deux blocs sont
+          deux façons de faire entrer une pièce, ils doivent se comporter pareil. */}
+      <section className="animate-rise space-y-5 rounded-2xl border border-border bg-card p-6 shadow-soft transition-all duration-200 hover:border-accent hover:bg-accent/5">
+      <div>
+        <h3 className="rule-label flex items-center gap-1.5 text-accent-ink">
+          <Gift className="size-3" aria-hidden />
+          Cadeaux et avantages en nature
+        </h3>
+        <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+          Un partenariat rémunéré en produits ou services («&nbsp;gifting&nbsp;») se déclare
+          à sa valeur marchande — le prix public TTC — et entre au livre des recettes comme
+          un encaissement.
+        </p>
+      </div>
+
+      {/* Photo : point de départ facultatif. Sans elle, le formulaire reste saisissable. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          ref={photoRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="rounded-full border-dashed"
+          disabled={estimating}
+          onClick={() => photoRef.current?.click()}
+        >
+          {estimating ? <Loader2 className="animate-spin" /> : <Camera />}
+          {estimating
+            ? "Analyse de la photo…"
+            : photo
+              ? "Changer la photo"
+              : "Remplir depuis une photo du cadeau"}
+        </Button>
+        {photo && (
+          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="max-w-[12rem] truncate">{photo.name}</span>
+            <button
+              type="button"
+              onClick={reinitialiser}
+              className="text-muted-foreground transition-colors hover:text-destructive"
+              aria-label="Retirer la photo"
+            >
+              <X className="size-3.5" />
+            </button>
+          </span>
         )}
-      >
-        <div className="space-y-4 border-b border-border px-5 pb-4 pt-5">
-          <h3 className="rule-label flex items-center gap-1.5 text-accent-ink">
-            <Gift className="size-3" aria-hidden />
-            Cadeaux et avantages en nature
-          </h3>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Un partenariat rémunéré en produits ou services («&nbsp;gifting&nbsp;») se déclare
-            à sa valeur marchande — le prix public TTC — et entre au livre des recettes comme
-            un encaissement.
+      </div>
+
+      {apercu && (
+        <img
+          src={apercu}
+          alt="Aperçu du cadeau déposé"
+          className="max-h-40 rounded-xl border border-border object-contain"
+        />
+      )}
+
+
+      {/* La suggestion vit dans son propre encart, séparée des champs : ce qui vient
+          de la machine ne doit jamais se confondre avec ce que l'utilisateur déclare. */}
+      {estimation && (
+        <div
+          className={cn(
+            "space-y-2 rounded-xl border p-4",
+            estimation.confiance === "haute"
+              ? "border-success/40 bg-success/8"
+              : "border-warning/40 bg-warning/8",
+          )}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={estimation.confiance === "haute" ? "success" : "warning"}>
+              {estimation.confiance === "haute" ? <Check /> : <TriangleAlert />}
+              Suggestion · {CONFIANCE_LABEL[estimation.confiance] ?? estimation.confiance}
+            </Badge>
+            <span className="text-xs font-medium text-foreground">à vérifier avant d&apos;ajouter</span>
+          </div>
+          <p className="text-sm leading-relaxed text-foreground">{estimation.message}</p>
+          {estimation.fourchette_min != null && estimation.fourchette_max != null && (
+            <p className="num text-xs text-muted-foreground">
+              Fourchette estimée : {Math.round(estimation.fourchette_min)}–
+              {Math.round(estimation.fourchette_max)} €
+            </p>
+          )}
+          <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 size-3 shrink-0" aria-hidden />
+            {estimation.avertissement}
           </p>
         </div>
+      )}
 
-        <GiftCadeauDrop
-          onFiles={onGiftFiles}
-          variant="panel"
-          disabled={estimating || saving}
-          preview={apercu}
-          fileName={photo?.name ?? null}
-          busy={estimating}
-        />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Champ label="Date reçue" htmlFor="cadeau-date">
+            <input
+              id="cadeau-date"
+              type="date"
+              value={dateReception}
+              onChange={(e) => setDateReception(e.target.value)}
+              className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+            />
+          </Champ>
+          <Champ label="Description" htmlFor="cadeau-description" requis>
+            <input
+              id="cadeau-description"
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="ex. bracelet et bague assortis"
+              className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+            />
+          </Champ>
+          <Champ label="Marque / client" htmlFor="cadeau-marque">
+            <input
+              id="cadeau-marque"
+              type="text"
+              value={marque}
+              onChange={(e) => setMarque(e.target.value)}
+              placeholder="ex. Youhave Jewellery"
+              className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+            />
+          </Champ>
+          <Champ label="Valeur TTC (€)" htmlFor="cadeau-valeur" requis>
+            <input
+              id="cadeau-valeur"
+              type="number"
+              min="0"
+              step="0.01"
+              value={valeur}
+              onChange={(e) => setValeur(e.target.value)}
+              placeholder="0,00"
+              aria-describedby="cadeau-valeur-aide"
+              className="input-boxed num w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+            />
+            <p id="cadeau-valeur-aide" className="mt-1.5 text-xs text-muted-foreground">
+              {valeurValide
+                ? origineValeur(estimation, valeurNombre)
+                : "Prix public TTC de l'objet à l'état neuf."}
+            </p>
+          </Champ>
+        </div>
 
-        {photo && (
-          <div className="flex flex-wrap items-center gap-3 border-t border-border px-5 py-3">
-            <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              <span className="max-w-56 truncate">{photo.name}</span>
-              <button
-                type="button"
-                onClick={reinitialiser}
-                disabled={estimating || saving}
-                className="text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
-                aria-label="Retirer la photo"
-              >
-                <X className="size-3.5" />
-              </button>
-            </span>
-          </div>
-        )}
-
-        {extraitPret && estimation && (
-          <form onSubmit={handleSubmit} className="space-y-5 border-t border-border p-5">
-            {/* Ligne d'annonce. Un point coloré suffit à dire la confiance : un
-                bandeau d'alerte pleine largeur criait plus fort que le chiffre
-                qu'il qualifie, et une estimation moyenne reste une estimation
-                utilisable — pas un incident. */}
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-              <p className="rule-label text-muted-foreground">Extrait de la photo</p>
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full",
-                    TON_CONFIANCE[estimation.confiance] ?? "bg-muted-foreground",
-                  )}
-                  aria-hidden
-                />
-                {CONFIANCE_LABEL[estimation.confiance] ?? estimation.confiance}
-              </span>
-            </div>
-
-            {/* Le montant d'abord : c'est la seule valeur que l'utilisateur
-                confirme, et celle qui partira en déclaration. */}
-            <div>
-              <p className="font-mono text-4xl font-semibold tracking-tight proportional-nums">
-                {valeurValide ? formatMoney(valeurNombre) : "—"}
-                <span className="ml-2 align-baseline text-lg font-medium text-muted-foreground">
-                  EUR
-                </span>
-              </p>
-              <p className="num mt-1.5 text-xs text-muted-foreground">
-                valeur TTC retenue
-                {estimation.fourchette_min != null && estimation.fourchette_max != null &&
-                  ` · fourchette estimée ${Math.round(estimation.fourchette_min)}–${Math.round(
-                    estimation.fourchette_max,
-                  )} €`}
-              </p>
-            </div>
-
-            {/* Valeurs alignées à gauche : la description tient deux lignes et se
-                lisait mal plaquée contre le bord droit. */}
-            <dl className="border-t border-border pt-1">
-              <LigneExtrait label="Description" valeur={description.trim() || "—"} />
-              <LigneExtrait label="Marque" valeur={marque.trim() || "—"} />
-              <LigneExtrait label="Reçu le" valeur={dateReception || "—"} />
-            </dl>
-
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-              <button
-                type="button"
-                onClick={() => setCorriger((c) => !c)}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-              >
-                <Pencil className="size-3" />
-                {corriger ? "Masquer la correction" : "Corriger une valeur"}
-              </button>
-
-              {/* Le commentaire du modèle et la mention de responsabilité restent
-                  accessibles mais repliés : ils redisent en prose ce que le chiffre
-                  et la fourchette montrent déjà, et n'appellent aucun geste. */}
-              <button
-                type="button"
-                onClick={() => setNoteOuverte((n) => !n)}
-                aria-expanded={noteOuverte}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-              >
-                <Info className="size-3" />
-                D&apos;où vient ce montant ?
-              </button>
-            </div>
-
-            {noteOuverte && (
-              <div className="animate-rise space-y-2 text-xs leading-relaxed text-muted-foreground">
-                {estimation.message && <p>{estimation.message}</p>}
-                <p>{estimation.avertissement}</p>
-              </div>
-            )}
-
-            {corriger && (
-              <div className="grid animate-rise gap-4 sm:grid-cols-2">
-                <Champ label="Date reçue" htmlFor="cadeau-date">
-                  <input
-                    id="cadeau-date"
-                    type="date"
-                    value={dateReception}
-                    onChange={(e) => setDateReception(e.target.value)}
-                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                  />
-                </Champ>
-                <Champ label="Description" htmlFor="cadeau-description" requis>
-                  <input
-                    id="cadeau-description"
-                    type="text"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                  />
-                </Champ>
-                <Champ label="Marque / client" htmlFor="cadeau-marque">
-                  <input
-                    id="cadeau-marque"
-                    type="text"
-                    value={marque}
-                    onChange={(e) => setMarque(e.target.value)}
-                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                  />
-                </Champ>
-                <Champ label="Valeur TTC (€)" htmlFor="cadeau-valeur" requis>
-                  <input
-                    id="cadeau-valeur"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={valeur}
-                    onChange={(e) => setValeur(e.target.value)}
-                    className="input-boxed num w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                  />
-                </Champ>
-                <div className="sm:col-span-2">
-                  <Champ label="Contrepartie attendue (optionnel)" htmlFor="cadeau-contrepartie">
-                    <input
-                      id="cadeau-contrepartie"
-                      type="text"
-                      value={contrepartie}
-                      onChange={(e) => setContrepartie(e.target.value)}
-                      placeholder="ex. 1 post Instagram + 2 stories"
-                      className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                    />
-                  </Champ>
-                </div>
-              </div>
-            )}
+        <Champ label="Contrepartie attendue" htmlFor="cadeau-contrepartie">
+          <input
+            id="cadeau-contrepartie"
+            type="text"
+            value={contrepartie}
+            onChange={(e) => setContrepartie(e.target.value)}
+            placeholder="ex. 1 post Instagram + 2 stories"
+            className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+          />
+        </Champ>
 
             {error && (
               <p

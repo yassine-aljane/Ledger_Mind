@@ -1,8 +1,5 @@
 /**
- * Historique des conversations de l'espace guidance.
- *
- * Chaque échange est repris là où il s'était arrêté (messages, profil, feuille de route et
- * cases cochées sont rechargés depuis le serveur), renommable et supprimable.
+ * Historique des conversations de l'espace guidance / pédagogue.
  */
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -24,6 +21,7 @@ export function ConversationHistory({
   onNew,
   onRename,
   onDelete,
+  showNewButton = true,
 }: {
   conversations: ConversationSummary[];
   currentId: string | null;
@@ -31,6 +29,7 @@ export function ConversationHistory({
   onNew: () => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
+  showNewButton?: boolean;
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -47,12 +46,16 @@ export function ConversationHistory({
   };
 
   return (
-    <aside className="h-fit rounded-2xl border border-border bg-card p-4 shadow-soft lg:sticky lg:top-24">
-      <Button onClick={onNew} className="w-full">
-        <Plus /> Nouvelle conversation
-      </Button>
+    <aside className="h-fit rounded-2xl border border-border bg-card p-4 shadow-soft">
+      {showNewButton && (
+        <Button onClick={onNew} className="w-full rounded-full text-sm">
+          <Plus className="size-3.5" /> Nouvelle conversation
+        </Button>
+      )}
 
-      <p className="rule-label mt-5 text-muted-foreground">Historique</p>
+      <p className={cn("rule-label text-muted-foreground", showNewButton ? "mt-5" : "mt-0")}>
+        Historique
+      </p>
 
       {conversations.length === 0 ? (
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
@@ -68,7 +71,7 @@ export function ConversationHistory({
                   className={cn(
                     "group cursor-pointer rounded-xl border px-3 py-2 transition-all duration-200",
                     active
-                      ? "border-accent bg-accent/10"
+                      ? "border-accent/50 bg-accent/10"
                       : "border-transparent hover:border-border hover:bg-secondary/60",
                   )}
                   onClick={() => renaming !== conv.id && onOpen(conv.id)}
@@ -96,6 +99,7 @@ export function ConversationHistory({
                       </p>
                       <div className="mt-1.5 flex gap-3 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             startRename(conv);
@@ -105,6 +109,7 @@ export function ConversationHistory({
                           <Pencil className="size-3" /> Renommer
                         </button>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             onDelete(conv.id);
