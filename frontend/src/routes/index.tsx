@@ -17,6 +17,7 @@ import {
 } from "react";
 import { HeroVideo } from "@/components/lm/HeroVideo";
 import { MarketingLayout } from "@/components/lm/Marketing";
+import { ProductAssistant } from "@/components/lm/ProductAssistant";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -275,19 +276,20 @@ export const Route = createFileRoute("/")({
 function Landing() {
   return (
     <MarketingLayout>
+      <ProductAssistant />
       {/* ---------- Héros plein cadre (vidéo seule ici) ---------- */}
       <section className="relative min-h-[92vh] overflow-hidden text-ink-foreground">
-        <HeroVideo className="absolute inset-0 size-full object-cover" />
+        <HeroVideo className="absolute inset-0 size-full object-cover brightness-110 saturate-110" />
         <div
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(105deg, color-mix(in oklch, var(--ink) 92%, transparent) 0%, color-mix(in oklch, var(--ink) 72%, transparent) 48%, color-mix(in oklch, var(--ink) 38%, transparent) 100%)",
+              "linear-gradient(105deg, color-mix(in oklch, var(--ink) 68%, transparent) 0%, color-mix(in oklch, var(--ink) 35%, transparent) 48%, color-mix(in oklch, var(--ink) 8%, transparent) 100%)",
           }}
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.1]"
+          className="pointer-events-none absolute inset-0 opacity-[0.04]"
           style={{
             backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
             backgroundSize: "22px 22px",

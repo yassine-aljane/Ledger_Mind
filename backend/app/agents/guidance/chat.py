@@ -1,7 +1,7 @@
 """Génération DÉTERMINISTE de la feuille de route + court message d'accompagnement.
 
 La feuille de route est produite exclusivement par `build_roadmap()` (moteur déterministe,
-seuils versionnés et sourcés). Le LLM ne rédige QUE 2 à 4 phrases d'accompagnement : il ne
+seuils versionnés et sourcés). Le LLM ne rédige QUE 3 à 5 phrases d'accompagnement : il ne
 décide de rien, n'énumère aucune étape, ne cite ni seuil ni source — et sa sortie est validée
 par le code, avec un repli déterministe si elle ne l'est pas.
 """
@@ -38,10 +38,12 @@ Tu reçois : le profil utilisateur, le verdict déterministe (dont les champs `r
 
 # TA MISSION
 
-Produire UNIQUEMENT un message d'accompagnement de 2 à 4 phrases, en français, qui :
-- resitue la situation de la personne dans ses propres termes ;
-- indique que la feuille de route ci-dessous est personnalisée ;
-- invite à la parcourir.
+Produire UNIQUEMENT un message d'accompagnement de 3 à 5 phrases, en français, avec ce rythme :
+- reconnaître concrètement l'activité et la situation déjà décrites, sans les paraphraser de
+  façon vague ;
+- annoncer le cap recommandé et expliquer sobrement pourquoi il correspond au verdict ;
+- désigner UNE seule prochaine action, en reprenant exactement `prochaine_action` ;
+- montrer que la feuille de route personnalisée transforme le diagnostic en trajet réalisable.
 
 Ton : chaleureux, clair, jamais culpabilisant. La personne peut être débutante et inquiète.
 Tutoiement si l'utilisateur tutoie, vouvoiement sinon.
@@ -50,6 +52,8 @@ Tutoiement si l'utilisateur tutoie, vouvoiement sinon.
 
 Uniquement en le déduisant du verdict, sans jamais l'inventer :
 - le régime retenu, nommé simplement ;
+- l'activité et la situation actuelle, uniquement si elles figurent dans `profil_public` ;
+- la prochaine action, uniquement en recopiant le champ `prochaine_action` ;
 - une nuance de durabilité, STRICTEMENT selon le champ `durabilite` :
     • eligible_stable      → aucune alerte. N'évoque NI dépassement NI anticipation.
     • depassement_ponctuel → signale que la situation est à surveiller, sans dramatiser.
@@ -62,7 +66,7 @@ Ne présuppose JAMAIS qu'un chiffre d'affaires élevé implique un dépassement 
 
 # CE QUE TU NE DOIS JAMAIS FAIRE
 
-- énumérer ou résumer les étapes, sous quelque forme que ce soit ;
+- énumérer ou résumer plusieurs étapes, sous quelque forme que ce soit ;
 - produire une liste, une checklist, un tableau ou un comparatif ;
 - citer un seuil, un taux, un montant, un délai, un coût, un formulaire ou une administration ;
 - citer une source (le composant les affiche déjà) ;
@@ -75,12 +79,7 @@ D'ÉTAPES, pas sur le vocabulaire.
 
 # SORTIE
 
-Texte brut. 2 à 4 phrases. Rien d'autre."""
-
-_ACCOMPAGNEMENT_REPLI = (
-    "Voici ta feuille de route personnalisée, adaptée à ta situation. "
-    "Prends-la étape par étape, à ton rythme."
-)
+Texte brut. 3 à 5 phrases. Rien d'autre."""
 
 _EMOJI = re.compile(
     r"[←-⇿①-➿⬀-⯿️]"
@@ -107,9 +106,28 @@ def accompagnement_valide(texte: str) -> tuple[bool, str]:
         return False, "liste/puce"
     if re.search(r"(?m)^\s*#", t):
         return False, "markdown titre"
-    if _nb_phrases(t) > 4:
-        return False, "plus de 4 phrases"
+    phrases = _nb_phrases(t)
+    if phrases < 3:
+        return False, "moins de 3 phrases"
+    if phrases > 5:
+        return False, "plus de 5 phrases"
     return True, ""
+
+
+def _accompagnement_repli(profil: dict, roadmap: dict) -> str:
+    """Repli utile et personnalisé : même sans LLM, la sortie nomme un cap et un premier geste."""
+    activite = str(profil.get("activite") or "").strip()
+    sujet = f"ton activité « {activite} »" if activite else "ton activité"
+    situation = str(profil.get("situation_actuelle") or "").strip()
+    regime = str((roadmap.get("bandeau") or {}).get("titre") or "le parcours proposé").strip()
+    etapes = roadmap.get("etapes") or []
+    prochaine = str((etapes[0] if etapes else {}).get("titre") or "ouvrir la première étape").strip()
+    contexte = f" dans votre situation actuelle ({situation})" if situation else ""
+    return (
+        f"Pour {sujet}{contexte}, le cap recommandé est {regime}. "
+        "La feuille de route ci-dessous transforme ce diagnostic en un trajet concret et personnalisé. "
+        f"Commence par « {prochaine} », puis avance à ton rythme en validant chaque jalon."
+    )
 
 
 def _contexte_llm(profil: dict, roadmap: dict, verdict: dict) -> str:
@@ -120,41 +138,48 @@ def _contexte_llm(profil: dict, roadmap: dict, verdict: dict) -> str:
         "durabilite": roadmap.get("durabilite"),
         "question_manquante": verdict.get("question_manquante"),
     }
+    profil_public = {
+        key: profil.get(key)
+        for key in ("activite", "situation_actuelle", "anciennete", "vend_produits", "recoit_cadeaux")
+        if profil.get(key) is not None
+    }
+    etapes = roadmap.get("etapes") or []
     resume = {
         "parcours": roadmap["parcours"],
         "nb_etapes": len(roadmap.get("etapes", [])),
         "nb_phases": len(roadmap.get("phases", [])),
+        "prochaine_action": (etapes[0] if etapes else {}).get("titre"),
     }
     return (
-        f"Profil utilisateur : {json.dumps(profil, ensure_ascii=False)}\n"
+        f"Profil public utile au récit : {json.dumps(profil_public, ensure_ascii=False)}\n"
         f"Verdict déterministe : {json.dumps(v, ensure_ascii=False)}\n"
-        f"Roadmap (résumé, ne pas énumérer) : {json.dumps(resume, ensure_ascii=False)}"
+        f"Roadmap (résumé sûr) : {json.dumps(resume, ensure_ascii=False)}"
     )
 
 
-async def _rediger_accompagnement(message: str, contexte: str) -> str:
+async def _rediger_accompagnement(message: str, contexte: str, repli: str) -> str:
     """Appelle le LLM, valide, régénère une fois si invalide, sinon repli déterministe."""
     for tentative in range(2):
         rappel = "" if tentative == 0 else (
-            "\n\nRAPPEL STRICT : 2 à 4 phrases, texte brut, aucune liste, aucun emoji, "
-            "aucun markdown, aucun symbole € ou %, aucune étape énumérée."
+            "\n\nRAPPEL STRICT : 3 à 5 phrases, texte brut, aucune liste, aucun emoji, "
+            "aucun markdown, aucun symbole € ou %, une seule prochaine action exacte."
         )
         try:
             texte = await chat_text(
                 ROADMAP_SYSTEME,
                 f"Message de l'utilisateur (pour le ton) : {message}\n\n{contexte}{rappel}",
-                temperature=0.2,
-                max_tokens=220,
+                temperature=0.35,
+                max_tokens=320,
             )
         except Exception as exc:  # noqa: BLE001 — le LLM ne doit jamais bloquer la roadmap
             logger.warning("Accompagnement indisponible : %s", exc)
-            return _ACCOMPAGNEMENT_REPLI
+            return repli
         ok, motif = accompagnement_valide(texte)
         if ok:
             return texte
         logger.warning("Accompagnement rejeté (tentative %d) : %s — %r",
                        tentative + 1, motif, texte[:120])
-    return _ACCOMPAGNEMENT_REPLI
+    return repli
 
 
 async def guidance_chat(message: str, profil: dict | None = None) -> dict:
@@ -167,6 +192,10 @@ async def guidance_chat(message: str, profil: dict | None = None) -> dict:
         return {"reponse": _JSON_ABSENT, "roadmap": None, "sources": []}
 
     verdict = parcours.verdict_regime(profil) or {}
-    reponse = await _rediger_accompagnement(message, _contexte_llm(profil, roadmap, verdict))
+    reponse = await _rediger_accompagnement(
+        message,
+        _contexte_llm(profil, roadmap, verdict),
+        _accompagnement_repli(profil, roadmap),
+    )
     # Les sources sont portées par la roadmap (legal_sources) et affichées par le composant.
     return {"reponse": reponse, "roadmap": roadmap, "sources": []}

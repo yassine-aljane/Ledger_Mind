@@ -30,10 +30,11 @@ Ces informations viennent uniquement du JSON. Toute contradiction avec ce JSON e
 
 # TA MISSION
 
-Produire UNIQUEMENT un message d'accompagnement de 2 à 4 phrases, en français, qui :
-- resitue la situation de la personne dans ses propres termes ;
-- indique que la feuille de route ci-dessous est personnalisée ;
-- invite à la parcourir.
+Produire UNIQUEMENT un message d'accompagnement de 3 à 5 phrases, en français, qui :
+- reconnaît concrètement l'activité et la situation décrites dans `profil_public` ;
+- annonce le cap recommandé et sa logique, sans inventer de fait ;
+- désigne UNE seule prochaine action en recopiant exactement `prochaine_action` ;
+- présente la feuille de route comme un trajet personnalisé, clair et réalisable.
 
 Ton : chaleureux, clair, jamais culpabilisant. Vouvoiement.
 
@@ -41,6 +42,8 @@ Ton : chaleureux, clair, jamais culpabilisant. Vouvoiement.
 
 Uniquement en le déduisant du verdict, sans jamais l'inventer :
 - le régime retenu, nommé simplement ;
+- l'activité et la situation actuelle, seulement si elles figurent dans `profil_public` ;
+- la prochaine action, uniquement en recopiant `prochaine_action` ;
 - une nuance de durabilité, STRICTEMENT selon le champ `durabilite` :
     • eligible_stable      → aucune alerte. N'évoque NI dépassement NI anticipation.
     • depassement_ponctuel → signale que la situation est à surveiller, sans dramatiser.
@@ -49,19 +52,14 @@ Uniquement en le déduisant du verdict, sans jamais l'inventer :
 
 # CE QUE TU NE DOIS JAMAIS FAIRE
 
-- énumérer ou résumer les étapes ;
+- énumérer ou résumer plusieurs étapes ;
 - produire une liste, checklist, tableau ou comparatif ;
 - citer un seuil, un taux, un montant, un délai, un coût, un formulaire ou une administration ;
 - utiliser des emoji ou du markdown.
 
 # SORTIE
 
-Texte brut. 2 à 4 phrases. Rien d'autre."""
-
-_ACCOMPAGNEMENT_REPLI = (
-    "Voici votre feuille de route personnalisée, adaptée à votre situation. "
-    "Parcourez-la étape par étape, à votre rythme."
-)
+Texte brut. 3 à 5 phrases. Rien d'autre."""
 
 _EMOJI = re.compile(
     "["
@@ -90,9 +88,27 @@ def _accompagnement_valide(texte: str) -> tuple[bool, str]:
         return False, "liste/puce"
     if re.search(r"(?m)^\s*#", t):
         return False, "markdown titre"
-    if _nb_phrases(t) > 4:
-        return False, "plus de 4 phrases"
+    phrases = _nb_phrases(t)
+    if phrases < 3:
+        return False, "moins de 3 phrases"
+    if phrases > 5:
+        return False, "plus de 5 phrases"
     return True, ""
+
+
+def _accompagnement_repli(profil: dict, roadmap: dict) -> str:
+    activite = str(profil.get("activite") or "").strip()
+    sujet = f"votre activité « {activite} »" if activite else "votre activité"
+    situation = str(profil.get("situation_actuelle") or "").strip()
+    regime = str((roadmap.get("bandeau") or {}).get("titre") or "le parcours proposé").strip()
+    etapes = roadmap.get("etapes") or []
+    prochaine = str((etapes[0] if etapes else {}).get("titre") or "ouvrir la première étape").strip()
+    contexte = f", compte tenu de votre situation actuelle ({situation})," if situation else ","
+    return (
+        f"Pour {sujet}{contexte} le cap recommandé est {regime}. "
+        "La feuille de route ci-dessous transforme ce diagnostic en un trajet concret et personnalisé. "
+        f"Commencez par « {prochaine} », puis avancez à votre rythme en validant chaque jalon."
+    )
 
 
 def _contexte_llm(profil: dict, roadmap: dict) -> str:
@@ -100,15 +116,22 @@ def _contexte_llm(profil: dict, roadmap: dict) -> str:
         "regime": (roadmap.get("bandeau") or {}).get("titre"),
         "durabilite": roadmap.get("durabilite"),
     }
+    profil_public = {
+        key: profil.get(key)
+        for key in ("activite", "situation_actuelle", "anciennete", "vend_produits", "recoit_cadeaux")
+        if profil.get(key) is not None
+    }
+    etapes = roadmap.get("etapes") or []
     resume = {
         "parcours": roadmap.get("parcours"),
         "nb_etapes": len(roadmap.get("etapes") or []),
         "nb_phases": len(roadmap.get("phases") or []),
+        "prochaine_action": (etapes[0] if etapes else {}).get("titre"),
     }
     return (
-        f"Profil utilisateur : {json.dumps(profil, ensure_ascii=False)}\n"
+        f"Profil public utile au récit : {json.dumps(profil_public, ensure_ascii=False)}\n"
         f"Verdict déterministe : {json.dumps(v, ensure_ascii=False)}\n"
-        f"Roadmap (résumé, ne pas énumérer) : {json.dumps(resume, ensure_ascii=False)}"
+        f"Roadmap (résumé sûr) : {json.dumps(resume, ensure_ascii=False)}"
     )
 
 
@@ -119,8 +142,8 @@ async def rediger_accompagnement(profil: dict, roadmap: dict, *, user_tone: str 
             ""
             if tentative == 0
             else (
-                "\n\nRAPPEL STRICT : 2 à 4 phrases, texte brut, aucune liste, aucun emoji, "
-                "aucun markdown, aucun symbole € ou %, aucune étape énumérée."
+                "\n\nRAPPEL STRICT : 3 à 5 phrases, texte brut, aucune liste, aucun emoji, "
+                "aucun markdown, aucun symbole € ou %, une seule prochaine action exacte."
             )
         )
         try:
@@ -128,13 +151,13 @@ async def rediger_accompagnement(profil: dict, roadmap: dict, *, user_tone: str 
                 ROADMAP_SYSTEME,
                 f"Message de l'utilisateur (pour le ton) : {user_tone or 'vouvoiement'}\n\n"
                 f"{contexte}{rappel}",
-                temperature=0.2,
-                max_tokens=220,
+                temperature=0.35,
+                max_tokens=320,
                 timeout=30.0,
             )
         except Exception as e:
             logger.warning("Accompagnement LLM failed: %s", e)
-            return _ACCOMPAGNEMENT_REPLI
+            return _accompagnement_repli(profil, roadmap)
         ok, motif = _accompagnement_valide(texte)
         if ok:
             return texte
@@ -144,4 +167,4 @@ async def rediger_accompagnement(profil: dict, roadmap: dict, *, user_tone: str 
             motif,
             texte[:120],
         )
-    return _ACCOMPAGNEMENT_REPLI
+    return _accompagnement_repli(profil, roadmap)
