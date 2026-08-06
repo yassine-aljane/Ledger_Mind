@@ -163,6 +163,12 @@ class JeuDeclarations(BaseModel):
     tva_collectee: Dict[str, Any] = Field(default_factory=dict)
     tva_deductible: Dict[str, Any] = Field(default_factory=dict)
     contrats_actifs: List[Dict[str, Any]] = Field(default_factory=list)
+    # Avantages en nature reçus en contrepartie d'un service : du CHIFFRE D'AFFAIRES, sans
+    # aucun flux bancaire. Ils entrent dans les cases, mais n'apparaissent sur aucun relevé.
+    cadeaux_recus: List[Dict[str, Any]] = Field(default_factory=list)
+    total_cadeaux_eur: float = 0.0
+    # Cadeaux déclarés sans valeur retenue : non comptés, donc CA minoré. Jamais tus.
+    cadeaux_a_valoriser: List[Dict[str, Any]] = Field(default_factory=list)
     # Rapport fiscal portant exactement la même période, s'il existe : un écart entre les
     # deux doit se voir AVANT de déclarer, pas se découvrir après.
     recoupement_rapport: Optional[Dict[str, Any]] = None

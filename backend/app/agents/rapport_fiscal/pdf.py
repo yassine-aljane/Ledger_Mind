@@ -167,6 +167,13 @@ def rapport_to_pdf(rapport: RapportFiscal) -> bytes:
         if incertain > 0:
             ligne_cle_valeur("dont rattaché par montant et date (à confirmer)", eur(incertain))
 
+    # Deux natures de recette dans une même assiette : l'une figure sur un relevé bancaire,
+    # l'autre non. Les confondre rendrait le rapprochement bancaire incompréhensible.
+    if rapport.ca_avantages_en_nature > 0:
+        ligne_cle_valeur("dont encaissements bancaires", eur(rapport.ca_encaisse_bancaire))
+        ligne_cle_valeur("dont avantages en nature", eur(rapport.ca_avantages_en_nature),
+                         aide="hors relevé bancaire")
+
     # Indicateur d'écart, jamais assiette : facturer n'est pas encaisser.
     ligne_cle_valeur("Chiffre d'affaires facturé sur la période", eur(rapport.ca_facture_periode))
     ecart = round(rapport.ca_facture_periode - rapport.ca_retenu, 2)
@@ -333,12 +340,13 @@ def rapport_to_pdf(rapport: RapportFiscal) -> bytes:
 
     # --- Pièces du dossier : elles éclairent, elles n'entrent pas dans l'assiette -------
     src = rapport.sources
-    if src.contrats or src.depenses:
+    if src.contrats or src.depenses or src.cadeaux or src.cadeaux_a_valoriser:
         titre_section("Pièces prises en compte")
         ligne_cle_valeur("Factures émises analysées", str(src.factures_emises))
         ligne_cle_valeur("Virements analysés", str(src.virements_analyses))
         ligne_cle_valeur("Contrats en cours sur la période", str(src.contrats_en_cours))
         ligne_cle_valeur("Factures de dépense capturées", str(src.depenses_capturees))
+        ligne_cle_valeur("Avantages en nature reçus", str(src.cadeaux_recus))
         pdf.ln(1)
 
     if src.contrats:
@@ -362,6 +370,47 @@ def rapport_to_pdf(rapport: RapportFiscal) -> bytes:
                     eur(c.montant_eur),
                 )
                 for c in src.contrats
+            ],
+        )
+
+    if src.cadeaux:
+        titre_section("Avantages en nature comptés dans le chiffre d'affaires")
+        paragraphe(
+            "Fiscalement, ce ne sont PAS des cadeaux : un partenariat rémunéré en produits est "
+            "un revenu en nature, déclarable à sa valeur marchande. Ces montants entrent dans "
+            "l'assiette alors qu'ils n'apparaissent sur aucun relevé bancaire."
+        )
+        pdf.ln(1)
+        _tableau(
+            pdf, font, texte,
+            largeurs=(24, 52, 40, 30, 32),
+            entetes=("Date", "Objet reçu", "Marque", "Contrepartie", "Valeur"),
+            alignements=("L", "L", "L", "L", "R"),
+            lignes=[
+                (_fr_date(c.date), (c.description or "—")[:30], (c.marque or "—")[:22],
+                 (c.contrepartie or "—")[:18], eur(c.valeur_eur))
+                for c in src.cadeaux
+            ],
+        )
+        pdf.ln(1)
+        ligne_cle_valeur("Total des avantages en nature", eur(src.total_cadeaux_eur), gras=True)
+
+    if src.cadeaux_a_valoriser:
+        titre_section("Cadeaux reçus sans valeur retenue")
+        paragraphe(
+            "Ils ne sont PAS comptés faute de valeur marchande, ce qui minore le chiffre "
+            "d'affaires déclaré. Valorisez-les avant toute déclaration."
+        )
+        pdf.ln(1)
+        _tableau(
+            pdf, font, texte,
+            largeurs=(26, 76, 46, 30),
+            entetes=("Date", "Objet reçu", "Marque", "Estimation"),
+            alignements=("L", "L", "L", "R"),
+            lignes=[
+                (_fr_date(c.get("date")), (c.get("description") or "—")[:44],
+                 (c.get("marque") or "—")[:26], eur(c.get("valeur_estimee")))
+                for c in src.cadeaux_a_valoriser
             ],
         )
 

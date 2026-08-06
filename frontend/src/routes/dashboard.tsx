@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   CircleAlert,
+  FileBarChart,
   FileText,
   Lock,
   Minus,
@@ -448,9 +449,11 @@ function DashboardPage() {
         }
         actions={
           aDesDonnees ? (
-            <Button asChild variant="outline" size="sm" className="rounded-full">
-              <Link to="/activite">
-                <Receipt className="size-3.5" /> Espace Facturation
+            /* Le rapport fiscal relève du bilan, pas de la facturation : il se déclenche
+               depuis ici, sur sa propre page. La facturation reste accessible par le rail. */
+            <Button asChild variant="accent" size="sm" className="rounded-full">
+              <Link to="/rapport">
+                <FileBarChart className="size-3.5" /> Générer un rapport
               </Link>
             </Button>
           ) : undefined

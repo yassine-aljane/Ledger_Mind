@@ -175,6 +175,24 @@ class DepenseCapturee(BaseModel):
     categorie: Optional[str] = None
 
 
+class CadeauRecu(BaseModel):
+    """Cadeau reçu en contrepartie d'un service — du CHIFFRE D'AFFAIRES, pas un cadeau.
+
+    Un partenariat rémunéré en produits est un revenu en nature : il se déclare à sa valeur
+    marchande et entre au livre des recettes, alors qu'aucun euro n'a transité par le compte.
+    C'est pourquoi il ne passe PAS par le rapprochement bancaire — il n'y a rien à rapprocher.
+    """
+
+    document_id: str
+    description: Optional[str] = None
+    marque: Optional[str] = None
+    date: Optional[str] = None
+    valeur_eur: float
+    contrepartie: Optional[str] = None
+    # Vrai quand l'utilisateur a corrigé l'estimation automatique : trace de l'arbitrage.
+    valeur_corrigee: Optional[bool] = None
+
+
 class SourcesRapport(BaseModel):
     """Ce sur quoi le rapport s'appuie, et en quelle quantité — traçabilité de l'assiette."""
 
@@ -182,10 +200,16 @@ class SourcesRapport(BaseModel):
     virements_analyses: int = 0
     contrats_en_cours: int = 0
     depenses_capturees: int = 0
+    cadeaux_recus: int = 0
     profil_onboarding: bool = False
     contrats: List[ContratEnCours] = Field(default_factory=list)
     depenses: List[DepenseCapturee] = Field(default_factory=list)
+    cadeaux: List[CadeauRecu] = Field(default_factory=list)
+    # Cadeaux déclarés SANS valeur retenue : ils ne peuvent pas entrer dans le CA, et les
+    # taire minorerait la déclaration sans que rien ne le signale.
+    cadeaux_a_valoriser: List[Dict[str, Any]] = Field(default_factory=list)
     total_depenses_eur: float = 0.0
+    total_cadeaux_eur: float = 0.0
     revenu_contractuel_engage_eur: float = 0.0
 
 
@@ -213,8 +237,12 @@ class RapportFiscal(BaseModel):
     date_fin: str
     genere_le: str
 
-    # Assiette retenue — l'ENCAISSÉ, toujours.
+    # Assiette retenue — l'ENCAISSÉ, toujours. Virements rapprochés + cadeaux en nature.
     ca_retenu: float
+    # Part du CA venant d'encaissements bancaires, et part venant d'avantages en nature.
+    # Les distinguer compte : la seconde n'apparaît sur aucun relevé de compte.
+    ca_encaisse_bancaire: float = 0.0
+    ca_avantages_en_nature: float = 0.0
     base_de_calcul: str = Field(
         description="Phrase expliquant CE QUI a été compté, et pourquoi"
     )

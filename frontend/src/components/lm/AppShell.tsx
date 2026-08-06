@@ -6,14 +6,13 @@ import {
   FileStack,
   Gauge,
   History,
+  Landmark,
   Lock,
   LogOut,
   Moon,
   Receipt,
-  Settings,
   Sparkles,
   Sun,
-  Users,
   Wallet,
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
@@ -32,12 +31,17 @@ const NAV = [
   { to: "/education", label: "Assistant fiscal", icon: BookOpen, feature: "education" },
   { to: "/dashboard", label: "Ma situation", icon: Gauge, feature: "dashboard" },
   { to: "/onboarding", label: "Mise en route", icon: Compass, feature: "onboarding" },
-  { to: "/capture", label: "Justificatifs", icon: Receipt, feature: "capture" },
+  { to: "/capture", label: "Versements", icon: Receipt, feature: "capture" },
   { to: "/activite", label: "Facturation", icon: Wallet, feature: "activite" },
-  { to: "/referral", label: "Expert-comptable", icon: Users, feature: "referral" },
-  { to: "/historique", label: "Transactions", icon: History, feature: "historique" },
+  // Déclarer relève de l'administration, pas de la facturation : entrée à part, sous la même
+  // condition d'accès (SIREN vérifié) — d'où la fonctionnalité « activite » réutilisée.
+  { to: "/declaration", label: "Déclaration", icon: Landmark, feature: "activite" },
+  // « Expert-comptable » n'est plus une entrée du rail : on y accède depuis la page
+  // Déclaration, au moment précis où la question d'un contrôle humain se pose.
+  { to: "/historique", label: "Historiques", icon: History, feature: "historique" },
   { to: "/simulateur", label: "Scénarios", icon: FileStack, feature: "simulateur" },
-  { to: "/parametres", label: "Mon compte", icon: Settings, feature: "profile" },
+  // « Mon compte » n'est plus une entrée du rail : le bloc de compte, en bas, y mène
+  // directement — c'est là que l'utilisateur cherche son profil.
 ] as const satisfies readonly {
   to: string;
   label: string;
@@ -178,15 +182,39 @@ function CarteFormule() {
   return null;
 }
 
+/**
+ * Bloc de compte du rail — porte l'accès à « Mon compte » depuis que l'entrée de navigation
+ * a été retirée.
+ *
+ * Le nom et l'e-mail forment le lien ; la déconnexion reste un bouton distinct à côté. Les
+ * imbriquer serait une faute : un clic destiné à ouvrir son compte déconnecterait l'utilisateur
+ * une fois sur deux.
+ */
 function BlocCompte() {
-  const { user, state } = useEntitlements();
+  const { user, state, lockReason } = useEntitlements();
   if (state === "invite") return null;
+
+  const verrou = lockReason("profile");
+  const accessible = verrou === "none";
+
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{displayName(user)}</p>
-        <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-      </div>
+    <div className="flex items-center gap-1 rounded-xl border border-border pr-2 transition-colors focus-within:border-ink hover:border-ink">
+      {accessible ? (
+        <Link
+          to="/parametres"
+          className="min-w-0 flex-1 rounded-l-xl px-3 py-2 text-left focus:outline-none"
+          title="Ouvrir mon compte"
+        >
+          <p className="truncate text-sm font-medium">{displayName(user)}</p>
+          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+        </Link>
+      ) : (
+        // Verrouillé : on affiche l'identité sans promettre une page inaccessible.
+        <div className="min-w-0 flex-1 px-3 py-2" title={LOCK_TITLE[verrou]}>
+          <p className="truncate text-sm font-medium">{displayName(user)}</p>
+          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+        </div>
+      )}
       <LogoutBubble />
     </div>
   );

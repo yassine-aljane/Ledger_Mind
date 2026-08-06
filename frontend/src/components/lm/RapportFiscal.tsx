@@ -13,6 +13,7 @@
 
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   ChevronDown,
@@ -205,9 +206,11 @@ export function RapportFiscalPanel({
   onPeriodeGeneree,
   onSuivant,
 }: {
+  /** Notifie la période retenue — sert à un écran hôte qui enchaîne sur une autre étape. */
   onPeriodeGeneree?: (debut: string, fin: string) => void;
+  /** Bouton de suite, affiché seulement si l'hôte en fournit un. */
   onSuivant?: () => void;
-}) {
+} = {}) {
   const [dateDebut, setDateDebut] = useState(debutAnneeIso());
   const [dateFin, setDateFin] = useState(aujourdHuiIso());
   const [contexte, setContexte] = useState<ContexteFiscalRapport>({
@@ -356,31 +359,32 @@ export function RapportFiscalPanel({
           </div>
         )}
 
-        <HistoriqueRapports
-          archives={archives}
-          actifId={rapport?.id ?? null}
-          exportEnCours={exportEnCours}
-          onOuvrir={ouvrirArchive}
-          onTelecharger={exporter}
-          onSupprimer={supprimerArchive}
-        />
       </div>
 
       {/* ------------------------------------------------------------------ résultat */}
       <div className="space-y-6 lg:col-span-7">
         {!rapport ? (
-          <Carte className="py-16 text-center">
-            <Receipt className="mx-auto size-8 text-muted-foreground/40" />
-            <p className="mt-4 text-sm text-muted-foreground">
-              Choisissez une période, puis établissez le rapport.
-            </p>
-            <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-muted-foreground/80">
-              Vos factures émises seront rapprochées de vos virements reçus, pour établir ce qui
-              a réellement été encaissé sur la période.
-            </p>
-          </Carte>
+          // Tant qu'aucun rapport n'est ouvert, cet espace sert à retrouver les précédents —
+          // c'est ce qu'on vient chercher le plus souvent, bien plus qu'un texte d'attente.
+          <HistoriqueRapports
+            archives={archives}
+            actifId={null}
+            exportEnCours={exportEnCours}
+            onOuvrir={ouvrirArchive}
+            onTelecharger={exporter}
+            onSupprimer={supprimerArchive}
+          />
         ) : (
           <>
+            {/* Un rapport ouvert masque la liste : ce lien y ramène. */}
+            <button
+              type="button"
+              onClick={() => setRapport(null)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-ink"
+            >
+              <ArrowLeft className="size-4" /> Tous les rapports établis
+            </button>
+
             {/* Assiette */}
             <Carte className="space-y-4">
               <div className="flex items-start justify-between gap-4">
@@ -425,6 +429,21 @@ export function RapportFiscalPanel({
                       aide="à confirmer"
                       valeur={eur(incertain)}
                     />
+                  )}
+                  {/* Deux natures de recette dans une même assiette : l'une figure sur un
+                      relevé bancaire, l'autre non. */}
+                  {rapport.ca_avantages_en_nature > 0 && (
+                    <>
+                      <LigneChiffre
+                        libelle="dont encaissements bancaires"
+                        valeur={eur(rapport.ca_encaisse_bancaire)}
+                      />
+                      <LigneChiffre
+                        libelle="dont avantages en nature"
+                        aide="hors relevé bancaire"
+                        valeur={eur(rapport.ca_avantages_en_nature)}
+                      />
+                    </>
                   )}
                   {/* Indicateur, jamais assiette : facturer n'est pas encaisser. */}
                   <LigneChiffre
@@ -846,17 +865,95 @@ export function RapportFiscalPanel({
             )}
 
             {/* Pièces du dossier : elles éclairent, elles n'entrent pas dans l'assiette */}
-            {src && (src.contrats.length > 0 || src.depenses.length > 0) && (
+            {src &&
+              (src.contrats.length > 0 ||
+                src.depenses.length > 0 ||
+                src.cadeaux.length > 0 ||
+                src.cadeaux_a_valoriser.length > 0) && (
               <Carte className="space-y-3">
                 <Rubrique titre="Pièces prises en compte">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                     <Compteur libelle="Factures émises" valeur={src.factures_emises} />
                     <Compteur libelle="Virements" valeur={src.virements_analyses} />
                     <Compteur libelle="Contrats en cours" valeur={src.contrats_en_cours} />
                     <Compteur libelle="Dépenses" valeur={src.depenses_capturees} />
+                    <Compteur libelle="Cadeaux reçus" valeur={src.cadeaux_recus} />
                   </div>
 
                   <div className="space-y-2">
+                    {/* Le seul dépliant dont le contenu ENTRE dans l'assiette. */}
+                    <Depliant titre="Avantages en nature comptés" compte={src.cadeaux.length}>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        Fiscalement, ce ne sont pas des cadeaux : un partenariat rémunéré en
+                        produits est un revenu en nature, déclarable à sa valeur marchande. Ces
+                        montants sont <strong>dans</strong> votre chiffre d'affaires, alors
+                        qu'ils n'apparaissent sur aucun relevé bancaire.
+                      </p>
+                      {src.cadeaux.map((c) => (
+                        <div
+                          key={c.document_id}
+                          className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm"
+                        >
+                          <span className="text-xs text-muted-foreground">{dateFr(c.date)}</span>
+                          <span className="min-w-0 flex-1 truncate">
+                            {c.description ?? "—"}
+                            {c.marque && (
+                              <span className="ml-1 text-xs text-muted-foreground">
+                                · {c.marque}
+                              </span>
+                            )}
+                          </span>
+                          {c.contrepartie && (
+                            <span className="text-xs text-muted-foreground">
+                              {c.contrepartie}
+                            </span>
+                          )}
+                          <span className="num tabular-nums font-medium">
+                            {eur(c.valeur_eur)}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="border-t border-border pt-2">
+                        <LigneChiffre
+                          libelle="Total des avantages en nature"
+                          valeur={eur(src.total_cadeaux_eur)}
+                        />
+                      </div>
+                    </Depliant>
+
+                    <Depliant
+                      titre="Cadeaux sans valeur retenue"
+                      compte={src.cadeaux_a_valoriser.length}
+                      accent
+                    >
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        Non comptés faute de valeur marchande — votre chiffre d'affaires
+                        déclaré s'en trouve <strong>minoré</strong>. Valorisez-les dans vos
+                        justificatifs avant de déclarer.
+                      </p>
+                      {src.cadeaux_a_valoriser.map((c) => (
+                        <div
+                          key={c.document_id}
+                          className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm"
+                        >
+                          <span className="text-xs text-muted-foreground">{dateFr(c.date)}</span>
+                          <span className="min-w-0 flex-1 truncate">
+                            {c.description ?? "—"}
+                            {c.marque && (
+                              <span className="ml-1 text-xs text-muted-foreground">
+                                · {c.marque}
+                              </span>
+                            )}
+                          </span>
+                          {c.valeur_estimee !== null && (
+                            <span className="text-xs text-amber-fiscal">
+                              estimé {eur(c.valeur_estimee)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </Depliant>
+
                     <Depliant titre="Contrats en cours" compte={src.contrats.length}>
                       <p className="text-xs leading-relaxed text-muted-foreground">
                         Un contrat engage, il n'encaisse pas : ces montants ne comptent pas dans

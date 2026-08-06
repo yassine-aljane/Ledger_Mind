@@ -549,7 +549,21 @@ def generer_declarations(
     factures = facture_store.lister_emises(uid)
     virements = pieces.virements(uid)
     resultat = rappro.rapprocher(factures, virements, debut, fin)
-    ventile = _ventiler(resultat.ca_par_categorie, contexte)
+    ca_par_nature = dict(resultat.ca_par_categorie)
+
+    # -- Avantages en nature : du CA sans flux bancaire ---------------------------------
+    # Un cadeau reçu en contrepartie d'un service est un revenu en nature, déclarable à sa
+    # valeur marchande. Il rémunère une PRESTATION — le créateur n'a rien vendu, il a reçu.
+    cadeaux = pieces.cadeaux_recus(uid, debut, fin)
+    cadeaux_a_valoriser = pieces.cadeaux_sans_valeur(uid, debut, fin)
+    ca_cadeaux = pieces.total_cadeaux(cadeaux)
+    if ca_cadeaux > 0:
+        ca_par_nature["prestation"] = round(
+            ca_par_nature.get("prestation", 0.0) + ca_cadeaux, 2
+        )
+
+    ca_encaisse = round(resultat.ca_encaisse + ca_cadeaux, 2)
+    ventile = _ventiler(ca_par_nature, contexte)
 
     # -- Montants dus : le moteur fait foi, on recopie -----------------------------------
     annee_activite = _annee_activite(contexte.date_creation, fin)
@@ -563,7 +577,7 @@ def generer_declarations(
         premiere_annee=annee_activite == 1,
         ca_annuel_cumule=(
             contexte.ca_annuel_cumule
-            if contexte.ca_annuel_cumule is not None else resultat.ca_encaisse
+            if contexte.ca_annuel_cumule is not None else ca_encaisse
         ),
         option_versement_liberatoire=contexte.option_versement_liberatoire,
     )
@@ -587,7 +601,7 @@ def generer_declarations(
     contrats = pieces_decl.contrats_actifs(uid, debut, fin)
     rapports = pieces_decl.rapports_couvrant(uid, debut, fin)
     ecart_rapport = pieces_decl.ecart_avec_rapport(
-        resultat.ca_encaisse, rapports, debut, fin
+        ca_encaisse, rapports, debut, fin
     )
     # La CFE s'assoit sur le CA de l'ANNÉE, pas sur celui de la période déclarée.
     ca_annuel = rappro.rapprocher(
@@ -606,7 +620,7 @@ def generer_declarations(
     # Une période à zéro alors que l'année en compte n'est pas une panne : c'est un fait, mais
     # il doit être DIT. Sans cela, l'utilisateur croit l'outil cassé au lieu de comprendre que
     # son chiffre d'affaires se trouve sur une autre période.
-    if resultat.ca_encaisse <= 0:
+    if ca_encaisse <= 0:
         annuel = rappro.rapprocher(
             factures, virements, date(debut.year, 1, 1), date(debut.year, 12, 31),
         )
@@ -629,12 +643,30 @@ def generer_declarations(
     else:
         hypotheses_zero = None
 
+    if ca_cadeaux > 0:
+        hypotheses_cadeaux = (
+            f"{_eur(ca_cadeaux)} d'avantages en nature sont inclus dans le chiffre d'affaires "
+            f"({len(cadeaux)} cadeau(x) reçu(s) en contrepartie d'un service). Fiscalement ce "
+            "ne sont pas des cadeaux : ils se déclarent à leur valeur marchande. Ils "
+            "n'apparaissent sur AUCUN relevé bancaire."
+        )
+    elif cadeaux_a_valoriser:
+        hypotheses_cadeaux = (
+            f"{len(cadeaux_a_valoriser)} cadeau(x) reçu(s) sans valeur retenue ne sont PAS "
+            "comptés : votre chiffre d'affaires déclaré s'en trouve minoré. Valorisez-les "
+            "dans vos justificatifs avant de déclarer."
+        )
+    else:
+        hypotheses_cadeaux = None
+
     hypotheses = [
         "L'assiette est le CA ENCAISSÉ : seuls les virements reçus et rapprochés d'une facture "
         "sont comptés. Une facture émise et non payée comptera lors de son encaissement.",
         "Aucun montant n'est calculé par cet agent : ils viennent tous du moteur d'impôt.",
         "Aucune déclaration n'est transmise : vous recopiez et validez vous-même.",
     ]
+    if hypotheses_cadeaux:
+        hypotheses.insert(0, hypotheses_cadeaux)
     if hypotheses_zero:
         hypotheses.insert(0, hypotheses_zero)
     if annee_activite is None:
@@ -650,7 +682,7 @@ def generer_declarations(
         date_fin=demande.date_fin,
         genere_le=datetime.now(timezone.utc).isoformat(),
         frequence=contexte.frequence,
-        ca_encaisse=resultat.ca_encaisse,
+        ca_encaisse=ca_encaisse,
         ca_par_categorie=ventile,
         brouillons=brouillons,
         rappels=_rappels(brouillons, revenus, contexte) + _rappels_recoupement(ecart_rapport),
@@ -659,6 +691,9 @@ def generer_declarations(
         tva_collectee=collectee,
         tva_deductible=deductible,
         contrats_actifs=contrats,
+        cadeaux_recus=cadeaux,
+        total_cadeaux_eur=ca_cadeaux,
+        cadeaux_a_valoriser=cadeaux_a_valoriser,
         recoupement_rapport=ecart_rapport,
         avertissement=_AVERTISSEMENT,
         hypotheses=hypotheses,

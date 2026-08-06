@@ -25,6 +25,7 @@ from . import sources
 from . import tva as tva_flag
 from .schemas import (
     Alerte,
+    CadeauRecu,
     ContexteFiscalRapport,
     DemandeRapport,
     RapportFiscal,
@@ -296,6 +297,29 @@ def _alertes_pieces(pieces: SourcesRapport) -> List[Alerte]:
             ),
         ))
 
+    if pieces.cadeaux:
+        alertes.append(Alerte(
+            niveau="vigilance",
+            titre=f"{_eur(pieces.total_cadeaux_eur)} d'avantages en nature comptés dans le CA",
+            message=(
+                f"{len(pieces.cadeaux)} cadeau(x) reçu(s) en contrepartie d'un service. "
+                "Fiscalement ce ne sont pas des cadeaux : un partenariat rémunéré en produits "
+                "est un revenu en nature, déclarable à sa valeur marchande. Ces montants "
+                "n'apparaissent sur AUCUN relevé bancaire — vérifiez chaque valeur retenue."
+            ),
+        ))
+
+    if pieces.cadeaux_a_valoriser:
+        alertes.append(Alerte(
+            niveau="critique",
+            titre=f"{len(pieces.cadeaux_a_valoriser)} cadeau(x) sans valeur retenue",
+            message=(
+                "Ces avantages en nature ne sont PAS comptés faute de valeur marchande, ce qui "
+                "minore votre chiffre d'affaires déclaré. Renseignez leur valeur dans vos "
+                "justificatifs avant de déclarer."
+            ),
+        ))
+
     if pieces.depenses:
         alertes.append(Alerte(
             niveau="info",
@@ -339,9 +363,30 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
     tous_virements = _virements(uid)
 
     resultat_rappro = rappro.rapprocher(factures, tous_virements, debut, fin)
-    ca_retenu = resultat_rappro.ca_encaisse
+    ca_bancaire = resultat_rappro.ca_encaisse
     ca_par_categorie = dict(resultat_rappro.ca_par_categorie)
+
+    # -- Avantages en nature : du chiffre d'affaires sans flux bancaire ------------------
+    # Un partenariat rémunéré en produits est un revenu en nature. Il ne passe PAS par le
+    # rapprochement — il n'y a aucun virement à rapprocher — mais il entre dans l'assiette.
+    cadeaux = sources.cadeaux_recus(uid, debut, fin)
+    a_valoriser = sources.cadeaux_sans_valeur(uid, debut, fin)
+    ca_cadeaux = sources.total_cadeaux(cadeaux)
+
+    if ca_cadeaux > 0:
+        # Un cadeau rémunère un SERVICE rendu : il relève de la prestation, jamais de la
+        # vente de marchandises — le créateur ne vend pas l'objet, il l'a reçu.
+        ca_par_categorie["prestation"] = round(
+            ca_par_categorie.get("prestation", 0.0) + ca_cadeaux, 2
+        )
+
+    ca_retenu = round(ca_bancaire + ca_cadeaux, 2)
     base = (
+        "CA ENCAISSÉ : les virements reçus, rapprochés d'une facture et datés de la période, "
+        "AUXQUELS S'AJOUTENT les avantages en nature reçus en contrepartie d'un service, "
+        "retenus à leur valeur marchande. Une facture non payée ne compte pas — elle comptera "
+        "lors de son encaissement."
+        if ca_cadeaux > 0 else
         "CA ENCAISSÉ : seuls les virements reçus, rapprochés d'une facture et datés de la "
         "période, sont comptés. Une facture non payée ne compte pas — elle comptera lors de "
         "son encaissement."
@@ -359,10 +404,14 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
         virements_analyses=len(tous_virements),
         contrats_en_cours=len(contrats),
         depenses_capturees=len(depenses),
+        cadeaux_recus=len(cadeaux),
         profil_onboarding=profil is not None,
         contrats=contrats,
         depenses=depenses,
+        cadeaux=[CadeauRecu(**c) for c in cadeaux],
+        cadeaux_a_valoriser=a_valoriser,
         total_depenses_eur=sources.total_eur(depenses),
+        total_cadeaux_eur=ca_cadeaux,
         revenu_contractuel_engage_eur=sources.total_eur(commerciaux),
     )
 
@@ -436,6 +485,8 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
         date_fin=demande.date_fin,
         genere_le=datetime.now(timezone.utc).isoformat(),
         ca_retenu=ca_retenu,
+        ca_encaisse_bancaire=ca_bancaire,
+        ca_avantages_en_nature=ca_cadeaux,
         base_de_calcul=base,
         ca_facture_periode=_ca_facture_sur_la_periode(factures, debut, fin),
         rapprochement=resultat_rappro,
