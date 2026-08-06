@@ -192,6 +192,15 @@ export function clearAuth(): void {
   if (!s) return;
   s.removeItem(TOKEN_KEY);
   s.removeItem(USER_KEY);
+  // L'identifiant de session appartient au compte qu'on quitte. Le laisser derrière soi le
+  // ferait réclamer par le compte suivant, qui recevrait un 403 sur chaque écran — c'est
+  // exactement ce qui vidait « Ma situation » sans rien expliquer.
+  try {
+    localStorage.removeItem("ledgermind_session_id");
+    sessionStorage.removeItem("ledgermind_session_id");
+  } catch {
+    /* ignore private-mode failures */
+  }
   // La formule reste attachée au compte : on ne l'efface pas, on signale juste que la session
   // visible redevient anonyme (l'utilisateur retrouvera son Premium en se reconnectant).
   refreshPlan();

@@ -123,8 +123,15 @@ function ActiviteGate() {
 
         if (sessionId) {
           storeSessionId(sessionId);
-          const d = await fetchSessionDetail(sessionId);
-          if (!cancelled) setProfile(d.profile);
+          try {
+            const d = await fetchSessionDetail(sessionId);
+            if (!cancelled) setProfile(d.profile);
+          } catch {
+            // Identifiant appartenant à un autre compte (403) ou disparu (404) :
+            // `fetchSessionDetail` vient de l'oublier. Le profil du compte suffit ici — il
+            // porte déjà le SIREN vérifié — plutôt que de faire échouer tout l'écran.
+            if (!cancelled) setProfile(profileFromUser(me));
+          }
         } else if (!cancelled) {
           setProfile(profileFromUser(me));
         }
