@@ -244,15 +244,34 @@ export type DepenseCapturee = {
   categorie: string | null;
 };
 
+/** Cadeau reçu en contrepartie d'un service — du chiffre d'affaires, sans flux bancaire. */
+export type CadeauRecu = {
+  document_id: string;
+  description: string | null;
+  marque: string | null;
+  date: string | null;
+  valeur_eur: number;
+  contrepartie: string | null;
+  valeur_corrigee: boolean | null;
+};
+
 export type SourcesRapport = {
   factures_emises: number;
   virements_analyses: number;
   contrats_en_cours: number;
   depenses_capturees: number;
+  cadeaux_recus: number;
   profil_onboarding: boolean;
   contrats: ContratEnCours[];
   depenses: DepenseCapturee[];
+  cadeaux: CadeauRecu[];
+  /** Cadeaux sans valeur retenue : non comptés, donc CA minoré. Jamais tus. */
+  cadeaux_a_valoriser: {
+    document_id: string; description: string | null; marque: string | null;
+    date: string | null; valeur_estimee: number | null;
+  }[];
   total_depenses_eur: number;
+  total_cadeaux_eur: number;
   revenu_contractuel_engage_eur: number;
 };
 
@@ -262,8 +281,12 @@ export type RapportFiscal = {
   date_debut: string;
   date_fin: string;
   genere_le: string;
-  /** Assiette : le CA ENCAISSÉ. */
+  /** Assiette : le CA ENCAISSÉ — virements rapprochés + avantages en nature. */
   ca_retenu: number;
+  /** Part figurant sur un relevé bancaire. */
+  ca_encaisse_bancaire: number;
+  /** Part reçue en nature : réelle, mais absente de tout relevé. */
+  ca_avantages_en_nature: number;
   base_de_calcul: string;
   /** Indicateur d'écart, jamais assiette : facturer n'est pas encaisser. */
   ca_facture_periode: number;

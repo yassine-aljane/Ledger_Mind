@@ -14,6 +14,7 @@
 
 import {
   AlertTriangle,
+  ArrowLeft,
   Building2,
   Calendar,
   Check,
@@ -501,75 +502,70 @@ export function DeclarationsPanel(_props: {
           </div>
         )}
 
-        <div className="space-y-3">
-          <h3 className="rule-label text-accent-ink">Déclarations préparées</h3>
-          {archives.length === 0 ? (
-            <Carte className="py-8 text-center text-sm text-muted-foreground">
-              Aucune préparation pour l'instant.
-            </Carte>
-          ) : (
-            <div className="space-y-2">
-              {archives.map((a) => (
-                <div
-                  key={a.id}
-                  className={cn(
-                    "rounded-xl border p-4",
-                    a.id === jeu?.id ? "border-primary/40 bg-primary/5" : "border-border bg-card",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      obtenirJeuDeclarations(a.id).then(setJeu).catch(() => {})
-                    }
-                    className="w-full space-y-1 text-left"
-                  >
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-sm font-medium">
-                        {dateFr(a.date_debut)} → {dateFr(a.date_fin)}
-                      </span>
-                      <span className="num tabular-nums text-sm font-semibold">
-                        {eur(a.prelevements?.total_a_payer ?? null)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      préparé le {dateFr(a.genere_le)} · {a.rappels.length} rappel(s)
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      supprimerJeuDeclarations(a.id).then(() => {
-                        if (jeu?.id === a.id) setJeu(null);
-                        rechargerArchives();
-                      }).catch(() => {})
-                    }
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-destructive"
-                  >
-                    <Trash2 className="size-3.5" /> Supprimer
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ------------------------------------------------------------------ résultat */}
       <div className="space-y-6 lg:col-span-7">
         {!jeu ? (
-          <Carte className="py-16 text-center">
-            <FileText className="mx-auto size-8 text-muted-foreground/40" />
-            <p className="mt-4 text-sm text-muted-foreground">
-              Choisissez une période, puis préparez vos déclarations.
-            </p>
-            <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-muted-foreground/80">
-              Chaque brouillon reproduit le formulaire officiel, champ par champ. Rien n'est
-              transmis : vous recopiez et validez vous-même sur le site de l'administration.
-            </p>
-          </Carte>
+          // Tant qu'aucun jeu n'est ouvert, cet espace sert à retrouver les préparations
+          // précédentes — c'est ce qu'on vient y chercher le plus souvent.
+          <div className="space-y-3">
+            <h3 className="rule-label text-accent-ink">Déclarations préparées</h3>
+            {archives.length === 0 ? (
+              <Carte className="py-8 text-center text-sm text-muted-foreground">
+                Aucune préparation pour l'instant.
+              </Carte>
+            ) : (
+              <div className="space-y-2">
+                {archives.map((a) => (
+                  <div key={a.id} className="rounded-xl border border-border bg-card p-4">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        obtenirJeuDeclarations(a.id).then(setJeu).catch(() => {})
+                      }
+                      className="w-full space-y-1 text-left"
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-sm font-medium">
+                          {dateFr(a.date_debut)} → {dateFr(a.date_fin)}
+                        </span>
+                        <span className="num tabular-nums text-sm font-semibold">
+                          {eur(a.prelevements?.total_a_payer ?? null)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        préparé le {dateFr(a.genere_le)} · {a.rappels.length} rappel(s)
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        // Aucun jeu n'est ouvert dans cette branche : il n'y a rien à refermer.
+                        supprimerJeuDeclarations(a.id)
+                          .then(rechargerArchives)
+                          .catch(() => {})
+                      }
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-destructive"
+                    >
+                      <Trash2 className="size-3.5" /> Supprimer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <>
+            {/* Un jeu ouvert masque la liste : ce lien y ramène. */}
+            <button
+              type="button"
+              onClick={() => setJeu(null)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-ink"
+            >
+              <ArrowLeft className="size-4" /> Toutes les déclarations préparées
+            </button>
+
             <div className="rounded-xl border border-amber-fiscal/40 bg-amber-fiscal/10 p-4 text-xs leading-relaxed">
               {jeu.avertissement}
             </div>
@@ -708,6 +704,71 @@ export function DeclarationsPanel(_props: {
                       lisible : elles ne sont pas comptées. Une TVA illisible n'est pas une
                       TVA nulle.
                     </p>
+                  )}
+                </Rubrique>
+              </Carte>
+            )}
+
+            {/* Avantages en nature : dans les cases, hors de tout relevé bancaire */}
+            {(jeu.cadeaux_recus.length > 0 || jeu.cadeaux_a_valoriser.length > 0) && (
+              <Carte className="space-y-3">
+                <Rubrique titre="Avantages en nature">
+                  {jeu.cadeaux_recus.length > 0 && (
+                    <>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        Fiscalement, ce ne sont pas des cadeaux : un partenariat rémunéré en
+                        produits est un revenu en nature. Ces montants sont{" "}
+                        <strong>compris dans les cases déclarées</strong>, alors qu'ils
+                        n'apparaissent sur aucun relevé bancaire.
+                      </p>
+                      <div className="space-y-1">
+                        {jeu.cadeaux_recus.map((c) => (
+                          <div
+                            key={c.document_id}
+                            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border/60 py-2 text-sm last:border-0"
+                          >
+                            <span className="text-xs text-muted-foreground">{dateFr(c.date)}</span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {c.description ?? "—"}
+                              {c.marque && (
+                                <span className="ml-1 text-xs text-muted-foreground">
+                                  · {c.marque}
+                                </span>
+                              )}
+                            </span>
+                            <span className="num tabular-nums font-medium">
+                              {eur(c.valeur_eur)}
+                            </span>
+                          </div>
+                        ))}
+                        <LigneChiffre
+                          libelle="Total inclus dans le chiffre d'affaires"
+                          valeur={eur(jeu.total_cadeaux_eur)}
+                          fort
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {jeu.cadeaux_a_valoriser.length > 0 && (
+                    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+                      <p className="text-sm font-semibold text-destructive">
+                        {jeu.cadeaux_a_valoriser.length} cadeau(x) sans valeur retenue
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed">
+                        Ils ne sont <strong>pas comptés</strong> : votre chiffre d'affaires
+                        déclaré s'en trouve minoré. Valorisez-les dans vos justificatifs avant
+                        de transmettre.
+                      </p>
+                      <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                        {jeu.cadeaux_a_valoriser.map((c) => (
+                          <li key={c.document_id}>
+                            {dateFr(c.date)} — {c.description ?? "objet non décrit"}
+                            {c.marque && ` · ${c.marque}`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </Rubrique>
               </Carte>

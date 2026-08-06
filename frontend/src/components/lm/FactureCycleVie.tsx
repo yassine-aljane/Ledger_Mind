@@ -202,7 +202,7 @@ function Total({
   );
 }
 
-export function FactureCycleVie({ onSuivant }: { onSuivant: () => void }) {
+export function FactureCycleVie() {
   // -- Saisie ---------------------------------------------------------------
   const [clientNom, setClientNom] = useState("");
   const [clientPro, setClientPro] = useState(false);
@@ -714,15 +714,6 @@ export function FactureCycleVie({ onSuivant }: { onSuivant: () => void }) {
           </div>
         )}
 
-        {emis.length > 0 && (
-          <button
-            type="button"
-            onClick={onSuivant}
-            className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium transition-all hover:border-ink active:scale-[0.97]"
-          >
-            Étape suivante : rapport →
-          </button>
-        )}
       </div>
 
       <div className="space-y-6 lg:sticky lg:top-24 lg:col-span-5">

@@ -230,6 +230,39 @@ def brouillon_to_pdf(
             "Identifiez laquelle avant de viser ce document."
         )
 
+    # --- Avantages en nature : dans les cases, hors de tout relevé ----------
+    if brouillon.type in ("ca_urssaf", "revenus_2042") and jeu.cadeaux_recus:
+        titre_section("Avantages en nature inclus dans les montants déclarés")
+        paragraphe(
+            "Fiscalement, ce ne sont PAS des cadeaux : un partenariat rémunéré en produits "
+            "est un revenu en nature, déclarable à sa valeur marchande. Ces montants sont "
+            "compris dans les cases ci-dessus, alors qu'ils n'apparaissent sur AUCUN relevé "
+            "bancaire — leur justification tient aux pièces jointes, pas à un virement."
+        )
+        pdf.ln(1)
+        _tableau(
+            pdf, font, texte,
+            largeurs=(24, 54, 40, 28, 32),
+            entetes=("Date", "Objet reçu", "Marque", "Contrepartie", "Valeur"),
+            alignements=("L", "L", "L", "L", "R"),
+            lignes=[
+                (_fr_date(c.get("date")), (c.get("description") or "—")[:30],
+                 (c.get("marque") or "—")[:22], (c.get("contrepartie") or "—")[:16],
+                 eur(c.get("valeur_eur")))
+                for c in jeu.cadeaux_recus
+            ],
+        )
+        pdf.ln(1)
+        cle_valeur("Total des avantages en nature", eur(jeu.total_cadeaux_eur), gras=True)
+
+    if brouillon.type == "ca_urssaf" and jeu.cadeaux_a_valoriser:
+        titre_section("Cadeaux reçus sans valeur retenue")
+        paragraphe(
+            f"{len(jeu.cadeaux_a_valoriser)} avantage(s) en nature ne sont PAS compris dans "
+            "les montants ci-dessus, faute de valeur marchande retenue. Le chiffre d'affaires "
+            "déclaré s'en trouve minoré : valorisez-les avant de transmettre."
+        )
+
     # --- Contrats en cours : contexte, jamais une case ----------------------
     if brouillon.type == "ca_urssaf" and jeu.contrats_actifs:
         titre_section("Contrats en cours sur la période")
