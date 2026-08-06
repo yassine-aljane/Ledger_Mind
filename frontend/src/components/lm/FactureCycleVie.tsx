@@ -63,7 +63,7 @@ function BadgeStatut({ statut }: { statut: StatutFacture }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+        "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
         statut === "payee" && "border-success/30 bg-success/12 text-success-ink",
         statut === "emise" && "border-info/30 bg-info/12 text-info-ink",
         statut === "partiellement_payee" && "border-warning/40 bg-warning/15 text-warning-ink",
@@ -77,7 +77,7 @@ function BadgeStatut({ statut }: { statut: StatutFacture }) {
 }
 
 const champStyle =
-  "w-full rounded-lg border border-transparent bg-background px-3 py-2 text-sm input-boxed";
+  "w-full rounded-lg border border-transparent bg-background px-3 py-2 text-[0.9375rem] input-boxed";
 
 const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
@@ -100,9 +100,9 @@ function Champ({
 }) {
   return (
     <div className={className}>
-      <label className="rule-label text-muted-foreground">{label}</label>
+      <label className="rule-label-lg text-label-ink">{label}</label>
       <div className="mt-1.5">{children}</div>
-      {aide && <p className="mt-1 text-xs text-muted-foreground">{aide}</p>}
+      {aide && <p className="mt-1 text-[0.8125rem] text-muted-foreground">{aide}</p>}
     </div>
   );
 }
@@ -137,14 +137,14 @@ function Totaux({
       <Total libelle="Total HT" valeur={eur(ht)} />
 
       {regimeIndetermine ? (
-        <div className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
+        <div className="flex items-baseline justify-between gap-3 py-1.5 text-[0.9375rem]">
           <span className="text-muted-foreground">TVA</span>
-          <span className="text-right text-xs font-medium text-warning-ink">
+          <span className="text-right text-[0.8125rem] font-medium text-warning-ink">
             régime non qualifié
           </span>
         </div>
       ) : sousFranchise ? (
-        <div className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
+        <div className="flex items-baseline justify-between gap-3 py-1.5 text-[0.9375rem]">
           <span className="text-muted-foreground">TVA</span>
           <span className="num text-right tabular-nums">{eur(0)}</span>
         </div>
@@ -166,15 +166,15 @@ function Totaux({
       )}
 
       {sousFranchise && mentionTva && (
-        <p className="pt-2 text-xs leading-relaxed text-muted-foreground">{mentionTva}</p>
+        <p className="pt-2 text-[0.8125rem] leading-relaxed text-muted-foreground">{mentionTva}</p>
       )}
       {regimeIndetermine && (
-        <p className="pt-2 text-xs leading-relaxed text-warning-ink">
+        <p className="pt-2 text-[0.8125rem] leading-relaxed text-warning-ink">
           Votre régime de TVA n'est pas renseigné : la facture ne peut porter ni la mention
           d'exonération, ni un taux. Complétez-le dans votre parcours fiscal.
         </p>
       )}
-      <p className="pt-1 text-xs text-muted-foreground/80">
+      <p className="pt-1 text-[0.8125rem] text-muted-foreground/80">
         Montants indicatifs : les valeurs qui font foi sont calculées à l'émission.
       </p>
     </div>
@@ -192,10 +192,10 @@ function Total({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <span className={cn("text-sm", fort ? "font-medium" : "text-muted-foreground")}>
+      <span className={cn("text-[0.9375rem]", fort ? "font-medium" : "text-muted-foreground")}>
         {libelle}
       </span>
-      <span className={cn("num tabular-nums", fort ? "text-base font-semibold" : "text-sm")}>
+      <span className={cn("num tabular-nums", fort ? "text-base font-semibold" : "text-[0.9375rem]")}>
         {valeur}
       </span>
     </div>
@@ -350,11 +350,11 @@ export function FactureCycleVie() {
       <div className="space-y-6 lg:col-span-7">
         {/* Alerte de seuil : informative, jamais décisionnelle — le régime reste déclaré. */}
         {alerte?.alerte && (
-          <div className="flex items-start gap-2.5 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4 text-sm text-warning-ink">
+          <div className="flex items-start gap-2.5 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4 text-[0.9375rem] text-warning-ink">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <div className="space-y-1">
               <p className="font-medium">{alerte.alerte.message}</p>
-              <p className="text-xs opacity-90">{alerte.alerte.note}</p>
+              <p className="text-[0.8125rem] opacity-90">{alerte.alerte.note}</p>
             </div>
           </div>
         )}
@@ -362,9 +362,9 @@ export function FactureCycleVie() {
         {/* Informations collectées à l'onboarding qui manquent encore à la facture. Les
             signaler ici évite que l'utilisateur ne le découvre sur le PDF final. */}
         {contexte && contexte.champs_profil_manquants.length > 0 && (
-          <div className="space-y-2 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4 text-sm text-warning-ink">
+          <div className="space-y-2 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4 text-[0.9375rem] text-warning-ink">
             <p className="font-medium">Votre profil est incomplet pour facturer</p>
-            <ul className="space-y-1 text-xs">
+            <ul className="space-y-1 text-[0.8125rem]">
               {contexte.champs_profil_manquants.map((c) => (
                 <li key={c.champ}>
                   <span className="font-medium">{c.libelle}</span> — {c.consequence}
@@ -383,9 +383,9 @@ export function FactureCycleVie() {
         >
           {/* Le régime détermine la TVA du document : il est affiché, jamais saisi ici. */}
           {contexte && (
-            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-4 text-sm">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-4 text-[0.9375rem]">
               <span className="font-medium">{contexte.denomination ?? "Votre activité"}</span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[0.8125rem] text-muted-foreground">
                 SIREN {contexte.siren ?? "—"} ·{" "}
                 {contexte.franchise_tva === true
                   ? "franchise en base de TVA"
@@ -396,7 +396,7 @@ export function FactureCycleVie() {
             </div>
           )}
           <div className="space-y-4">
-            <h3 className="rule-label text-accent-ink">Client</h3>
+            <h3 className="rule-label-lg text-accent-ink">Client</h3>
             <Champ label="Nom ou raison sociale du client">
               <input
                 type="text"
@@ -407,7 +407,7 @@ export function FactureCycleVie() {
               />
             </Champ>
 
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-[0.9375rem]">
               <input
                 type="checkbox"
                 className="size-4 rounded border-border accent-primary"
@@ -457,24 +457,24 @@ export function FactureCycleVie() {
           </div>
 
           <div className="space-y-3 border-t border-border pt-5">
-            <h3 className="rule-label text-accent-ink">Prestations / produits</h3>
+            <h3 className="rule-label-lg text-accent-ink">Prestations / produits</h3>
 
             <div className="overflow-x-auto">
               <div className="min-w-[46rem] space-y-2">
                 {/* En-têtes : sans eux, six champs numériques côte à côte sont illisibles. */}
                 <div className="grid grid-cols-24 gap-2 px-1">
-                  <span className="rule-label col-span-4 text-muted-foreground">Catégorie</span>
-                  <span className="rule-label col-span-7 text-muted-foreground">Désignation</span>
-                  <span className="rule-label col-span-3 text-right text-muted-foreground">
+                  <span className="rule-label-lg col-span-4 text-label-ink">Catégorie</span>
+                  <span className="rule-label-lg col-span-7 text-label-ink">Désignation</span>
+                  <span className="rule-label-lg col-span-3 text-right text-label-ink">
                     Quantité
                   </span>
-                  <span className="rule-label col-span-4 text-right text-muted-foreground">
+                  <span className="rule-label-lg col-span-4 text-right text-label-ink">
                     Prix unitaire HT
                   </span>
-                  <span className="rule-label col-span-2 text-right text-muted-foreground">
+                  <span className="rule-label-lg col-span-2 text-right text-label-ink">
                     Remise
                   </span>
-                  <span className="rule-label col-span-3 text-right text-muted-foreground">
+                  <span className="rule-label-lg col-span-3 text-right text-label-ink">
                     Total HT
                   </span>
                   <span className="col-span-1" />
@@ -525,7 +525,7 @@ export function FactureCycleVie() {
                       onChange={(e) => majLigne(i, { remise_pourcent: Number(e.target.value) })}
                     />
                     {/* Calculé, jamais saisi : deux sources pour un même total divergeraient. */}
-                    <span className="num col-span-3 pr-1 text-right text-sm tabular-nums">
+                    <span className="num col-span-3 pr-1 text-right text-[0.9375rem] tabular-nums">
                       {eur(totalLigneHt(l))}
                     </span>
                     <button
@@ -545,7 +545,7 @@ export function FactureCycleVie() {
             <button
               type="button"
               onClick={() => setLignes((prev) => [...prev, ligneVide()])}
-              className="inline-flex items-center gap-1 text-sm font-medium text-teal-dark hover:underline"
+              className="inline-flex items-center gap-1 text-[0.9375rem] font-medium text-teal-dark hover:underline"
             >
               <Plus className="size-3.5" /> Ajouter une ligne
             </button>
@@ -566,7 +566,7 @@ export function FactureCycleVie() {
             <button
               type="button"
               onClick={() => setOptionsOuvertes((v) => !v)}
-              className="rule-label text-accent-ink hover:underline"
+              className="rule-label-lg text-accent-ink hover:underline"
             >
               {optionsOuvertes ? "− " : "+ "}Règlement, contrat et acompte
             </button>
@@ -619,7 +619,7 @@ export function FactureCycleVie() {
                 </div>
 
                 <div className="rounded-xl border border-border p-4">
-                  <label className="flex items-center gap-2 text-sm font-medium">
+                  <label className="flex items-center gap-2 text-[0.9375rem] font-medium">
                     <input
                       type="checkbox"
                       className="size-4 rounded border-border accent-primary"
@@ -653,9 +653,9 @@ export function FactureCycleVie() {
           </div>
 
           {manquants.length > 0 && (
-            <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning-ink">
+            <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-[0.9375rem] text-warning-ink">
               <p className="font-medium">Mentions obligatoires manquantes</p>
-              <ul className="mt-1 list-inside list-disc text-xs">
+              <ul className="mt-1 list-inside list-disc text-[0.8125rem]">
                 {manquants.map((m) => (
                   <li key={m}>{m}</li>
                 ))}
@@ -669,7 +669,7 @@ export function FactureCycleVie() {
                 type="button"
                 onClick={() => void enregistrerBrouillon()}
                 disabled={!saisieValide || occupe !== null}
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border px-4 text-sm font-medium transition-all hover:border-ink active:scale-[0.98] disabled:opacity-40"
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border px-4 text-[0.9375rem] font-medium transition-all hover:border-ink active:scale-[0.98] disabled:opacity-40"
               >
                 {occupe === "brouillon" ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -682,7 +682,7 @@ export function FactureCycleVie() {
                 type="submit"
                 disabled={!saisieValide || occupe !== null}
                 title="Attribue le numéro légal et fige le document"
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-accent px-6 text-sm font-medium text-accent-ink shadow-soft transition-all hover:brightness-[1.04] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-accent px-6 text-[0.9375rem] font-medium text-accent-ink shadow-soft transition-all hover:brightness-[1.04] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {occupe === "emettre" ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -693,7 +693,7 @@ export function FactureCycleVie() {
               </button>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[0.8125rem] text-muted-foreground">
             Un brouillon ne consomme aucun numéro et reste modifiable. L'émission attribue le
             numéro légal et fige définitivement le document : sa correction passera par un avoir.
           </p>
@@ -702,13 +702,13 @@ export function FactureCycleVie() {
         {erreur && (
           <div
             role="alert"
-            className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm font-medium text-destructive"
+            className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-[0.9375rem] font-medium text-destructive"
           >
             {erreur}
           </div>
         )}
         {message && !erreur && (
-          <div className="flex items-center gap-2 rounded-2xl border border-success/30 bg-success/10 px-5 py-4 text-sm text-success-ink">
+          <div className="flex items-center gap-2 rounded-2xl border border-success/30 bg-success/10 px-5 py-4 text-[0.9375rem] text-success-ink">
             <Check className="size-4 shrink-0" />
             {message}
           </div>
@@ -719,15 +719,15 @@ export function FactureCycleVie() {
       <div className="space-y-6 lg:sticky lg:top-24 lg:col-span-5">
         {brouillons.length > 0 && (
           <section className="space-y-3">
-            <h3 className="rule-label text-muted-foreground">
+            <h3 className="rule-label-lg text-label-ink">
               Brouillons · sans existence fiscale
             </h3>
             {brouillons.map((f) => (
               <div key={f.id} className="rounded-2xl border border-dashed border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{f.client.nom || "Sans client"}</p>
-                    <p className="num text-xs text-muted-foreground">
+                    <p className="truncate text-[0.9375rem] font-medium">{f.client.nom || "Sans client"}</p>
+                    <p className="num text-[0.8125rem] text-muted-foreground">
                       {f.net_a_payer.toFixed(2)} € TTC
                     </p>
                   </div>
@@ -745,7 +745,7 @@ export function FactureCycleVie() {
                       })
                     }
                     disabled={occupe !== null}
-                    className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink disabled:opacity-40"
+                    className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[0.8125rem] font-medium text-accent-ink disabled:opacity-40"
                   >
                     <Lock className="size-3" /> Émettre
                   </button>
@@ -769,7 +769,7 @@ export function FactureCycleVie() {
                       });
                     }}
                     disabled={occupe !== null}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40"
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40"
                   >
                     <Trash2 className="size-3" /> Supprimer
                   </button>
@@ -780,9 +780,9 @@ export function FactureCycleVie() {
         )}
 
         <section className="space-y-3">
-          <h3 className="rule-label text-accent-ink">Documents émis</h3>
+          <h3 className="rule-label-lg text-accent-ink">Documents émis</h3>
           {emis.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-border bg-card p-6 text-center text-[0.9375rem] text-muted-foreground">
               Aucune facture émise pour l&apos;instant.
             </div>
           ) : (
@@ -790,18 +790,18 @@ export function FactureCycleVie() {
               <div key={f.id} className="card-hover rounded-2xl border border-border bg-card p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="num text-sm font-medium">{f.numero}</p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="num text-[0.9375rem] font-medium">{f.numero}</p>
+                    <p className="truncate text-[0.8125rem] text-muted-foreground">
                       {f.client.nom} · {f.net_a_payer.toFixed(2)} € TTC
                       {f.montant_regle > 0 && ` · ${f.montant_regle.toFixed(2)} € réglés`}
                     </p>
                     {f.facture_origine_numero && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[0.8125rem] text-muted-foreground">
                         annule {f.facture_origine_numero}
                       </p>
                     )}
                     {f.avoir_numero && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[0.8125rem] text-muted-foreground">
                         annulée par {f.avoir_numero}
                       </p>
                     )}
@@ -813,7 +813,7 @@ export function FactureCycleVie() {
                   <button
                     type="button"
                     onClick={() => void telechargerFacturePdf(f.id, f.numero)}
-                    className="text-xs font-medium text-teal-dark hover:underline"
+                    className="text-[0.8125rem] font-medium text-teal-dark hover:underline"
                   >
                     PDF
                   </button>
@@ -834,7 +834,7 @@ export function FactureCycleVie() {
                         });
                       }}
                       disabled={occupe !== null}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-teal-dark hover:underline disabled:opacity-40"
+                      className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-teal-dark hover:underline disabled:opacity-40"
                     >
                       <Wallet className="size-3" /> Règlement
                     </button>
@@ -862,7 +862,7 @@ export function FactureCycleVie() {
                         });
                       }}
                       disabled={occupe !== null}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-destructive hover:underline disabled:opacity-40"
+                      className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-muted-foreground hover:text-destructive hover:underline disabled:opacity-40"
                     >
                       <Undo2 className="size-3" /> Avoir
                     </button>
@@ -897,7 +897,7 @@ export function FactureCycleVie() {
                       });
                     }}
                     disabled={occupe !== null}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-destructive hover:underline disabled:opacity-40"
+                    className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-destructive hover:underline disabled:opacity-40"
                   >
                     <Trash2 className="size-3" /> Supprimer
                   </button>

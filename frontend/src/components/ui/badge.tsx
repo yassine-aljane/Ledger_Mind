@@ -3,9 +3,13 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-// Chasse mono + capitales espacées, dans la même famille visuelle que l'utilitaire `rule-label`.
+// Chasse mono + capitales espacées, dans la même famille visuelle que `rule-label-lg` —
+// dont ce composant reprend désormais la taille (12 px) et l'interlettrage (0,08em).
+// Il était à 0,65rem, soit 10,4 px : sous le plancher de lisibilité, alors que c'est lui qui
+// porte les statuts qui décident d'une action — « brouillon », « plafond dépassé », la
+// sévérité d'une alerte. Une étiquette d'état ne se devine pas, elle se lit.
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-[0.65rem] font-medium uppercase tracking-[0.12em] transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [&_svg]:size-3.5 [&_svg]:shrink-0",
+  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-xs font-medium uppercase tracking-[0.08em] transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [&_svg]:size-3.5 [&_svg]:shrink-0",
   {
     variants: {
       variant: {

@@ -155,7 +155,7 @@ export function CascadeFiscale({
                     x={0}
                     y={y + HAUTEUR_MARCHE / 2 + 4}
                     className={cn(
-                      "text-[11px]",
+                      "text-xs",
                       total ? "fill-foreground font-medium" : "fill-muted-foreground",
                     )}
                   >
@@ -179,7 +179,7 @@ export function CascadeFiscale({
                     x={Math.min(xDebut + longueur + 8, largeur - 4)}
                     y={y + HAUTEUR_MARCHE / 2 + 4}
                     textAnchor={xDebut + longueur + 8 > largeur - 72 ? "end" : "start"}
-                    className={cn("num text-[11px]", total ? "fill-foreground font-medium" : "fill-muted-foreground")}
+                    className={cn("num text-xs", total ? "fill-foreground font-medium" : "fill-muted-foreground")}
                   >
                     {formatEuros(marche.montant)}
                     {marche.type === "retrait" ? ` · ${formatPct(marche.part * 100)}` : ""}
@@ -209,7 +209,7 @@ export function CascadeFiscale({
             className="pointer-events-none absolute right-0 top-0 z-20 max-w-xs rounded-xl border border-border bg-popover p-3 shadow-lift"
           >
             <p className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
                 <span
                   aria-hidden
                   className="inline-block size-2.5 rounded-[3px]"
@@ -217,11 +217,11 @@ export function CascadeFiscale({
                 />
                 {marcheActive.label}
               </span>
-              <span className="num text-xs font-medium text-foreground">
+              <span className="num text-[0.8125rem] font-medium text-foreground">
                 {formatEuros(marcheActive.montant)}
               </span>
             </p>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted-foreground">
               {marcheActive.explication}
             </p>
           </div>
@@ -229,7 +229,7 @@ export function CascadeFiscale({
       </div>
 
       {!complet && (
-        <p className="mt-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs text-warning-ink">
+        <p className="mt-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-[0.8125rem] text-warning-ink">
           L'impôt sur le revenu n'étant pas calculable, la dernière marche est incomplète :
           ce qui vous reste sera inférieur au montant affiché.
         </p>
@@ -240,7 +240,7 @@ export function CascadeFiscale({
           type="button"
           onClick={() => setTableau((v) => !v)}
           aria-expanded={tableau}
-          className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          className="text-[0.8125rem] text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
         >
           {tableau ? "Masquer le tableau" : "Voir les valeurs en tableau"}
         </button>
@@ -248,7 +248,7 @@ export function CascadeFiscale({
 
       {tableau && (
         <div className="mt-3 overflow-auto rounded-xl border border-border">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-[0.8125rem]">
             <caption className="sr-only">Détail de la cascade du chiffre d&apos;affaires</caption>
             <thead className="bg-secondary/80">
               <tr>
@@ -300,15 +300,15 @@ export function RepereAbattement({
 
   return (
     <div className="rounded-xl border border-border bg-secondary/40 p-4">
-      <p className="rule-label text-muted-foreground">Avant tout calcul d&apos;impôt</p>
-      <p className="mt-2 text-sm leading-relaxed">
+      <p className="rule-label-lg text-label-ink">Avant tout calcul d&apos;impôt</p>
+      <p className="mt-2 text-[0.9375rem] leading-relaxed">
         L&apos;administration retire{" "}
         <span className="num font-medium">{formatEuros(abattement)}</span>
         {taux !== null && <> ({formatPct(taux * 100)})</>} de votre chiffre d&apos;affaires.
         L&apos;impôt ne portera donc que sur{" "}
         <span className="num font-medium">{formatEuros(base)}</span>.
       </p>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-2 text-[0.8125rem] text-muted-foreground">
         Cet abattement n&apos;est pas une dépense : cette somme reste sur votre compte. Elle
         remplace la déduction de vos frais réels.
       </p>
@@ -330,7 +330,7 @@ export function ComparaisonOptions({ comparaison }: { comparaison: ComparaisonOp
 
   if (montantBareme === null && montantVersementLiberatoire === null) {
     return (
-      <p className="rounded-xl border border-border bg-secondary/40 p-4 text-xs leading-relaxed text-muted-foreground">
+      <p className="rounded-xl border border-border bg-secondary/40 p-4 text-[0.8125rem] leading-relaxed text-muted-foreground">
         {comparaison.motifIneligibilite ??
           "La comparaison demande le nombre de parts, les autres revenus du foyer et le revenu fiscal de référence N-2."}
       </p>
@@ -364,7 +364,7 @@ export function ComparaisonOptions({ comparaison }: { comparaison: ComparaisonOp
           return (
             <li key={option.cle}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="flex items-center gap-2 text-sm">
+                <p className="flex items-center gap-2 text-[0.9375rem]">
                   <span
                     aria-hidden
                     className="inline-block size-2.5 shrink-0 rounded-[3px]"
@@ -372,13 +372,13 @@ export function ComparaisonOptions({ comparaison }: { comparaison: ComparaisonOp
                   />
                   {option.label}
                   {recommandee && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[0.65rem] font-medium text-success-ink">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success-ink">
                       <ShieldCheck className="size-3" aria-hidden />
                       moins coûteux
                     </span>
                   )}
                 </p>
-                <p className="num text-sm font-medium">
+                <p className="num text-[0.9375rem] font-medium">
                   {option.montant === null ? "non calculable" : formatEuros(option.montant)}
                 </p>
               </div>
@@ -397,14 +397,14 @@ export function ComparaisonOptions({ comparaison }: { comparaison: ComparaisonOp
                   }}
                 />
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">{option.aide}</p>
+              <p className="mt-1.5 text-[0.8125rem] text-muted-foreground">{option.aide}</p>
             </li>
           );
         })}
       </ul>
 
       {economie !== null && economie > 0 && recommandation && (
-        <p className="mt-5 rounded-xl border border-success/30 bg-success/10 p-3 text-sm text-success-ink">
+        <p className="mt-5 rounded-xl border border-success/30 bg-success/10 p-3 text-[0.9375rem] text-success-ink">
           L'option la moins coûteuse vous fait économiser{" "}
           <span className="num font-medium">{formatEuros(economie)}</span> sur l'année.
           {comparaison.optionRetenue && comparaison.optionRetenue !== recommandation && (
@@ -414,13 +414,13 @@ export function ComparaisonOptions({ comparaison }: { comparaison: ComparaisonOp
       )}
 
       {comparaison.eligible === false && comparaison.motifIneligibilite && (
-        <p className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+        <p className="mt-4 flex items-start gap-2 text-[0.8125rem] text-muted-foreground">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
           {comparaison.motifIneligibilite}
         </p>
       )}
       {comparaison.eligible === null && (
-        <p className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+        <p className="mt-4 flex items-start gap-2 text-[0.8125rem] text-muted-foreground">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
           Éligibilité au versement libératoire indéterminée : le revenu fiscal de référence
           N-2 est nécessaire pour trancher.
@@ -461,7 +461,7 @@ export function DetailCalcul({
       >
         <span className="flex items-center gap-2">
           <Info className="size-4 shrink-0 text-muted-foreground" />
-          <span className="text-sm font-medium">{titre}</span>
+          <span className="text-[0.9375rem] font-medium">{titre}</span>
         </span>
         <ChevronDown
           className={cn(
@@ -478,23 +478,23 @@ export function DetailCalcul({
               <li key={etape.cle} className="flex gap-3">
                 <span
                   aria-hidden
-                  className="num mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] text-muted-foreground"
+                  className="num mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground"
                 >
                   {index + 1}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium">{etape.titre}</span>
+                    <span className="text-[0.9375rem] font-medium">{etape.titre}</span>
                     <span
                       className={cn(
-                        "num text-sm",
+                        "num text-[0.9375rem]",
                         etape.nonCalculable ? "text-warning-ink" : "text-foreground",
                       )}
                     >
                       {etape.valeur ?? "non calculable"}
                     </span>
                   </p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted-foreground">
                     {etape.detail}
                   </p>
                 </div>
@@ -504,10 +504,10 @@ export function DetailCalcul({
 
           {sources.length > 0 && (
             <div className="mt-6 border-t border-border pt-4">
-              <p className="rule-label text-muted-foreground">D'où viennent ces taux</p>
+              <p className="rule-label-lg text-label-ink">D'où viennent ces taux</p>
               <ul className="mt-3 space-y-2">
                 {sources.map((source) => (
-                  <li key={source.cle} className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                  <li key={source.cle} className="flex flex-wrap items-baseline gap-x-2 text-[0.8125rem]">
                     <span className="text-foreground">{source.libelle}</span>
                     {source.annee !== null && (
                       <span className="num text-muted-foreground">{source.annee}</span>

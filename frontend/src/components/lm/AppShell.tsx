@@ -111,7 +111,7 @@ function NavLink({
       title={locked ? LOCK_TITLE[motif] : item.label}
       aria-disabled={locked || undefined}
       className={cn(
-        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.9375rem] font-medium transition-colors",
         active
           ? "bg-primary text-primary-foreground"
           : locked
@@ -139,8 +139,8 @@ function CarteFormule() {
   if (state === "free") {
     return (
       <div className="shimmer-premium rounded-2xl border border-accent/40 bg-accent/10 p-4">
-        <p className="rule-label text-accent-ink">Formule actuelle · Free</p>
-        <p className="mt-2 text-sm font-medium">Débloquez la mise en route et les outils.</p>
+        <p className="rule-label-lg text-accent-ink">Formule actuelle · Free</p>
+        <p className="mt-2 text-[0.9375rem] font-medium">Débloquez la mise en route et les outils.</p>
         <Button asChild variant="accent" size="sm" className="mt-3 w-full">
           <Link to="/premium">
             <Sparkles /> Passer Premium
@@ -153,8 +153,8 @@ function CarteFormule() {
   if (state === "premium_parcours") {
     return (
       <div className="rounded-2xl border border-accent/40 bg-accent/8 p-4">
-        <p className="rule-label text-accent-ink">Mise en route</p>
-        <p className="mt-2 text-sm font-medium">
+        <p className="rule-label-lg text-accent-ink">Mise en route</p>
+        <p className="mt-2 text-[0.9375rem] font-medium">
           Terminez-la pour débloquer Ma situation et les outils.
         </p>
         <Button asChild variant="accent" size="sm" className="mt-3 w-full">
@@ -167,8 +167,8 @@ function CarteFormule() {
   if (state === "invite") {
     return (
       <div className="space-y-2 rounded-2xl border border-border p-4">
-        <p className="text-sm font-medium">Assistant fiscal libre</p>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-[0.9375rem] font-medium">Assistant fiscal libre</p>
+        <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
           Posez vos questions fiscales sans compte. Connectez-vous pour conserver
           l&apos;historique.
         </p>
@@ -205,14 +205,14 @@ function BlocCompte() {
           className="min-w-0 flex-1 rounded-l-xl px-3 py-2 text-left focus:outline-none"
           title="Ouvrir mon compte"
         >
-          <p className="truncate text-sm font-medium">{displayName(user)}</p>
-          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+          <p className="truncate text-[0.9375rem] font-medium">{displayName(user)}</p>
+          <p className="truncate text-[0.8125rem] text-muted-foreground">{user?.email}</p>
         </Link>
       ) : (
         // Verrouillé : on affiche l'identité sans promettre une page inaccessible.
         <div className="min-w-0 flex-1 px-3 py-2" title={LOCK_TITLE[verrou]}>
-          <p className="truncate text-sm font-medium">{displayName(user)}</p>
-          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+          <p className="truncate text-[0.9375rem] font-medium">{displayName(user)}</p>
+          <p className="truncate text-[0.8125rem] text-muted-foreground">{user?.email}</p>
         </div>
       )}
       <LogoutBubble />
@@ -256,7 +256,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <CarteFormule />
             <BlocCompte />
             <div className="flex items-center justify-between px-1">
-              <span className="rule-label text-muted-foreground">Apparence</span>
+              <span className="rule-label-lg text-label-ink">Apparence</span>
               <ThemeToggle />
             </div>
           </div>
@@ -302,14 +302,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label="Navigation principale"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur lg:hidden"
       >
-        <div className="flex overflow-x-auto">
+        {/* Les libellés étaient à 8 px — illisibles. À 12 px, le plancher, ils ne tiennent plus
+            sur une ligne : les entrées se PARTAGENT donc la largeur et le texte revient à la
+            ligne, borné à deux lignes. Un défilement horizontal serait pire qu'un retour à la
+            ligne dans une barre fixe de cinq entrées. */}
+        <div className="flex">
           {entrees.slice(0, 5).map(({ item, motif, active }) => (
             <Link
               key={item.to}
               to={item.to}
               title={motif !== "none" ? LOCK_TITLE[motif] : item.label}
               className={cn(
-                "flex flex-1 shrink-0 flex-col items-center gap-1 px-3 py-2.5 text-[0.5rem] font-medium",
+                "flex min-w-0 flex-1 flex-col items-center gap-1 px-1.5 py-2.5 text-center text-xs font-medium leading-tight",
                 active ? "text-foreground" : "text-muted-foreground",
               )}
             >
@@ -319,7 +323,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Lock className="absolute -right-2 -top-1 size-2.5 text-accent" />
                 )}
               </span>
-              {motif === "deja_fait" ? "Mise en route terminée" : item.label}
+              <span className="line-clamp-2">
+                {motif === "deja_fait" ? "Mise en route terminée" : item.label}
+              </span>
             </Link>
           ))}
         </div>
@@ -342,10 +348,10 @@ export function PageHeader({
   return (
     <header className="animate-rise mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
-        {eyebrow && <p className="rule-label mb-2 text-accent-ink">{eyebrow}</p>}
+        {eyebrow && <p className="rule-label-lg mb-2 text-accent-ink">{eyebrow}</p>}
         <h1 className="text-balance text-3xl sm:text-4xl">{title}</h1>
         {description && (
-          <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-3 text-pretty text-[0.9375rem] leading-relaxed text-muted-foreground">
             {description}
           </p>
         )}

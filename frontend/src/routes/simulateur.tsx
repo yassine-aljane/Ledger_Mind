@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, CircleAlert, Loader2, Table2, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccessGate } from "@/components/lm/AccessGate";
@@ -19,6 +19,7 @@ import { construireSynthese, formatEuros, formatPct } from "@/lib/finance";
 import { listerFactures, type Facture } from "@/lib/facturation-api";
 import {
   avertissementsUniques,
+  chargerBrouillonScenarios,
   chargerContexte,
   construireCascade,
   construireComparaisonOption,
@@ -28,6 +29,7 @@ import {
   construireProjection,
   construireProvisions,
   depassementsParScenario,
+  enregistrerBrouillonScenarios,
   etapesCalcul,
   lireProvenance,
   simulerScenarios,
@@ -68,16 +70,57 @@ const PHRASE_INITIALE = "Si je signe ce contrat de 5 000 € avec un client fran
  * une lecture qu'on n'a pas relue.
  */
 function SimulateurPage() {
+  /*
+   * Restauration du brouillon — lue SYNCHRONEMENT au premier rendu.
+   *
+   * Cet écran est le seul de l'app dont tout le contenu vient d'une saisie : quitter la route
+   * démonte le composant, et l'état local part avec lui. La saisie est donc mémorisée dans la
+   * session, et relue ici.
+   *
+   * Restaurer depuis un `useEffect` a été essayé et s'est révélé FAUX, de façon destructrice.
+   * Deux effets — restaurer, puis enregistrer — s'exécutent dans le même commit, donc tous
+   * les deux avec les valeurs du PREMIER rendu : celui d'enregistrement réécrivait l'état par
+   * défaut par-dessus le brouillon qui venait à peine d'être lu. Le rendu suivant remettait
+   * les bonnes valeurs, sauf si la page était démontée entre-temps — et `AccessGate` démonte
+   * cet écran dès que `useEntitlements` repasse en chargement. Le brouillon était alors perdu
+   * pour de bon, et la visite suivante restaurait fidèlement l'état par défaut.
+   *
+   * Lu à l'initialisation, l'état du premier rendu EST déjà le bon : il n'existe plus aucune
+   * fenêtre pendant laquelle une valeur par défaut peut être écrite.
+   *
+   * Aucun risque d'écart d'hydratation, pour deux raisons cumulées : `AccessGate` ne monte
+   * pas cet écran tant que les droits ne sont pas résolus, et `chargement` vaut `true` au
+   * premier rendu — serveur comme client, la sortie est le squelette, jamais la saisie.
+   */
+  const [brouillon] = useState(chargerBrouillonScenarios);
+
   const [contexte, setContexte] = useState<ContexteSimulation | null>(null);
   const [factures, setFactures] = useState<Facture[]>([]);
-  const [phrase, setPhrase] = useState(PHRASE_INITIALE);
-  const [compris, setCompris] = useState<ScenarioInterprete[]>([]);
-  const [resume, setResume] = useState<string | null>(null);
-  const [retenus, setRetenus] = useState<string[]>([]);
+  const [phrase, setPhrase] = useState(brouillon?.phrase ?? PHRASE_INITIALE);
+  const [compris, setCompris] = useState<ScenarioInterprete[]>(brouillon?.compris ?? []);
+  const [resume, setResume] = useState<string | null>(brouillon?.resume ?? null);
+  const [retenus, setRetenus] = useState<string[]>(brouillon?.retenus ?? []);
   const [reponse, setReponse] = useState<ReponseScenarios | null>(null);
   const [chargement, setChargement] = useState(true);
   const [calcul, setCalcul] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [repris, setRepris] = useState((brouillon?.compris.length ?? 0) > 0);
+
+  useEffect(() => {
+    enregistrerBrouillonScenarios({ phrase, compris, resume, retenus });
+  }, [phrase, compris, resume, retenus]);
+
+  const reinitialiser = useCallback(() => {
+    // Champ VIDE et non `PHRASE_INITIALE` : c'est le vrai état zéro. Le placeholder et les
+    // exemples cliquables reprennent alors leur rôle, et l'effet d'enregistrement ci-dessus
+    // reconnaît « rien à retenir » et purge la clé — ce qui rend l'effacement définitif.
+    setPhrase("");
+    setCompris([]);
+    setResume(null);
+    setRetenus([]);
+    setReponse(null);
+    setRepris(false);
+  }, []);
 
   // Le contexte (CA réel, foyer déclaré) et l'historique de facturation sont indépendants :
   // l'échec de l'un ne doit pas priver l'écran de l'autre.
@@ -118,16 +161,31 @@ function SimulateurPage() {
     [retenus, compris, categorieParDefaut],
   );
 
+  /*
+   * Numéro de la dernière simulation demandée.
+   *
+   * Cocher puis décocher rapidement lance deux requêtes ; rien ne garantit qu'elles
+   * reviennent dans l'ordre. Sans ce compteur, une première réponse arrivée en retard
+   * écrasait la seconde et l'écran affichait des montants qui ne correspondaient plus à la
+   * sélection — exactement l'invariant que le commentaire ci-dessous affirme tenir.
+   */
+  const demande = useRef(0);
+
   const lancer = useCallback(async () => {
     if (!contexte) return;
+    const numero = ++demande.current;
     setCalcul(true);
     setErreur(null);
     try {
-      setReponse(await simulerScenarios(contexte.base, variantes));
+      const resultat = await simulerScenarios(contexte.base, variantes);
+      if (numero !== demande.current) return;
+      setReponse(resultat);
     } catch (e) {
+      if (numero !== demande.current) return;
       setErreur(e instanceof Error ? e.message : "La simulation a échoué.");
     } finally {
-      setCalcul(false);
+      // Une réponse périmée ne doit pas éteindre l'indicateur d'une requête encore en vol.
+      if (numero === demande.current) setCalcul(false);
     }
   }, [contexte, variantes]);
 
@@ -241,7 +299,7 @@ function SimulateurPage() {
       {erreur && (
         <div className="animate-rise mb-6 flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <p className="text-sm text-destructive">{erreur}</p>
+          <p className="text-[0.9375rem] text-destructive">{erreur}</p>
         </div>
       )}
 
@@ -265,12 +323,16 @@ function SimulateurPage() {
               // Ce que la phrase décrit est retenu d'office ; les suggestions, non :
               // l'utilisateur ne doit jamais subir des chiffres qu'il n'a pas demandés.
               setRetenus(liste.filter((s) => !s.propose).slice(0, 3).map((s) => s.id));
+              // Ce qui s'affiche vient d'être analysé : ce n'est plus une reprise.
+              setRepris(false);
             }}
             resume={resume}
             desactive={calcul}
+            repris={repris}
+            onReinitialiser={reinitialiser}
           />
 
-          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted-foreground">
             {calcul && <Loader2 className="size-3.5 animate-spin" />}
             {contexte.ca_source} · {contexte.nb_factures_prises_en_compte} facture
             {contexte.nb_factures_prises_en_compte > 1 ? "s" : ""} prise
@@ -310,8 +372,8 @@ function SimulateurPage() {
               {recommandations.length > 0 && (
                 <section className="space-y-4">
                   <div>
-                    <h2 className="text-lg">Ce qu'il faut vérifier</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <h2 className="text-xl sm:text-2xl">Ce qu'il faut vérifier</h2>
+                    <p className="mt-1 text-[0.9375rem] text-muted-foreground">
                       Croisement des calculs avec vos factures et votre profil.
                     </p>
                   </div>
@@ -384,7 +446,7 @@ function BlocDetail({
       >
         <span className="flex items-center gap-2">
           <Table2 className="size-4 shrink-0 text-muted-foreground" />
-          <span className="text-sm font-medium">Les chiffres en détail</span>
+          <span className="text-[0.9375rem] font-medium">Les chiffres en détail</span>
         </span>
         <ChevronDown
           className={cn(
@@ -411,10 +473,10 @@ function BlocDetail({
 
           {avertissements.length > 0 && (
             <div className="rounded-xl border border-border bg-secondary/40 p-4">
-              <p className="rule-label text-muted-foreground">Ce que le moteur signale</p>
+              <p className="rule-label-lg text-label-ink">Ce que le moteur signale</p>
               <ul className="mt-3 space-y-2">
                 {avertissements.map((message) => (
-                  <li key={message} className="text-xs leading-relaxed text-muted-foreground">
+                  <li key={message} className="text-[0.8125rem] leading-relaxed text-muted-foreground">
                     {message}
                   </li>
                 ))}
@@ -443,18 +505,18 @@ function TableauComparatif({
   return (
     <section className="animate-rise overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-[0.9375rem]">
           <caption className="sr-only">
             Comparaison chiffrée des scénarios : net perçu, prélèvements et écart face à la
             situation actuelle
           </caption>
           <thead className="border-b border-border bg-secondary/50">
             <tr>
-              <th scope="col" className="rule-label px-5 py-3.5 text-left text-muted-foreground">
+              <th scope="col" className="rule-label-lg px-5 py-3.5 text-left text-label-ink">
                 Scénario
               </th>
               {["CA", "Net perçu", "Prélèvements", "Taux", "Écart net"].map((h) => (
-                <th key={h} scope="col" className="rule-label px-5 py-3.5 text-right text-muted-foreground">
+                <th key={h} scope="col" className="rule-label-lg px-5 py-3.5 text-right text-label-ink">
                   {h}
                 </th>
               ))}
@@ -476,7 +538,7 @@ function TableauComparatif({
                       />
                       {scenario.libelle}
                       {depasse && (
-                        <span className="rule-label text-destructive">plafond dépassé</span>
+                        <span className="rule-label-lg text-destructive">plafond dépassé</span>
                       )}
                     </span>
                   </th>
@@ -521,25 +583,25 @@ function BlocNonCalculable({
 }) {
   return (
     <section className="animate-rise rounded-2xl border border-warning/40 bg-warning/10 p-5">
-      <h2 className="flex items-center gap-2 text-sm font-medium text-warning-ink">
+      <h2 className="flex items-center gap-2 text-[0.9375rem] font-medium text-warning-ink">
         <CircleAlert className="size-4 shrink-0" />
         Certains montants ne sont pas calculés
       </h2>
       <ul className="mt-3 space-y-2">
         {champs.map((champ) => (
-          <li key={champ.champ} className="text-xs leading-relaxed text-warning-ink">
+          <li key={champ.champ} className="text-[0.8125rem] leading-relaxed text-warning-ink">
             <strong>{champ.libelle}</strong> — {champ.consequence}
           </li>
         ))}
       </ul>
-      <p className="mt-4 text-xs text-warning-ink">
+      <p className="mt-4 text-[0.8125rem] text-warning-ink">
         Les cotisations sociales et la formation professionnelle, elles, restent calculées :
         elles ne dépendent pas du foyer.
       </p>
       <div className="mt-4">
         <Link
           to="/parametres"
-          className="inline-flex h-9 items-center justify-center rounded-xl border border-warning/50 px-4 text-xs font-medium text-warning-ink transition-colors hover:border-warning"
+          className="inline-flex h-9 items-center justify-center rounded-xl border border-warning/50 px-4 text-[0.8125rem] font-medium text-warning-ink transition-colors hover:border-warning"
         >
           Compléter mon profil fiscal
         </Link>
@@ -574,7 +636,7 @@ function EtatIndisponible() {
   return (
     <div className="animate-rise rounded-2xl border border-border bg-card p-10 text-center shadow-soft">
       <h2 className="text-xl">Simulation indisponible</h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+      <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted-foreground">
         Le contexte de simulation n'a pas pu être chargé. Vérifiez votre connexion, puis
         rechargez la page.
       </p>

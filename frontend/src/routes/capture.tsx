@@ -419,7 +419,7 @@ function CapturePage() {
       <div className="grid items-start gap-8 lg:grid-cols-2">
         <div className="space-y-5">
           <section className="space-y-3">
-            <h2 className="rule-label text-accent-ink">Déposer</h2>
+            <h2 className="rule-label-lg text-accent-ink">Déposer</h2>
 
             <div
               className="flex rounded-2xl border border-border bg-card p-1.5 shadow-soft"
@@ -432,7 +432,7 @@ function CapturePage() {
                 aria-selected={depositMode === "documents"}
                 onClick={() => setDepositMode("documents")}
                 className={cn(
-                  "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  "flex-1 rounded-xl px-3 py-2 text-[0.9375rem] font-medium transition-colors",
                   depositMode === "documents"
                     ? "bg-secondary text-foreground"
                     : "text-muted-foreground hover:text-foreground",
@@ -446,7 +446,7 @@ function CapturePage() {
                 aria-selected={depositMode === "cadeau"}
                 onClick={() => setDepositMode("cadeau")}
                 className={cn(
-                  "flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  "flex-1 rounded-xl px-3 py-2 text-[0.9375rem] font-medium transition-colors",
                   depositMode === "cadeau"
                     ? "bg-secondary text-foreground"
                     : "text-muted-foreground hover:text-foreground",
@@ -491,10 +491,10 @@ function CapturePage() {
                 >
                   <UploadCloud className="size-5" />
                 </div>
-                <p className="text-sm font-medium">
+                <p className="text-[0.9375rem] font-medium">
                   {dragging ? "Relâchez pour analyser" : "Glissez vos documents ici"}
                 </p>
-                <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
+                <p className="mt-1.5 max-w-xs text-[0.8125rem] leading-relaxed text-muted-foreground">
                   Factures, virements, contrats · PDF ou image · 20 Mo max
                 </p>
               </label>
@@ -506,14 +506,14 @@ function CapturePage() {
           {queue.length > 0 && (
             <section className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-soft">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="rule-label text-muted-foreground">
+                <h3 className="rule-label-lg text-label-ink">
                   Traitement · {done}/{queue.length}
                 </h3>
                 {!busy && (
                   <button
                     type="button"
                     onClick={() => setQueue([])}
-                    className="text-xs text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+                    className="text-[0.8125rem] text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
                   >
                     Effacer
                   </button>
@@ -539,7 +539,7 @@ function CapturePage() {
                 {queue.map((it) => (
                   <li
                     key={it.key}
-                    className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm odd:bg-secondary/30"
+                    className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[0.9375rem] odd:bg-secondary/30"
                   >
                     <StatusIcon status={it.status} />
                     <span className="min-w-0 flex-1 truncate" title={it.name}>
@@ -547,7 +547,7 @@ function CapturePage() {
                     </span>
                     <span
                       className={cn(
-                        "shrink-0 text-xs",
+                        "shrink-0 text-[0.8125rem]",
                         it.status === "erreur"
                           ? "text-destructive"
                           : it.status === "non_reconnu"
@@ -564,14 +564,14 @@ function CapturePage() {
 
               {analysing && (
                 <div className="space-y-2 border-t border-border pt-3">
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-[0.8125rem] text-muted-foreground">
                     OCR, extraction et classification… 30 à 90 secondes par pièce.
                   </p>
                   <div className="grid grid-cols-5 gap-2">
                     {PIPELINE.map((step) => (
                       <div key={step} className="space-y-2">
                         <div className="h-1.5 animate-pulse rounded-full bg-border" />
-                        <span className="rule-label block text-muted-foreground">{step}</span>
+                        <span className="rule-label-lg block text-label-ink">{step}</span>
                       </div>
                     ))}
                   </div>
@@ -587,7 +587,7 @@ function CapturePage() {
                     .map((it) => (
                       <li
                         key={it.key}
-                        className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-ink"
+                        className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[0.8125rem] text-warning-ink"
                       >
                         <FileQuestion className="mt-0.5 size-3.5 shrink-0" />
                         <span>
@@ -603,7 +603,7 @@ function CapturePage() {
                   {queue
                     .filter((it) => it.status === "erreur")
                     .map((it) => (
-                      <li key={it.key} className="text-xs text-destructive">
+                      <li key={it.key} className="text-[0.8125rem] text-destructive">
                         <span className="font-medium">{it.name}</span> — {it.message}
                       </li>
                     ))}
@@ -628,9 +628,9 @@ function CapturePage() {
                     ? "Lecture à confirmer"
                     : "Information requise"}
                 </Badge>
-                <span className="truncate text-xs text-muted-foreground">{asking.name}</span>
+                <span className="truncate text-[0.8125rem] text-muted-foreground">{asking.name}</span>
               </div>
-              <p className="text-sm font-medium">{asking.pending.question}</p>
+              <p className="text-[0.9375rem] font-medium">{asking.pending.question}</p>
               {asking.pending.suggestions && asking.pending.suggestions.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {asking.pending.suggestions.map((s) => (
@@ -638,7 +638,7 @@ function CapturePage() {
                       key={s}
                       type="button"
                       onClick={() => setHitlAnswer(s)}
-                      className="suggestion-chip rounded-full px-3 py-1.5 text-xs font-medium"
+                      className="suggestion-chip rounded-full px-3 py-1.5 text-[0.8125rem] font-medium"
                     >
                       {s}
                     </button>
@@ -650,14 +650,14 @@ function CapturePage() {
                 value={hitlAnswer}
                 onChange={(e) => setHitlAnswer(e.target.value)}
                 placeholder="Votre réponse…"
-                className="input-boxed w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+                className="input-boxed w-full rounded-xl border border-border bg-card px-4 py-2.5 text-[0.9375rem] focus:border-ink focus:outline-none"
               />
               <div className="flex items-center gap-3">
                 <Button type="submit" disabled={!hitlAnswer.trim() || hitlSending}>
                   <Send /> Envoyer
                 </Button>
                 {queue.some((it) => it.status === "attente") && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[0.8125rem] text-muted-foreground">
                     Les pièces suivantes reprendront après votre réponse.
                   </p>
                 )}
@@ -670,9 +670,9 @@ function CapturePage() {
         {/* Colonne bibliothèque */}
         <div className="space-y-5">
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="rule-label text-accent-ink">Mes documents</h2>
+            <h2 className="rule-label-lg text-accent-ink">Mes documents</h2>
             {unified.length > 0 && (
-              <span className="num text-xs text-muted-foreground">
+              <span className="num text-[0.8125rem] text-muted-foreground">
                 {unified.length} pièce{unified.length > 1 ? "s" : ""}
               </span>
             )}
@@ -682,7 +682,7 @@ function CapturePage() {
             <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border p-8 text-center">
               <div className="space-y-2">
                 <FileText className="mx-auto size-6 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[0.9375rem] text-muted-foreground">
                   Aucun document analysé pour l'instant.
                 </p>
               </div>
@@ -726,13 +726,13 @@ function CapturePage() {
                               <KindIcon kind={doc.kind} />
                               {KIND_LABEL[doc.kind]}
                             </Badge>
-                            <span className="truncate text-sm font-medium">{doc.label}</span>
+                            <span className="truncate text-[0.9375rem] font-medium">{doc.label}</span>
                           </span>
-                          <span className="block truncate text-xs text-muted-foreground">
+                          <span className="block truncate text-[0.8125rem] text-muted-foreground">
                             {doc.subtitle}
                           </span>
                         </span>
-                        <span className="num shrink-0 text-right text-xs text-muted-foreground">
+                        <span className="num shrink-0 text-right text-[0.8125rem] text-muted-foreground">
                           {doc.amount != null
                             ? `${formatMoney(doc.amount)} ${doc.currency ?? "€"}`
                             : "—"}
@@ -779,8 +779,8 @@ function CapturePage() {
         >
           <div className="mb-5 flex items-start justify-between gap-3 border-b border-border pb-4">
             <div className="min-w-0">
-              <p className="rule-label text-muted-foreground">Détails du document</p>
-              <p className="truncate text-sm font-medium">{openDoc?.label ?? "Document"}</p>
+              <p className="rule-label-lg text-label-ink">Détails du document</p>
+              <p className="truncate text-[0.9375rem] font-medium">{openDoc?.label ?? "Document"}</p>
             </div>
             <Button
               variant="outline"
@@ -830,7 +830,7 @@ function CapturePage() {
           </AlertDialogHeader>
 
           {deleteError && (
-            <p role="alert" className="text-sm font-medium text-destructive">
+            <p role="alert" className="text-[0.9375rem] font-medium text-destructive">
               {deleteError}
             </p>
           )}

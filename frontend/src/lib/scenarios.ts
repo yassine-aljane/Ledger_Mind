@@ -267,6 +267,92 @@ export function interpreterPhrase(phrase: string): Promise<InterpretationScenari
   });
 }
 
+// -------------------------------------------------------------- Brouillon de scénarios
+
+/**
+ * Ce que l'utilisateur a SAISI, jamais ce que le moteur a répondu.
+ *
+ * Le distinguo est le cœur de ce module. Rejouer un brouillon consiste à relancer le calcul
+ * à partir de l'intention, pas à ressortir des montants d'un tiroir : entre-temps une
+ * facture a pu être émise, le profil fiscal a pu changer, et réafficher les anciens chiffres
+ * les présenterait comme à jour. On mémorise donc l'intention, et le moteur recalcule.
+ */
+export type BrouillonScenarios = {
+  /** La phrase telle qu'elle est dans le champ, même non analysée. */
+  phrase: string;
+  /** Scénarios compris + contre-scénarios proposés, dans l'ordre d'affichage. */
+  compris: ScenarioInterprete[];
+  /** Reformulation du modèle, affichée sous « Ce que j'ai compris ». */
+  resume: string | null;
+  /** Identifiants retenus, DANS L'ORDRE : c'est lui qui fixe les teintes des courbes. */
+  retenus: string[];
+};
+
+const BROUILLON_SCENARIOS_KEY = "ledgermind_scenarios_brouillon";
+
+/**
+ * `sessionStorage` et non `localStorage` : un scénario est une exploration en cours, pas un
+ * document enregistré. Il doit survivre à un changement d'écran ou à un rechargement — le
+ * bug qu'on corrige ici — mais retrouver une hypothèse d'il y a trois semaines en ouvrant
+ * l'app serait déroutant, et laisserait croire à un scénario sauvegardé qui ne l'est pas.
+ */
+export function enregistrerBrouillonScenarios(brouillon: BrouillonScenarios): void {
+  try {
+    if (typeof window === "undefined") return;
+
+    // Rien à retenir : on PURGE la clé au lieu d'y écrire un brouillon vide. C'est ce qui rend
+    // « Repartir de zéro » définitif — sinon l'entrée subsistait et la visite suivante la
+    // restaurait comme un brouillon légitime. C'est aussi la seule façon d'effacer : il n'y a
+    // pas de fonction d'oubli séparée, qui serait de toute façon écrasée par l'effet
+    // d'enregistrement au rendu suivant.
+    if (brouillon.compris.length === 0 && !brouillon.phrase.trim()) {
+      sessionStorage.removeItem(BROUILLON_SCENARIOS_KEY);
+      return;
+    }
+
+    sessionStorage.setItem(BROUILLON_SCENARIOS_KEY, JSON.stringify(brouillon));
+  } catch {
+    /* quota plein ou stockage refusé : le brouillon est un confort, jamais un prérequis */
+  }
+}
+
+/**
+ * Relecture DÉFENSIVE : le contenu vient du stockage du navigateur, donc d'une version
+ * peut-être antérieure du format. Un champ inattendu ne doit pas casser l'écran — au pire on
+ * repart d'un brouillon vide, ce qui est exactement l'état d'avant ce correctif.
+ */
+export function chargerBrouillonScenarios(): BrouillonScenarios | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const brut = sessionStorage.getItem(BROUILLON_SCENARIOS_KEY);
+    if (!brut) return null;
+
+    const donnees = JSON.parse(brut) as Partial<BrouillonScenarios> | null;
+    if (donnees == null || typeof donnees !== "object") return null;
+
+    const compris = liste(donnees.compris).filter(
+      (s): s is ScenarioInterprete =>
+        s != null && typeof s.id === "string" && typeof s.libelle === "string",
+    );
+    // Un identifiant retenu qui ne correspond à aucun scénario compris ferait une courbe
+    // fantôme dans la comparaison : on ne garde que ceux qui existent encore.
+    const idsConnus = new Set(compris.map((s) => s.id));
+    const retenus = liste(donnees.retenus).filter(
+      (id): id is string => typeof id === "string" && idsConnus.has(id),
+    );
+
+    const phrase = typeof donnees.phrase === "string" ? donnees.phrase : "";
+    const resume = typeof donnees.resume === "string" ? donnees.resume : null;
+
+    // Rien à restaurer : autant ne rien annoncer à l'écran.
+    if (!phrase.trim() && compris.length === 0) return null;
+
+    return { phrase, compris, resume, retenus };
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------- Garde-fous
 
 function nombre(v: number | null | undefined): number | null {

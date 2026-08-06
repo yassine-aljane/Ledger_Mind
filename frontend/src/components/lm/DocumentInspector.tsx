@@ -79,7 +79,7 @@ function money(
       <span className="num">
         {formatMoney(amount)} {cur}
         {amountEur != null && cur !== "EUR" && (
-          <span className="ml-2 text-xs text-muted-foreground">≈ {formatMoney(amountEur)} €</span>
+          <span className="ml-2 text-[0.8125rem] text-muted-foreground">≈ {formatMoney(amountEur)} €</span>
         )}
       </span>
     ),
@@ -168,7 +168,7 @@ function Hero({
     // `flex-1 min-w-0` : sans cela, la légende de conversion élargit le bloc et
     // repousse la pastille d'état à la ligne suivante, où elle paraît orpheline.
     <div className="min-w-0 flex-1">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-[0.8125rem] text-muted-foreground">{label}</p>
       <p className="mt-1 font-mono text-4xl font-semibold tracking-tight proportional-nums sm:text-5xl">
         {amount != null ? formatMoney(amount) : "—"}
         {amount != null && (
@@ -186,7 +186,7 @@ function Hero({
           <p className="mt-1.5 font-mono text-xl font-medium proportional-nums text-foreground">
             = {formatMoney(amountEur)} <span className="text-base">EUR</span>
           </p>
-          <p className="num mt-1 text-xs text-muted-foreground">
+          <p className="num mt-1 text-[0.8125rem] text-muted-foreground">
             taux {rate != null ? rate.toLocaleString("fr-FR", { maximumFractionDigits: 6 }) : "—"}
             {rateDate ? ` du ${frDate(rateDate)}` : ""}
             {rateSource ? ` · source ${rateSource}` : ""}
@@ -197,7 +197,7 @@ function Hero({
       {/* Une devise non convertible doit se voir : sans cela, le montant en
           euros paraîtrait simplement oublié. */}
       {etranger && amountEur == null && (
-        <p className="mt-1.5 text-xs text-muted-foreground">
+        <p className="mt-1.5 text-[0.8125rem] text-muted-foreground">
           Contre-valeur en euros indisponible pour cette devise.
         </p>
       )}
@@ -209,8 +209,8 @@ function Hero({
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="num mt-0.5 truncate text-sm font-medium">{children}</p>
+      <p className="text-[0.8125rem] text-muted-foreground">{label}</p>
+      <p className="num mt-0.5 truncate text-[0.9375rem] font-medium">{children}</p>
     </div>
   );
 }
@@ -228,7 +228,7 @@ function StatePill({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.8125rem] font-medium",
         tone === "success" && "border-success/30 bg-success/12 text-success-ink",
         tone === "warning" && "border-warning/40 bg-warning/15 text-warning-ink",
         tone === "danger" && "border-destructive/30 bg-destructive/10 text-destructive",
@@ -266,7 +266,7 @@ function FieldEditor({
           if (e.key === "Escape") onCancel();
         }}
         placeholder="Laisser vide pour effacer"
-        className="min-w-0 flex-1 rounded-md border border-ink/40 bg-card px-2 py-1 text-sm focus:border-ink focus:outline-none"
+        className="min-w-0 flex-1 rounded-md border border-ink/40 bg-card px-2 py-1 text-[0.9375rem] focus:border-ink focus:outline-none"
       />
       <button
         type="button"
@@ -319,7 +319,7 @@ function Section({
   if (visible.length === 0) return null;
   return (
     <section className="space-y-2">
-      <h4 className="rule-label text-accent-ink">{title}</h4>
+      <h4 className="rule-label-lg text-accent-ink">{title}</h4>
       <dl className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60">
         {visible.map((r) => {
           const modifiable = Boolean(r.field && editable.has(r.field));
@@ -327,7 +327,7 @@ function Section({
           return (
             <div
               key={r.label}
-              className="group grid grid-cols-[minmax(0,10rem)_1fr] gap-3 px-3 py-2 text-sm odd:bg-secondary/30"
+              className="group grid grid-cols-[minmax(0,10rem)_1fr] gap-3 px-3 py-2 text-[0.9375rem] odd:bg-secondary/30"
             >
               <dt className="flex items-start gap-1.5 text-muted-foreground">
                 <span className="min-w-0">{r.label}</span>
@@ -452,7 +452,7 @@ function Preview({ detail }: { detail: CaptureDocumentDetail }) {
   // Repli : les documents analysés avant la conservation des pièces n'ont que leur texte OCR.
   return (
     <div className="space-y-3">
-      <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/12 px-4 py-3 text-sm text-warning-ink">
+      <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/12 px-4 py-3 text-[0.9375rem] text-warning-ink">
         <FileWarning className="mt-0.5 size-4 shrink-0" />
         <p>
           {state === "error"
@@ -461,11 +461,11 @@ function Preview({ detail }: { detail: CaptureDocumentDetail }) {
         </p>
       </div>
       {detail.ocr_text ? (
-        <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-secondary/40 p-4 font-mono text-xs leading-relaxed text-muted-foreground">
+        <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-secondary/40 p-4 font-mono text-[0.8125rem] leading-relaxed text-muted-foreground">
           {detail.ocr_text}
         </pre>
       ) : (
-        <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl border border-dashed border-border p-6 text-center text-[0.9375rem] text-muted-foreground">
           Aucun texte disponible.
         </p>
       )}
@@ -567,7 +567,7 @@ export function DocumentInspector({ documentId, onChat }: Props) {
     return (
       <div
         role="alert"
-        className="rounded-2xl border border-destructive/30 bg-destructive/8 p-5 text-sm font-medium text-destructive"
+        className="rounded-2xl border border-destructive/30 bg-destructive/8 p-5 text-[0.9375rem] font-medium text-destructive"
       >
         {error ?? "Document introuvable."}
       </div>
@@ -749,7 +749,7 @@ export function DocumentInspector({ documentId, onChat }: Props) {
               "sender_iban",
               {
                 node: tr?.sender_iban ? (
-                  <span className="num text-xs break-all">{tr.sender_iban}</span>
+                  <span className="num text-[0.8125rem] break-all">{tr.sender_iban}</span>
                 ) : (
                   <Empty />
                 ),
@@ -765,7 +765,7 @@ export function DocumentInspector({ documentId, onChat }: Props) {
               "beneficiary_iban",
               {
                 node: tr?.beneficiary_iban ? (
-                  <span className="num text-xs break-all">{tr.beneficiary_iban}</span>
+                  <span className="num text-[0.8125rem] break-all">{tr.beneficiary_iban}</span>
                 ) : (
                   <Empty />
                 ),
@@ -847,7 +847,7 @@ export function DocumentInspector({ documentId, onChat }: Props) {
           >
             {isVirement ? "Virement" : isContrat ? "Contrat" : isCadeau ? "Cadeau" : "Facture"}
           </Badge>
-          <h2 className="truncate text-lg">{label}</h2>
+          <h2 className="truncate text-xl">{label}</h2>
         </div>
         {onChat && (
           <Button variant="outline" size="sm" onClick={() => onChat(label)}>
@@ -860,10 +860,10 @@ export function DocumentInspector({ documentId, onChat }: Props) {
         {/* La fiche est bien plus haute que l'aperçu : on garde la pièce sous les
             yeux pendant qu'on parcourt les montants. */}
         <div className="space-y-3 xl:sticky xl:top-24 xl:self-start">
-          <h3 className="rule-label text-muted-foreground">Aperçu</h3>
+          <h3 className="rule-label-lg text-label-ink">Aperçu</h3>
           <Preview detail={detail} />
           {detail.filename && (
-            <p className="truncate text-xs text-muted-foreground" title={detail.filename}>
+            <p className="truncate text-[0.8125rem] text-muted-foreground" title={detail.filename}>
               {detail.filename}
               {detail.detected_language && detail.detected_language !== "fr" && (
                 <span className="ml-2 inline-flex items-center gap-1">
@@ -879,7 +879,7 @@ export function DocumentInspector({ documentId, onChat }: Props) {
           {(detail.writing_mode === "manuscrit" || detail.writing_mode === "mixte") && (
             <div className="flex items-start gap-2 rounded-xl border border-border bg-secondary/50 px-3.5 py-3">
               <PenLine className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 space-y-1 text-xs text-muted-foreground">
+              <div className="min-w-0 space-y-1 text-[0.8125rem] text-muted-foreground">
                 <p className="font-medium text-foreground">
                   {detail.writing_mode === "manuscrit"
                     ? "Document manuscrit"
@@ -903,8 +903,8 @@ export function DocumentInspector({ documentId, onChat }: Props) {
 
         <div className="space-y-5">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="rule-label text-muted-foreground">Fiche</h3>
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <h3 className="rule-label-lg text-label-ink">Fiche</h3>
+            <label className="flex cursor-pointer items-center gap-2 text-[0.8125rem] text-muted-foreground">
               <input
                 type="checkbox"
                 checked={hideEmpty}
@@ -1063,8 +1063,8 @@ export function DocumentInspector({ documentId, onChat }: Props) {
 
             {!isVirement && !isContrat && detail.expense_category && (
               <div className="mt-4 flex items-center gap-2 border-t border-border/70 pt-4">
-                <span className="text-xs text-muted-foreground">Poste de dépense</span>
-                <span className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium capitalize">
+                <span className="text-[0.8125rem] text-muted-foreground">Poste de dépense</span>
+                <span className="rounded-full border border-border bg-card px-2.5 py-0.5 text-[0.8125rem] font-medium capitalize">
                   {detail.expense_category}
                 </span>
               </div>
@@ -1072,8 +1072,8 @@ export function DocumentInspector({ documentId, onChat }: Props) {
 
             {isContrat && ct?.contract_type && (
               <div className="mt-4 flex items-center gap-2 border-t border-border/70 pt-4">
-                <span className="text-xs text-muted-foreground">Nature</span>
-                <span className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium capitalize">
+                <span className="text-[0.8125rem] text-muted-foreground">Nature</span>
+                <span className="rounded-full border border-border bg-card px-2.5 py-0.5 text-[0.8125rem] font-medium capitalize">
                   {ct.contract_type}
                 </span>
               </div>
@@ -1083,9 +1083,9 @@ export function DocumentInspector({ documentId, onChat }: Props) {
           {/* Contrôles déterministes — des vérifications de cohérence, pas un avis. */}
           {detail.incoherences && (
             <section className="space-y-2">
-              <h4 className="rule-label text-accent-ink">Contrôles</h4>
+              <h4 className="rule-label-lg text-accent-ink">Contrôles</h4>
               {detail.incoherences.length === 0 ? (
-                <p className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2.5 text-sm text-success-ink">
+                <p className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-3 py-2.5 text-[0.9375rem] text-success-ink">
                   <ShieldCheck className="size-4 shrink-0" />
                   Aucune anomalie détectée sur cette pièce.
                 </p>
@@ -1094,7 +1094,7 @@ export function DocumentInspector({ documentId, onChat }: Props) {
                   {detail.incoherences.map((inc, i) => (
                     <li
                       key={i}
-                      className="flex items-start gap-2 bg-warning/10 px-3 py-2.5 text-sm text-warning-ink"
+                      className="flex items-start gap-2 bg-warning/10 px-3 py-2.5 text-[0.9375rem] text-warning-ink"
                     >
                       <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                       <span>{inc}</span>
@@ -1109,14 +1109,14 @@ export function DocumentInspector({ documentId, onChat }: Props) {
               savoir qui s'engage prime sur les conditions. */}
           {isContrat && ct?.parties && ct.parties.length > 0 && (
             <section className="space-y-2">
-              <h4 className="rule-label text-accent-ink">Parties signataires</h4>
+              <h4 className="rule-label-lg text-accent-ink">Parties signataires</h4>
               <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60">
                 {ct.parties.map((p, i) => (
-                  <li key={i} className="flex items-start gap-3 px-3 py-2.5 text-sm odd:bg-secondary/30">
+                  <li key={i} className="flex items-start gap-3 px-3 py-2.5 text-[0.9375rem] odd:bg-secondary/30">
                     <Users className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
                       <p className="font-medium">{p.name ?? <Empty />}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[0.8125rem] text-muted-foreground">
                         {p.role ?? "rôle non précisé"}
                         {p.identifier && <span className="num ml-2">{p.identifier}</span>}
                       </p>
@@ -1130,13 +1130,13 @@ export function DocumentInspector({ documentId, onChat }: Props) {
           {editError && (
             <p
               role="alert"
-              className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[0.9375rem] text-destructive"
             >
               {editError}
             </p>
           )}
           {notice && !editError && (
-            <p className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success-ink">
+            <p className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-[0.9375rem] text-success-ink">
               <Check className="size-3.5 shrink-0" />
               {notice}
             </p>
@@ -1164,11 +1164,11 @@ export function DocumentInspector({ documentId, onChat }: Props) {
 
           {isContrat && ct?.obligations && ct.obligations.length > 0 && (
             <section className="space-y-2">
-              <h4 className="rule-label text-accent-ink">Engagements clés</h4>
+              <h4 className="rule-label-lg text-accent-ink">Engagements clés</h4>
               <ul className="space-y-1.5">
                 {ct.obligations.map((o, i) => (
-                  <li key={i} className="flex gap-2.5 rounded-lg bg-secondary/60 px-3 py-2 text-sm">
-                    <span className="num shrink-0 text-xs text-muted-foreground">
+                  <li key={i} className="flex gap-2.5 rounded-lg bg-secondary/60 px-3 py-2 text-[0.9375rem]">
+                    <span className="num shrink-0 text-[0.8125rem] text-muted-foreground">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="min-w-0 text-muted-foreground">{o}</span>
@@ -1180,12 +1180,12 @@ export function DocumentInspector({ documentId, onChat }: Props) {
 
           {!isVirement && inv?.line_items && inv.line_items.length > 0 && (
             <section className="space-y-2">
-              <h4 className="rule-label text-accent-ink">Détail des lignes</h4>
+              <h4 className="rule-label-lg text-accent-ink">Détail des lignes</h4>
               {/* Colonnes de chiffres : ici la chasse tabulaire est la bonne. */}
               <div className="overflow-x-auto rounded-xl border border-border/60">
-                <table className="w-full text-sm">
+                <table className="w-full text-[0.9375rem]">
                   <thead>
-                    <tr className="border-b border-border/60 bg-secondary/40 text-xs text-muted-foreground">
+                    <tr className="border-b border-border/60 bg-secondary/40 text-[0.8125rem] text-muted-foreground">
                       <th className="px-3 py-2 text-left font-normal">Désignation</th>
                       <th className="px-3 py-2 text-right font-normal">Qté</th>
                       <th className="px-3 py-2 text-right font-normal">P.U.</th>
@@ -1219,12 +1219,12 @@ export function DocumentInspector({ documentId, onChat }: Props) {
               de page, pas le sujet principal. */}
           {synthese && (synthese.body || synthese.caution) && (
             <section className="space-y-3">
-              <h4 className="rule-label text-accent-ink">Synthèse</h4>
+              <h4 className="rule-label-lg text-accent-ink">Synthèse</h4>
 
               {synthese.body && (
                 <Markdown
                   text={synthese.body}
-                  className="border-l-2 border-border pl-4 text-sm text-muted-foreground"
+                  className="border-l-2 border-border pl-4 text-[0.9375rem] text-muted-foreground"
                 />
               )}
 
@@ -1235,8 +1235,8 @@ export function DocumentInspector({ documentId, onChat }: Props) {
                 <div className="flex items-start gap-2.5 rounded-xl border border-border bg-secondary/50 px-3.5 py-3">
                   <Eye className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 space-y-1">
-                    <p className="rule-label text-muted-foreground">Point de vigilance</p>
-                    <Markdown text={synthese.caution} className="text-sm text-muted-foreground" />
+                    <p className="rule-label-lg text-label-ink">Point de vigilance</p>
+                    <Markdown text={synthese.caution} className="text-[0.9375rem] text-muted-foreground" />
                   </div>
                 </div>
               )}

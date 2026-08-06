@@ -62,7 +62,7 @@ function AnalysePhoto({ nom, phase }: { nom: string; phase: PhasePhoto }) {
 
   return (
     <section className="animate-rise space-y-3 rounded-2xl border border-border bg-card p-5 shadow-soft">
-      <h3 className="rule-label text-muted-foreground">Analyse du cadeau · {fini ? 1 : 0}/1</h3>
+      <h3 className="rule-label-lg text-label-ink">Analyse du cadeau · {fini ? 1 : 0}/1</h3>
 
       <div
         className="h-1.5 overflow-hidden rounded-full bg-border"
@@ -80,7 +80,7 @@ function AnalysePhoto({ nom, phase }: { nom: string; phase: PhasePhoto }) {
         />
       </div>
 
-      <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm">
+      <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[0.9375rem]">
         {phase === "analyse" ? (
           <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
         ) : phase === "termine" ? (
@@ -93,7 +93,7 @@ function AnalysePhoto({ nom, phase }: { nom: string; phase: PhasePhoto }) {
         </span>
         <span
           className={cn(
-            "shrink-0 text-xs",
+            "shrink-0 text-[0.8125rem]",
             phase === "erreur" ? "text-destructive" : "text-muted-foreground",
           )}
         >
@@ -103,7 +103,7 @@ function AnalysePhoto({ nom, phase }: { nom: string; phase: PhasePhoto }) {
 
       {phase === "analyse" && (
         <div className="space-y-2 border-t border-border pt-3">
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="truncate text-[0.8125rem] text-muted-foreground">
             Reconnaissance de l&apos;objet et estimation du prix public… 5 à 20 secondes.
           </p>
           <div className="grid grid-cols-4 gap-2">
@@ -113,7 +113,7 @@ function AnalysePhoto({ nom, phase }: { nom: string; phase: PhasePhoto }) {
                   className="h-1.5 animate-pulse rounded-full bg-border"
                   style={{ animationDelay: `${i * 160}ms` }}
                 />
-                <span className="rule-label block text-muted-foreground">{etape}</span>
+                <span className="rule-label-lg block text-label-ink">{etape}</span>
               </div>
             ))}
           </div>
@@ -126,8 +126,8 @@ function AnalysePhoto({ nom, phase }: { nom: string; phase: PhasePhoto }) {
 function LigneExtrait({ label, valeur }: { label: string; valeur: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-2.5 last:border-0">
-      <span className="rule-label shrink-0 text-muted-foreground">{label}</span>
-      <span className="min-w-0 text-right text-sm font-medium text-foreground">{valeur}</span>
+      <span className="rule-label-lg shrink-0 text-label-ink">{label}</span>
+      <span className="min-w-0 text-right text-[0.9375rem] font-medium text-foreground">{valeur}</span>
     </div>
   );
 }
@@ -255,11 +255,11 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
     <div className="space-y-5">
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
         <div className="space-y-4 border-b border-border px-5 pb-4 pt-5">
-          <h3 className="rule-label flex items-center gap-1.5 text-accent-ink">
+          <h3 className="rule-label-lg flex items-center gap-1.5 text-accent-ink">
             <Gift className="size-3" aria-hidden />
             Cadeaux et avantages en nature
           </h3>
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <p className="text-[0.9375rem] leading-relaxed text-muted-foreground">
             Un partenariat rémunéré en produits ou services («&nbsp;gifting&nbsp;») se déclare
             à sa valeur marchande — le prix public TTC — et entre au livre des recettes comme
             un encaissement.
@@ -282,7 +282,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
               />
             )}
             {photo && (
-              <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex min-w-0 items-center gap-2 text-[0.8125rem] text-muted-foreground">
                 <span className="max-w-56 truncate">{photo.name}</span>
                 <button
                   type="button"
@@ -313,11 +313,11 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                   {estimation.confiance === "haute" ? <Check /> : <TriangleAlert />}
                   Extrait · {CONFIANCE_LABEL[estimation.confiance] ?? estimation.confiance}
                 </Badge>
-                <span className="text-xs font-medium text-foreground">
+                <span className="text-[0.8125rem] font-medium text-foreground">
                   vérifiez puis ajoutez
                 </span>
               </div>
-              <p className="text-sm leading-relaxed text-foreground">{estimation.message}</p>
+              <p className="text-[0.9375rem] leading-relaxed text-foreground">{estimation.message}</p>
 
               <div className="rounded-lg bg-card/70 px-3">
                 <LigneExtrait
@@ -333,12 +333,12 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
               </div>
 
               {estimation.fourchette_min != null && estimation.fourchette_max != null && (
-                <p className="num text-xs text-muted-foreground">
+                <p className="num text-[0.8125rem] text-muted-foreground">
                   Fourchette estimée : {Math.round(estimation.fourchette_min)}–
                   {Math.round(estimation.fourchette_max)} €
                 </p>
               )}
-              <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+              <p className="flex items-start gap-1.5 text-[0.8125rem] leading-relaxed text-muted-foreground">
                 <Info className="mt-0.5 size-3 shrink-0" aria-hidden />
                 {estimation.avertissement}
               </p>
@@ -347,7 +347,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
             <button
               type="button"
               onClick={() => setCorriger((c) => !c)}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+              className="inline-flex items-center gap-1.5 text-[0.8125rem] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
             >
               <Pencil className="size-3" />
               {corriger ? "Masquer la correction" : "Corriger une valeur"}
@@ -361,7 +361,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                     type="date"
                     value={dateReception}
                     onChange={(e) => setDateReception(e.target.value)}
-                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-[0.9375rem] focus:outline-none"
                   />
                 </Champ>
                 <Champ label="Description" htmlFor="cadeau-description" requis>
@@ -370,7 +370,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-[0.9375rem] focus:outline-none"
                   />
                 </Champ>
                 <Champ label="Marque / client" htmlFor="cadeau-marque">
@@ -379,7 +379,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                     type="text"
                     value={marque}
                     onChange={(e) => setMarque(e.target.value)}
-                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-[0.9375rem] focus:outline-none"
                   />
                 </Champ>
                 <Champ label="Valeur TTC (€)" htmlFor="cadeau-valeur" requis>
@@ -390,7 +390,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                     step="0.01"
                     value={valeur}
                     onChange={(e) => setValeur(e.target.value)}
-                    className="input-boxed num w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+                    className="input-boxed num w-full rounded-xl border border-border bg-background px-3 py-2 text-[0.9375rem] focus:outline-none"
                   />
                 </Champ>
                 <div className="sm:col-span-2">
@@ -401,7 +401,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                       value={contrepartie}
                       onChange={(e) => setContrepartie(e.target.value)}
                       placeholder="ex. 1 post Instagram + 2 stories"
-                      className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+                      className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-[0.9375rem] focus:outline-none"
                     />
                   </Champ>
                 </div>
@@ -411,7 +411,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
             {error && (
               <p
                 role="alert"
-                className="rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-2.5 text-sm text-destructive"
+                className="rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-2.5 text-[0.9375rem] text-destructive"
               >
                 {error}
               </p>
@@ -425,15 +425,15 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
         )}
 
         {succes && (
-          <p className="border-t border-border px-5 py-4 text-sm text-success-ink">{succes}</p>
+          <p className="border-t border-border px-5 py-4 text-[0.9375rem] text-success-ink">{succes}</p>
         )}
 
         {error && phasePhoto === "erreur" && (
           <div className="space-y-4 border-t border-border p-5">
-            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-2.5 text-sm text-destructive">
+            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-2.5 text-[0.9375rem] text-destructive">
               {error}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[0.8125rem] text-muted-foreground">
               Importez une autre photo, ou corrigez manuellement si besoin.
             </p>
             {corriger && (
@@ -444,7 +444,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-[0.9375rem] focus:outline-none"
                   />
                 </Champ>
                 <Champ label="Valeur TTC (€)" htmlFor="cadeau-valeur-err" requis>
@@ -455,7 +455,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                     step="0.01"
                     value={valeur}
                     onChange={(e) => setValeur(e.target.value)}
-                    className="input-boxed num w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+                    className="input-boxed num w-full rounded-xl border border-border bg-background px-3 py-2 text-[0.9375rem] focus:outline-none"
                   />
                 </Champ>
                 <Champ label="Marque / client" htmlFor="cadeau-marque-err">
@@ -464,7 +464,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
                     type="text"
                     value={marque}
                     onChange={(e) => setMarque(e.target.value)}
-                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none"
+                    className="input-boxed w-full rounded-xl border border-border bg-background px-3 py-2 text-[0.9375rem] focus:outline-none"
                   />
                 </Champ>
                 <div className="flex items-end sm:col-span-2">
@@ -502,7 +502,7 @@ function Champ({
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="rule-label mb-2 block text-muted-foreground">
+      <label htmlFor={htmlFor} className="rule-label-lg mb-2 block text-label-ink">
         {label}
         {requis && <span className="ml-1 text-accent-ink">*</span>}
       </label>

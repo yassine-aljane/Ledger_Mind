@@ -64,7 +64,7 @@ function BlocChargement({ label }: { label: string }) {
   return (
     <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
       <Loader2 className="size-5 animate-spin text-primary" />
-      <p className="rule-label text-muted-foreground">{label}</p>
+      <p className="rule-label-lg text-label-ink">{label}</p>
     </div>
   );
 }
@@ -82,12 +82,12 @@ function ParcoursLock({ feature }: { feature: Feature }) {
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent/15">
           <Compass className="size-5 text-accent-ink" />
         </div>
-        <p className="rule-label mt-5 text-accent-ink">Premium · mise en route</p>
+        <p className="rule-label-lg mt-5 text-accent-ink">Premium · mise en route</p>
         <h1 className="mt-3 text-2xl">{copy.title}</h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{copy.body}</p>
+        <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted-foreground">{copy.body}</p>
         {/* Dire explicitement que l'abonnement est actif : sans ça, un écran fermé juste après
             avoir payé se lit comme un problème de paiement. */}
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-[0.8125rem] text-muted-foreground">
           Votre abonnement Premium est actif — il reste à compléter le questionnaire de mise en
           route.
         </p>
@@ -112,9 +112,9 @@ function ParcoursDoneLock() {
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-success/15">
           <Check className="size-5 text-success-ink" />
         </div>
-        <p className="rule-label mt-5 text-muted-foreground">Mise en route terminée</p>
+        <p className="rule-label-lg mt-5 text-label-ink">Mise en route terminée</p>
         <h1 className="mt-3 text-2xl">Vous avez déjà terminé votre mise en route</h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted-foreground">
           Cette étape est verrouillée : votre profil fiscal est en place. Retrouvez votre synthèse
           et vos prochaines actions dans Ma situation.
         </p>
@@ -137,7 +137,7 @@ function AuthLock({ premiumAttendu }: { premiumAttendu: boolean }) {
     <AppShell>
       <CarteCentree>
         <h1 className="text-2xl">Connectez-vous pour continuer</h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted-foreground">
           {premiumAttendu
             ? "Cette fonctionnalité fait partie de Premium. L'Assistant fiscal reste ouvert sans compte."
             : "Cet espace s'appuie sur votre dossier. L'Assistant fiscal reste ouvert sans compte."}
@@ -203,7 +203,7 @@ export function UpsellStrip({ text, cta = "Passer Premium" }: { text: string; ct
   if (loading || isPremium) return null;
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm">{text}</p>
+      <p className="text-[0.9375rem]">{text}</p>
       <Button asChild variant="accent" size="sm" className="shrink-0">
         <Link to="/premium">
           <Sparkles /> {cta}
@@ -226,7 +226,7 @@ export function ParcoursStrip({
   if (loading || state !== "premium_parcours") return null;
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm">{text}</p>
+      <p className="text-[0.9375rem]">{text}</p>
       <Button asChild variant="accent" size="sm" className="shrink-0">
         <Link to="/onboarding">Continuer le parcours</Link>
       </Button>
