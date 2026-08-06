@@ -46,7 +46,7 @@ function Chip({
       onClick={onClick}
       aria-pressed={actif}
       className={cn(
-        "rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-200 active:scale-[0.97]",
+        "rounded-full px-4 py-1.5 text-[0.8125rem] font-medium transition-all duration-200 active:scale-[0.97]",
         actif
           ? "bg-primary text-primary-foreground shadow-soft"
           : "border border-border text-muted-foreground hover:border-ink hover:text-foreground",
@@ -111,7 +111,7 @@ export function TransactionsFiltres({
             onChange={(e) => maj({ recherche: e.target.value })}
             placeholder="Rechercher un client, une référence…"
             aria-label="Rechercher une transaction"
-            className="input-boxed w-full rounded-lg border border-transparent bg-background py-2 pl-9 pr-3 text-sm"
+            className="input-boxed w-full rounded-lg border border-transparent bg-background py-2 pl-9 pr-3 text-[0.9375rem]"
           />
         </div>
 
@@ -149,7 +149,7 @@ export function EtiquetteFiltresActifs({
     filtres.recherche.trim() !== "";
 
   return (
-    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+    <div className="flex items-center justify-between gap-3 text-[0.8125rem] text-muted-foreground">
       <span>
         {nbResultats === 1 ? "1 transaction" : `${nbResultats} transactions`}
       </span>

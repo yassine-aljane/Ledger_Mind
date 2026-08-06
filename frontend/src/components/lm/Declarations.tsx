@@ -105,7 +105,7 @@ function Carte({ children, className }: { children: React.ReactNode; className?:
 function Rubrique({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      <h3 className="rule-label text-muted-foreground">{titre}</h3>
+      <h3 className="rule-label-lg text-label-ink">{titre}</h3>
       {children}
     </div>
   );
@@ -124,14 +124,14 @@ function LigneChiffre({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-2 last:border-0">
-      <span className={cn("text-sm", fort ? "font-medium text-ink" : "text-muted-foreground")}>
+      <span className={cn("text-[0.9375rem]", fort ? "font-medium text-ink" : "text-muted-foreground")}>
         {libelle}
-        {aide && <span className="ml-1 text-xs text-muted-foreground/70">· {aide}</span>}
+        {aide && <span className="ml-1 text-[0.8125rem] text-muted-foreground/70">· {aide}</span>}
       </span>
       <span
         className={cn(
           "num whitespace-nowrap tabular-nums",
-          fort ? "text-base font-semibold" : "text-sm",
+          fort ? "text-base font-semibold" : "text-[0.9375rem]",
         )}
       >
         {valeur}
@@ -152,17 +152,17 @@ function BlocRappel({ rappel }: { rappel: Rappel }) {
     <div className={cn("flex gap-3 rounded-xl border p-4", boite)}>
       <Icone className="mt-0.5 size-4 shrink-0" />
       <div className="space-y-1">
-        <p className="text-sm font-semibold">{rappel.titre}</p>
-        <p className="text-xs leading-relaxed opacity-90">{rappel.message}</p>
+        <p className="text-[0.9375rem] font-semibold">{rappel.titre}</p>
+        <p className="text-[0.8125rem] leading-relaxed opacity-90">{rappel.message}</p>
         {rappel.echeance && (
-          <p className="text-xs font-medium opacity-80">Échéance : {rappel.echeance}</p>
+          <p className="text-[0.8125rem] font-medium opacity-80">Échéance : {rappel.echeance}</p>
         )}
         {rappel.lien && (
           <a
             href={rappel.lien}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs underline opacity-80 hover:opacity-100"
+            className="inline-flex items-center gap-1 text-[0.8125rem] underline opacity-80 hover:opacity-100"
           >
             Site officiel <ExternalLink className="size-3" />
           </a>
@@ -191,21 +191,21 @@ function LigneChamp({ champ }: { champ: ChampBrouillon }) {
   return (
     <div className="space-y-1 border-b border-border/60 py-2.5 last:border-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="flex items-baseline gap-2 text-sm">
+        <span className="flex items-baseline gap-2 text-[0.9375rem]">
           {champ.case && (
-            <span className="num rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
+            <span className="num rounded bg-primary/10 px-1.5 py-0.5 text-[0.8125rem] font-semibold text-primary">
               {champ.case}
             </span>
           )}
           <span>{champ.libelle}</span>
           {champ.fiabilite === "a_verifier" && (
-            <span className="inline-flex items-center gap-1 text-xs text-amber-fiscal">
+            <span className="inline-flex items-center gap-1 text-[0.8125rem] text-amber-fiscal">
               <AlertTriangle className="size-3" /> à vérifier
             </span>
           )}
         </span>
         <span className="flex items-center gap-2">
-          <span className="num tabular-nums text-sm font-semibold">{valeurAffichee(champ)}</span>
+          <span className="num tabular-nums text-[0.9375rem] font-semibold">{valeurAffichee(champ)}</span>
           {brut && (
             <button
               type="button"
@@ -218,9 +218,9 @@ function LigneChamp({ champ }: { champ: ChampBrouillon }) {
           )}
         </span>
       </div>
-      <p className="text-xs leading-relaxed text-muted-foreground">{champ.provenance}</p>
+      <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">{champ.provenance}</p>
       {champ.note && (
-        <p className="text-xs leading-relaxed text-amber-fiscal">{champ.note}</p>
+        <p className="text-[0.8125rem] leading-relaxed text-amber-fiscal">{champ.note}</p>
       )}
     </div>
   );
@@ -250,8 +250,8 @@ function CarteBrouillon({ brouillon }: { brouillon: Brouillon }) {
             )}
           />
           <span className="min-w-0">
-            <span className="block text-sm font-medium">{brouillon.titre}</span>
-            <span className="block text-xs text-muted-foreground">
+            <span className="block text-[0.9375rem] font-medium">{brouillon.titre}</span>
+            <span className="block text-[0.8125rem] text-muted-foreground">
               {brouillon.formulaire
                 ? `Formulaire ${brouillon.formulaire}`
                 : `Téléservice ${brouillon.teleservice ?? ""}`}
@@ -265,7 +265,7 @@ function CarteBrouillon({ brouillon }: { brouillon: Brouillon }) {
         </span>
         <span className="flex shrink-0 items-center gap-2">
           {brouillon.montant_a_payer !== null && (
-            <span className="num tabular-nums text-sm font-semibold">
+            <span className="num tabular-nums text-[0.9375rem] font-semibold">
               {eur(brouillon.montant_a_payer)}
             </span>
           )}
@@ -276,7 +276,7 @@ function CarteBrouillon({ brouillon }: { brouillon: Brouillon }) {
       {ouvert && (
         <div className="space-y-3 border-t border-border px-5 py-4">
           {!brouillon.applicable ? (
-            <p className="text-sm leading-relaxed text-muted-foreground">
+            <p className="text-[0.9375rem] leading-relaxed text-muted-foreground">
               {brouillon.motif_non_applicable}
             </p>
           ) : (
@@ -286,7 +286,7 @@ function CarteBrouillon({ brouillon }: { brouillon: Brouillon }) {
               {brouillon.points_de_vigilance.length > 0 && (
                 <ul className="space-y-1.5 rounded-xl bg-secondary/40 p-3">
                   {brouillon.points_de_vigilance.map((v, i) => (
-                    <li key={i} className="flex gap-2 text-xs leading-relaxed">
+                    <li key={i} className="flex gap-2 text-[0.8125rem] leading-relaxed">
                       <AlertTriangle className="mt-0.5 size-3 shrink-0 text-amber-fiscal" />
                       <span>{v}</span>
                     </li>
@@ -299,7 +299,7 @@ function CarteBrouillon({ brouillon }: { brouillon: Brouillon }) {
                   href={brouillon.lien}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-dark hover:underline"
+                  className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-teal-dark hover:underline"
                 >
                   Ouvrir le site officiel pour déclarer <ExternalLink className="size-3" />
                 </a>
@@ -390,20 +390,20 @@ export function DeclarationsPanel(_props: {
       <div className="space-y-6 lg:col-span-5 lg:sticky lg:top-24">
         <Carte className="space-y-5">
           {prefill?.profil_disponible && (
-            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-4 text-sm">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-4 text-[0.9375rem]">
               <span className="font-medium">{prefill.denomination ?? "Votre activité"}</span>
-              <span className="text-xs text-muted-foreground">SIREN {prefill.siren ?? "—"}</span>
+              <span className="text-[0.8125rem] text-muted-foreground">SIREN {prefill.siren ?? "—"}</span>
             </div>
           )}
 
           <Rubrique titre={`Échéances ${calendrier?.annee ?? ""}`}>
-            <p className="text-xs leading-relaxed text-muted-foreground">
+            <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
               Les périodes sont fixées par la réglementation et par votre périodicité{" "}
               <strong>{calendrier?.frequence ?? "—"}</strong>, déclarée lors de votre parcours.
               Elles ne se choisissent pas ici.
             </p>
             {calendrier && (
-              <p className="rounded-lg bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
+              <p className="rounded-lg bg-secondary/50 px-3 py-2 text-[0.8125rem] text-muted-foreground">
                 <span className="num font-medium text-ink">
                   {eur(calendrier.ca_annuel_encaisse)}
                 </span>{" "}
@@ -414,7 +414,7 @@ export function DeclarationsPanel(_props: {
             )}
 
             {!calendrier ? (
-              <p className="text-sm text-muted-foreground">Chargement du calendrier…</p>
+              <p className="text-[0.9375rem] text-muted-foreground">Chargement du calendrier…</p>
             ) : (
               <div className="space-y-2">
                 {calendrier.echeances.map((e) => {
@@ -434,17 +434,17 @@ export function DeclarationsPanel(_props: {
                       )}
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="text-sm font-medium">{e.libelle}</span>
+                        <span className="text-[0.9375rem] font-medium">{e.libelle}</span>
                         <span
                           className={cn(
-                            "rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                            "rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
                             statut.classe,
                           )}
                         >
                           {statut.libelle}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
+                      <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">
                         {e.libelle_periode}
                         {" · "}
                         {e.date_limite
@@ -457,7 +457,7 @@ export function DeclarationsPanel(_props: {
                       {e.type === "ca_urssaf" && (
                         <p
                           className={cn(
-                            "num mt-1 text-xs tabular-nums",
+                            "num mt-1 text-[0.8125rem] tabular-nums",
                             e.ca_encaisse > 0 ? "font-medium text-ink" : "text-muted-foreground",
                           )}
                         >
@@ -465,7 +465,7 @@ export function DeclarationsPanel(_props: {
                         </p>
                       )}
                       {e.obligatoire_meme_a_zero && (
-                        <p className="mt-0.5 text-[11px] text-muted-foreground/80">
+                        <p className="mt-0.5 text-xs text-muted-foreground/80">
                           Obligatoire même à 0 €
                         </p>
                       )}
@@ -478,8 +478,8 @@ export function DeclarationsPanel(_props: {
 
           {prefill && prefill.informations_manquantes.length > 0 && (
             <div className="space-y-1.5 rounded-xl border border-amber-fiscal/40 bg-amber-fiscal/10 p-4">
-              <p className="text-sm font-semibold">Informations manquantes à votre profil</p>
-              <ul className="space-y-1 text-xs leading-relaxed">
+              <p className="text-[0.9375rem] font-semibold">Informations manquantes à votre profil</p>
+              <ul className="space-y-1 text-[0.8125rem] leading-relaxed">
                 {prefill.informations_manquantes.map((m) => (
                   <li key={m.champ}>
                     <span className="font-medium">{m.libelle}</span> — {m.consequence}
@@ -490,14 +490,14 @@ export function DeclarationsPanel(_props: {
           )}
 
           {chargement && (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <p className="flex items-center gap-2 text-[0.9375rem] text-muted-foreground">
               <Loader2 className="size-4 animate-spin" /> Préparation des documents…
             </p>
           )}
         </Carte>
 
         {erreur && (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm font-medium text-destructive">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-[0.9375rem] font-medium text-destructive">
             {erreur}
           </div>
         )}
@@ -510,9 +510,9 @@ export function DeclarationsPanel(_props: {
           // Tant qu'aucun jeu n'est ouvert, cet espace sert à retrouver les préparations
           // précédentes — c'est ce qu'on vient y chercher le plus souvent.
           <div className="space-y-3">
-            <h3 className="rule-label text-accent-ink">Déclarations préparées</h3>
+            <h3 className="rule-label-lg text-accent-ink">Déclarations préparées</h3>
             {archives.length === 0 ? (
-              <Carte className="py-8 text-center text-sm text-muted-foreground">
+              <Carte className="py-8 text-center text-[0.9375rem] text-muted-foreground">
                 Aucune préparation pour l'instant.
               </Carte>
             ) : (
@@ -527,14 +527,14 @@ export function DeclarationsPanel(_props: {
                       className="w-full space-y-1 text-left"
                     >
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-sm font-medium">
+                        <span className="text-[0.9375rem] font-medium">
                           {dateFr(a.date_debut)} → {dateFr(a.date_fin)}
                         </span>
-                        <span className="num tabular-nums text-sm font-semibold">
+                        <span className="num tabular-nums text-[0.9375rem] font-semibold">
                           {eur(a.prelevements?.total_a_payer ?? null)}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[0.8125rem] text-muted-foreground">
                         préparé le {dateFr(a.genere_le)} · {a.rappels.length} rappel(s)
                       </p>
                     </button>
@@ -546,7 +546,7 @@ export function DeclarationsPanel(_props: {
                           .then(rechargerArchives)
                           .catch(() => {})
                       }
-                      className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-destructive"
+                      className="mt-2 inline-flex items-center gap-1 text-[0.8125rem] text-muted-foreground transition-colors hover:text-destructive"
                     >
                       <Trash2 className="size-3.5" /> Supprimer
                     </button>
@@ -561,23 +561,23 @@ export function DeclarationsPanel(_props: {
             <button
               type="button"
               onClick={() => setJeu(null)}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-ink"
+              className="inline-flex items-center gap-1.5 text-[0.9375rem] font-medium text-muted-foreground transition-colors hover:text-ink"
             >
               <ArrowLeft className="size-4" /> Toutes les déclarations préparées
             </button>
 
-            <div className="rounded-xl border border-amber-fiscal/40 bg-amber-fiscal/10 p-4 text-xs leading-relaxed">
+            <div className="rounded-xl border border-amber-fiscal/40 bg-amber-fiscal/10 p-4 text-[0.8125rem] leading-relaxed">
               {jeu.avertissement}
             </div>
 
             {/* Synthèse */}
             <Carte className="space-y-4">
               <div>
-                <p className="rule-label text-muted-foreground">Total à régler sur la période</p>
+                <p className="rule-label-lg text-label-ink">Total à régler sur la période</p>
                 <p className="num mt-1 text-4xl font-semibold tabular-nums sm:text-5xl">
                   {eur(p?.total_a_payer)}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-[0.8125rem] text-muted-foreground">
                   sur {eur(jeu.ca_encaisse)} encaissés · {dateFr(jeu.date_debut)} →{" "}
                   {dateFr(jeu.date_fin)}
                 </p>
@@ -585,9 +585,9 @@ export function DeclarationsPanel(_props: {
 
               {p && (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[24rem] text-sm">
+                  <table className="w-full min-w-[24rem] text-[0.9375rem]">
                     <thead>
-                      <tr className="rule-label text-muted-foreground">
+                      <tr className="rule-label-lg text-label-ink">
                         <th className="py-2 text-left font-normal">Prélèvement</th>
                         <th className="py-2 text-right font-normal">Taux</th>
                         <th className="py-2 text-right font-normal">Montant</th>
@@ -609,7 +609,7 @@ export function DeclarationsPanel(_props: {
                             <td className="py-2">
                               CFP
                               {poste.cfp_exoneree && (
-                                <span className="ml-1 text-xs text-muted-foreground">
+                                <span className="ml-1 text-[0.8125rem] text-muted-foreground">
                                   (exonérée)
                                 </span>
                               )}
@@ -666,7 +666,7 @@ export function DeclarationsPanel(_props: {
                       fort
                     />
                   </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                  <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
                     Une pièce a été ajoutée, corrigée ou supprimée entre les deux. Identifiez
                     laquelle avant de déclarer : sinon le montant transmis sera injustifiable.
                   </p>
@@ -695,11 +695,11 @@ export function DeclarationsPanel(_props: {
                       fort
                     />
                   </div>
-                  <p className="text-xs leading-relaxed text-amber-fiscal">
+                  <p className="text-[0.8125rem] leading-relaxed text-amber-fiscal">
                     {jeu.tva_deductible.reserve}
                   </p>
                   {jeu.tva_deductible.pieces_sans_tva_lue > 0 && (
-                    <p className="text-xs leading-relaxed text-amber-fiscal">
+                    <p className="text-[0.8125rem] leading-relaxed text-amber-fiscal">
                       {jeu.tva_deductible.pieces_sans_tva_lue} facture(s) d'achat sans TVA
                       lisible : elles ne sont pas comptées. Une TVA illisible n'est pas une
                       TVA nulle.
@@ -715,7 +715,7 @@ export function DeclarationsPanel(_props: {
                 <Rubrique titre="Avantages en nature">
                   {jeu.cadeaux_recus.length > 0 && (
                     <>
-                      <p className="text-xs leading-relaxed text-muted-foreground">
+                      <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
                         Fiscalement, ce ne sont pas des cadeaux : un partenariat rémunéré en
                         produits est un revenu en nature. Ces montants sont{" "}
                         <strong>compris dans les cases déclarées</strong>, alors qu'ils
@@ -725,13 +725,13 @@ export function DeclarationsPanel(_props: {
                         {jeu.cadeaux_recus.map((c) => (
                           <div
                             key={c.document_id}
-                            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border/60 py-2 text-sm last:border-0"
+                            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border/60 py-2 text-[0.9375rem] last:border-0"
                           >
-                            <span className="text-xs text-muted-foreground">{dateFr(c.date)}</span>
+                            <span className="text-[0.8125rem] text-muted-foreground">{dateFr(c.date)}</span>
                             <span className="min-w-0 flex-1 truncate">
                               {c.description ?? "—"}
                               {c.marque && (
-                                <span className="ml-1 text-xs text-muted-foreground">
+                                <span className="ml-1 text-[0.8125rem] text-muted-foreground">
                                   · {c.marque}
                                 </span>
                               )}
@@ -752,15 +752,15 @@ export function DeclarationsPanel(_props: {
 
                   {jeu.cadeaux_a_valoriser.length > 0 && (
                     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
-                      <p className="text-sm font-semibold text-destructive">
+                      <p className="text-[0.9375rem] font-semibold text-destructive">
                         {jeu.cadeaux_a_valoriser.length} cadeau(x) sans valeur retenue
                       </p>
-                      <p className="mt-1 text-xs leading-relaxed">
+                      <p className="mt-1 text-[0.8125rem] leading-relaxed">
                         Ils ne sont <strong>pas comptés</strong> : votre chiffre d'affaires
                         déclaré s'en trouve minoré. Valorisez-les dans vos justificatifs avant
                         de transmettre.
                       </p>
-                      <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                      <ul className="mt-2 space-y-0.5 text-[0.8125rem] text-muted-foreground">
                         {jeu.cadeaux_a_valoriser.map((c) => (
                           <li key={c.document_id}>
                             {dateFr(c.date)} — {c.description ?? "objet non décrit"}
@@ -791,7 +791,7 @@ export function DeclarationsPanel(_props: {
             {jeu.revenus_ue.length > 0 && (
               <Carte className="space-y-3">
                 <Rubrique titre="Encaissements d'origine européenne">
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                  <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
                     Ils déclenchent une DES <strong>même sous franchise de TVA</strong> : les deux
                     régimes sont indépendants.
                   </p>
@@ -799,17 +799,17 @@ export function DeclarationsPanel(_props: {
                     {jeu.revenus_ue.map((r) => (
                       <div
                         key={r.virement_document_id}
-                        className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border/60 py-2 text-sm last:border-0"
+                        className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border/60 py-2 text-[0.9375rem] last:border-0"
                       >
-                        <span className="text-xs text-muted-foreground">{dateFr(r.date)}</span>
+                        <span className="text-[0.8125rem] text-muted-foreground">{dateFr(r.date)}</span>
                         <span className="min-w-0 flex-1 truncate">
                           {r.contrepartie ?? "—"}
                           {r.pays && (
-                            <span className="ml-1 text-xs text-muted-foreground">({r.pays})</span>
+                            <span className="ml-1 text-[0.8125rem] text-muted-foreground">({r.pays})</span>
                           )}
                         </span>
                         {!r.certain && (
-                          <span className="inline-flex items-center gap-1 text-xs text-amber-fiscal">
+                          <span className="inline-flex items-center gap-1 text-[0.8125rem] text-amber-fiscal">
                             <AlertTriangle className="size-3.5" /> à confirmer
                           </span>
                         )}
@@ -824,7 +824,7 @@ export function DeclarationsPanel(_props: {
             {/* Documents signables */}
             <Carte className="space-y-3">
               <Rubrique titre="Documents prêts pour signature">
-                <p className="text-xs leading-relaxed text-muted-foreground">
+                <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
                   Chaque document identifie l'entreprise, énonce la période, reprend les cases
                   officielles et se termine par un bloc de signature — attestation du déclarant,
                   puis visa de l'expert-comptable.
@@ -838,7 +838,7 @@ export function DeclarationsPanel(_props: {
                     )
                   }
                   disabled={export_ !== null}
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 text-sm font-medium text-accent-ink shadow-soft transition-all hover:brightness-[1.04] active:scale-[0.98] disabled:opacity-40"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 text-[0.9375rem] font-medium text-accent-ink shadow-soft transition-all hover:brightness-[1.04] active:scale-[0.98] disabled:opacity-40"
                 >
                   {export_ === "dossier" ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -860,7 +860,7 @@ export function DeclarationsPanel(_props: {
                         )
                       }
                       disabled={export_ !== null}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:border-ink disabled:opacity-40"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[0.8125rem] font-medium transition-colors hover:border-ink disabled:opacity-40"
                     >
                       {export_ === b.type ? (
                         <Loader2 className="size-3.5 animate-spin" />
@@ -876,7 +876,7 @@ export function DeclarationsPanel(_props: {
 
             {/* Détail de chaque déclaration */}
             <div className="space-y-3">
-              <h3 className="rule-label text-accent-ink">Détail des déclarations</h3>
+              <h3 className="rule-label-lg text-accent-ink">Détail des déclarations</h3>
               {jeu.brouillons.map((b) => (
                 <CarteBrouillon key={b.type} brouillon={b} />
               ))}
@@ -885,7 +885,7 @@ export function DeclarationsPanel(_props: {
             {/* Hypothèses */}
             <Carte>
               <Rubrique titre="Hypothèses retenues">
-                <ul className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+                <ul className="space-y-1.5 text-[0.8125rem] leading-relaxed text-muted-foreground">
                   {jeu.hypotheses.map((h, i) => (
                     <li key={i} className="flex gap-2">
                       <span className="text-muted-foreground/50">—</span>

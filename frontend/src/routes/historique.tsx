@@ -151,7 +151,7 @@ function HistoriquePage() {
       {enErreur.length > 0 && (
         <div className="animate-rise mb-6 flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <p className="text-sm text-destructive">
+          <p className="text-[0.9375rem] text-destructive">
             Impossible de charger&nbsp;:{" "}
             {enErreur.map((cle) => LIBELLE_SOURCE_EN_ERREUR[cle]).join(", ")}. Le reste de la
             liste est à jour.
@@ -211,14 +211,14 @@ function EtatVide() {
     <div className="animate-rise rounded-2xl border border-border bg-card p-10 text-center shadow-soft">
       <Inbox className="mx-auto size-8 text-muted-foreground" />
       <h2 className="mt-4 text-xl">Aucune transaction pour l'instant</h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+      <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted-foreground">
         Dès qu'une facture, un virement ou un cadeau est capturé, il apparaît ici avec
         l'explication de son traitement fiscal.
       </p>
       <div className="mt-6">
         <Link
           to="/capture"
-          className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
+          className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-6 text-[0.9375rem] font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
         >
           Capturer un justificatif
         </Link>
@@ -230,13 +230,13 @@ function EtatVide() {
 function AucunResultat({ onReinitialiser }: { onReinitialiser: () => void }) {
   return (
     <div className="animate-rise rounded-2xl border border-border bg-card p-10 text-center shadow-soft">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-[0.9375rem] text-muted-foreground">
         Aucune transaction ne correspond à ces filtres.
       </p>
       <button
         type="button"
         onClick={onReinitialiser}
-        className="mt-4 inline-flex h-9 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium transition-colors hover:border-ink"
+        className="mt-4 inline-flex h-9 items-center justify-center rounded-xl border border-border px-4 text-[0.9375rem] font-medium transition-colors hover:border-ink"
       >
         Réinitialiser les filtres
       </button>

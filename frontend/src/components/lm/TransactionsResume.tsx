@@ -44,7 +44,7 @@ export function TotauxPeriode({ totaux }: { totaux: TotauxFlux }) {
           key={carte.cle}
           className="rounded-2xl border border-border bg-card p-4 shadow-soft"
         >
-          <p className="rule-label flex items-center gap-2 text-muted-foreground">
+          <p className="rule-label-lg flex items-center gap-2 text-label-ink">
             <span className={carte.ton}>{carte.icone}</span>
             {carte.label}
           </p>
@@ -53,7 +53,7 @@ export function TotauxPeriode({ totaux }: { totaux: TotauxFlux }) {
       ))}
 
       {totaux.nbSansMontant > 0 && (
-        <p className="text-xs text-muted-foreground sm:col-span-3">
+        <p className="text-[0.8125rem] text-muted-foreground sm:col-span-3">
           {totaux.nbSansMontant === 1
             ? "1 transaction sans montant lisible n'est pas comptée dans ce solde."
             : `${totaux.nbSansMontant} transactions sans montant lisible ne sont pas comptées dans ce solde.`}
@@ -91,14 +91,14 @@ export function BandeauAnomalies({
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-ink" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-warning-ink">
+          <p className="text-[0.9375rem] font-medium text-warning-ink">
             {total === 1
               ? "1 point à vérifier sur cette période"
               : `${total} points à vérifier sur cette période`}
           </p>
           <ul className="mt-2 space-y-1">
             {anomalies.slice(0, 4).map((a) => (
-              <li key={a.message} className="flex gap-2 text-xs text-muted-foreground">
+              <li key={a.message} className="flex gap-2 text-[0.8125rem] text-muted-foreground">
                 <span className="min-w-0 flex-1">{a.message}</span>
                 {a.occurrences > 1 && (
                   <span className="num shrink-0 text-warning-ink">×{a.occurrences}</span>
@@ -107,11 +107,11 @@ export function BandeauAnomalies({
             ))}
           </ul>
           {anomalies.length > 4 && (
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-[0.8125rem] text-muted-foreground">
               et {anomalies.length - 4} autre{anomalies.length - 4 > 1 ? "s" : ""}…
             </p>
           )}
-          <p className="mt-3 text-xs font-medium text-warning-ink">
+          <p className="mt-3 text-[0.8125rem] font-medium text-warning-ink">
             {actif ? "Afficher toutes les transactions" : "N'afficher que ces transactions"}
           </p>
         </div>
@@ -142,7 +142,7 @@ export function BandeauJustificatifs({
       )}
     >
       <FileWarning className="size-4 shrink-0 text-muted-foreground" />
-      <p className="min-w-0 flex-1 text-sm">
+      <p className="min-w-0 flex-1 text-[0.9375rem]">
         {nombre === 1
           ? "1 transaction sans justificatif attaché."
           : `${nombre} transactions sans justificatif attaché.`}{" "}
