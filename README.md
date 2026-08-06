@@ -127,6 +127,9 @@ ledgermind-assistant/
 
 ### Required
 
+Le chatbot produit de la landing page nécessite également une clé **Mistral** (génération et
+embeddings) et une clé **Pinecone** (recherche vectorielle).
+
 - **Python 3.11+** (3.12 used in development)
 - **Node.js** 20+ (for Vite / TanStack Start)
 - **MongoDB** running locally (or a reachable URI)
@@ -157,6 +160,19 @@ uvicorn app.main:app --reload --port 8000
 Health check: [http://localhost:8000/health](http://localhost:8000/health)  
 Interactive API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
+### Indexer le chatbot produit
+
+Après avoir renseigné `MISTRAL_API_KEY` et `PINECONE_API_KEY` dans `backend/.env`, lancer une fois
+depuis la racine du dépôt :
+
+```bash
+python -m backend.scripts.index_product_knowledge
+```
+
+Le script lit `DOCUMENTATION_RAG_LEDGERMIND.md`, crée l'index Pinecone s'il n'existe pas et
+remplace uniquement le namespace `product-docs`. Il faut le relancer après une modification du
+document. Le statut est visible sur `GET /api/product-assistant/status`.
+
 ### Frontend
 
 ```bash
@@ -176,6 +192,12 @@ Defined in `backend/.env` (see `backend/.env.example`):
 | `GEMINI_API_KEY` | Gemini calls for NL | your key |
 | `GEMINI_MODEL` | Model id — mind the free-tier daily cap (see `.env.example`) | `gemini-2.5-flash-lite` |
 | `AUTH_SECRET` | JWT signing key (≥ 32 chars) | see `.env.example` |
+| `MISTRAL_API_KEY` | Réponses et embeddings du chatbot produit | your key |
+| `MISTRAL_MODEL` | Modèle de génération Mistral | `mistral-small-latest` |
+| `EMBEDDING_MODEL` | Modèle vectoriel ; réindexer après tout changement | `mistral-embed` |
+| `PINECONE_API_KEY` | Accès à la base vectorielle produit | your key |
+| `PINECONE_INDEX_NAME` | Index dédié à l'aide produit | `ledgermind-product` |
+| `PINECONE_NAMESPACE` | Namespace remplacé lors de l'indexation | `product-docs` |
 | `AUTH_TOKEN_DAYS` | Token lifetime | `14` |
 | `MONGO_URI` | Session + **users** store | `mongodb://localhost:27017` |
 | `MONGO_DB_NAME` | Database name | `ledgermind` |
@@ -414,6 +436,16 @@ instead of an open-ended question, so answering never requires typing:
 `POST /api/guidance/chat` with `mode: "pedagogue"` routes to the same agent while keeping the
 conversation history. UI: `/education` (`FiscalAssistant.tsx`).
 
+### Chatbot produit de la landing page (RAG Mistral + Pinecone)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/product-assistant/chat` | Question produit publique + réponse + références documentaires |
+| `GET` | `/api/product-assistant/status` | Configuration, disponibilité et nombre de vecteurs du namespace |
+
+Le corpus est `DOCUMENTATION_RAG_LEDGERMIND.md`, découpé par question/réponse. Ce chatbot explique
+l'application ; il redirige les demandes de conseil fiscal personnel vers l'Assistant fiscal.
+
 ### Auth
 
 | Method | Path | Description |
@@ -608,8 +640,10 @@ Always design **fallbacks** (static questions, regex, quick-reply maps). Gemini 
 | `src/routes/onboarding.diagnostic.tsx` | Branch B chat (+ `<Outlet />` for resultat) |
 | `src/routes/onboarding.diagnostic.resultat.tsx` | Feuille de route UI |
 | `src/components/lm/Chatbot.tsx` | Shared orchestrator chat UI |
+| `src/components/lm/ProductAssistant.tsx` | Widget RAG public avec icône chat sur la landing page |
 | `src/components/AuthPage.tsx` | Static auth |
 | `src/lib/api.ts` | HTTP client + session helpers |
+| `src/lib/product-assistant-api.ts` | Client public de `/api/product-assistant/chat` |
 
 Stack: **TanStack Start / Router**, React 19, Tailwind 4, Vite.
 
