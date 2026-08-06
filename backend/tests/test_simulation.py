@@ -282,53 +282,228 @@ def test_un_profil_illisible_ne_casse_pas_la_simulation():
     assert contexte.base.activites[0].ca == 0.0
 
 
+# ------------------------------------------------------------------ Franchise de TVA
+
+
+def test_le_seuil_de_tva_se_franchit_avant_le_plafond_du_regime():
+    """Les deux seuils sont distincts, et c'est tout l'intérêt de l'alerte : on peut devoir
+    facturer la TVA en restant micro-entrepreneur."""
+    demande = api.DemandeScenarios(
+        base=_base(ca=10000.0),
+        variantes=[
+            api.VarianteScenario(
+                id="v",
+                libelle="+ 30 000 €",
+                ajouts=[ActiviteCA(categorie=CategorieFiscale.bnc, ca=30000.0)],
+            )
+        ],
+    )
+    base, variante = asyncio.run(api.scenarios(demande, user=_user())).scenarios
+
+    assert base.alerte_tva is None  # 10 000 € : le seuil est loin, on ne crie pas
+    assert variante.alerte_tva is not None
+    assert variante.alerte_tva.niveau in {"depasse_base", "depasse_majore"}
+    # Aucun plafond de régime n'est franchi pour autant.
+    assert variante.resultat.depassements == []
+
+
+def test_l_alerte_tva_retient_le_niveau_le_plus_severe():
+    demande = api.DemandeScenarios(
+        base=DemandeSimulation(
+            activites=[
+                ActiviteCA(categorie=CategorieFiscale.bnc, ca=50000.0),
+                ActiviteCA(categorie=CategorieFiscale.bic_vente, ca=1000.0),
+            ],
+            foyer=_FOYER_COMPLET,
+        ),
+        variantes=[],
+    )
+    alerte = asyncio.run(api.scenarios(demande, user=_user())).scenarios[0].alerte_tva
+
+    assert alerte is not None
+    assert alerte.niveau == "depasse_majore"
+    # Le message et la note viennent du module réglementaire, pas de ce router.
+    assert alerte.message
+    assert alerte.note
+
+
 # ------------------------------------------------------------------- Interprétation
 
 
+def _repond(monkeypatch, charge):
+    """Branche une sortie de modèle figée à la place de l'appel réseau."""
+    async def _faux(*args, **kwargs):
+        return charge
+
+    monkeypatch.setattr(api, "chat_json_with_system", _faux)
+
+
+def _interpreter(phrase: str = "si je signe ce contrat de 5000 €"):
+    return asyncio.run(api.interpreter(api.DemandeInterpretation(phrase=phrase), user=_user()))
+
+
 def test_l_interpretation_indisponible_renvoie_un_refus_explicite(monkeypatch):
-    """Sans modèle, le formulaire structuré reste la voie de secours — jamais un scénario
-    inventé."""
+    """Sans modèle, l'écran le dit — il n'invente pas un scénario pour meubler."""
     async def _indispo(*args, **kwargs):
         raise api.MistralIndisponible("pas de clé")
 
     monkeypatch.setattr(api, "chat_json_with_system", _indispo)
-    resultat = asyncio.run(
-        api.interpreter(api.DemandeInterpretation(phrase="un contrat de 5000 €"), user=_user())
-    )
+    resultat = _interpreter()
 
     assert resultat.comprise is False
-    assert resultat.montant is None
+    assert resultat.scenarios == []
     assert resultat.motif
 
 
 def test_une_phrase_sans_montant_n_est_pas_interpretee(monkeypatch):
-    async def _sans_montant(*args, **kwargs):
-        return {"comprise": True, "montant": None, "categorie": "BNC"}
-
-    monkeypatch.setattr(api, "chat_json_with_system", _sans_montant)
-    resultat = asyncio.run(
-        api.interpreter(api.DemandeInterpretation(phrase="et si je signais ?"), user=_user())
-    )
+    _repond(monkeypatch, {"comprise": True, "scenarios": [{"montant": None, "categorie": "BNC"}]})
+    resultat = _interpreter("et si je signais ?")
 
     assert resultat.comprise is False
+    assert resultat.scenarios == []
 
 
 def test_une_phrase_interpretable_ressort_structuree(monkeypatch):
-    async def _ok(*args, **kwargs):
-        return {
-            "comprise": True, "montant": 5000.0, "categorie": "BNC",
-            "recurrent": False, "libelle": "Contrat 5 000 €",
-            "resume": "Un contrat unique de 5 000 € en prestation libérale.",
-        }
-
-    monkeypatch.setattr(api, "chat_json_with_system", _ok)
-    resultat = asyncio.run(
-        api.interpreter(
-            api.DemandeInterpretation(phrase="si je signe ce contrat de 5000 €"), user=_user()
-        )
-    )
+    _repond(monkeypatch, {
+        "comprise": True,
+        "resume": "Un contrat unique de 5 000 € en prestation libérale.",
+        "scenarios": [{
+            "libelle": "Contrat 5 000 €", "montant": 5000.0, "categorie": "BNC",
+            "recurrent": False, "montant_explicite": True, "categorie_explicite": True,
+        }],
+    })
+    resultat = _interpreter()
 
     assert resultat.comprise is True
-    assert resultat.montant == 5000.0
-    assert resultat.categorie == CategorieFiscale.bnc
+    assert len(resultat.scenarios) == 1
+    scenario = resultat.scenarios[0]
+    assert scenario.montant == 5000.0
+    assert scenario.ca_annuel == 5000.0
+    assert scenario.categorie == CategorieFiscale.bnc
+    assert scenario.propose is False
     assert resultat.resume
+
+
+def test_une_phrase_peut_porter_plusieurs_scenarios(monkeypatch):
+    _repond(monkeypatch, {
+        "comprise": True,
+        "scenarios": [
+            {"libelle": "Client A", "montant": 3000.0, "categorie": "BNC"},
+            {"libelle": "Client B", "montant": 8000.0, "categorie": "BIC_VENTE"},
+        ],
+    })
+    resultat = _interpreter("deux clients, un à 3000 € et un à 8000 €")
+
+    assert [s.libelle for s in resultat.scenarios] == ["Client A", "Client B"]
+    assert [s.montant for s in resultat.scenarios] == [3000.0, 8000.0]
+    assert len({s.id for s in resultat.scenarios}) == 2  # identifiants distincts
+
+
+def test_le_nombre_de_scenarios_est_plafonne(monkeypatch):
+    """Au-delà, les courbes épuiseraient les quatre teintes catégorielles validées."""
+    _repond(monkeypatch, {
+        "comprise": True,
+        "scenarios": [{"montant": 1000.0 * i} for i in range(1, 8)],
+    })
+    resultat = _interpreter()
+
+    assert len(resultat.scenarios) == api._MAX_SCENARIOS
+
+
+def test_la_recurrence_multiplie_le_ca_annuel(monkeypatch):
+    """Un contrat mensuel de 2 000 € sur 6 mois ajoute 12 000 € à l'année, pas 2 000."""
+    _repond(monkeypatch, {
+        "comprise": True,
+        "scenarios": [{
+            "libelle": "Mensuel", "montant": 2000.0, "categorie": "BNC",
+            "recurrent": True, "mois": 6, "recurrence_explicite": True,
+        }],
+    })
+    scenario = _interpreter().scenarios[0]
+
+    assert scenario.montant == 2000.0  # une échéance
+    assert scenario.ca_annuel == 12000.0  # l'année
+    assert any(e.champ == "duree" and e.libelle == "sur 6 mois" for e in scenario.elements)
+
+
+def test_un_recurrent_sans_duree_court_jusqu_a_la_fin_de_l_annee(monkeypatch):
+    """Hypothèse défavorable assumée : c'est le franchissement du plafond qu'il faut voir."""
+    _repond(monkeypatch, {
+        "comprise": True,
+        "scenarios": [{"montant": 2000.0, "recurrent": True, "mois": None}],
+    })
+    scenario = _interpreter().scenarios[0]
+
+    assert scenario.ca_annuel == 24000.0
+    assert any(e.champ == "duree" and e.libelle == "sur 12 mois" for e in scenario.elements)
+
+
+def test_la_provenance_distingue_le_lu_du_suppose(monkeypatch):
+    """Le cœur de l'écran : l'utilisateur doit voir ce qu'il a dit et ce qu'on a deviné."""
+    _repond(monkeypatch, {
+        "comprise": True,
+        "scenarios": [{
+            "libelle": "Contrat", "montant": 5000.0, "categorie": "BNC",
+            "montant_explicite": True, "categorie_explicite": False,
+        }],
+    })
+    elements = {e.champ: e.provenance for e in _interpreter().scenarios[0].elements}
+
+    assert elements["montant"] == "explicite"
+    assert elements["categorie"] == "suppose"
+
+
+def test_une_categorie_absente_est_toujours_une_supposition(monkeypatch):
+    """Même si le modèle se dit sûr : sans catégorie, il n'a rien lu à confirmer."""
+    _repond(monkeypatch, {
+        "comprise": True,
+        "scenarios": [{"montant": 5000.0, "categorie": None, "categorie_explicite": True}],
+    })
+    scenario = _interpreter().scenarios[0]
+    element = next(e for e in scenario.elements if e.champ == "categorie")
+
+    assert scenario.categorie is None
+    assert element.provenance == "suppose"
+    assert element.libelle == "nature à préciser"
+
+
+def test_les_contre_scenarios_sont_marques_comme_proposes(monkeypatch):
+    _repond(monkeypatch, {
+        "comprise": True,
+        "scenarios": [{"libelle": "Contrat", "montant": 5000.0}],
+        "contre_scenarios": [
+            {"libelle": "La moitié", "montant": 2500.0},
+            {"libelle": "Deux fois", "montant": 10000.0},
+            {"libelle": "En trop", "montant": 99.0},
+        ],
+    })
+    resultat = _interpreter()
+
+    assert len(resultat.contre_scenarios) == api._MAX_CONTRE_SCENARIOS
+    assert all(s.propose for s in resultat.contre_scenarios)
+    assert all(not s.propose for s in resultat.scenarios)
+
+
+def test_les_entrees_hors_contrat_sont_ecartees_sans_faire_tomber_le_reste(monkeypatch):
+    _repond(monkeypatch, {
+        "comprise": True,
+        "scenarios": [
+            "pas un objet",
+            {"montant": "beaucoup"},
+            {"montant": -500.0},
+            {"montant": True},          # bool est un int en Python : doit être refusé
+            {"montant": 4000.0, "categorie": "PAS_UNE_CATEGORIE", "mois": 99},
+        ],
+    })
+    resultat = _interpreter()
+
+    assert len(resultat.scenarios) == 1
+    scenario = resultat.scenarios[0]
+    assert scenario.montant == 4000.0
+    assert scenario.categorie is None  # catégorie inconnue ignorée, pas propagée
+    assert scenario.mois is None       # 99 hors bornes
+
+
+def test_une_sortie_de_modele_qui_n_est_pas_un_objet_est_refusee(monkeypatch):
+    _repond(monkeypatch, ["une", "liste"])
+    assert _interpreter().comprise is False

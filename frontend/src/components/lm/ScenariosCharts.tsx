@@ -165,9 +165,13 @@ export function CourbeProjection({
               </g>
             ))}
 
-            {/* Ligne de plafond : un repère réglementaire, pas une série. Tiret assumé,
-                et étiquette directe pour qu'elle ne dépende pas de la légende. */}
-            {projection.plafond !== null && projection.plafond <= haut && (
+            {/* Ligne de plafond : un repère réglementaire, pas une série. Tiret assumé —
+                c'est un seuil, pas une grille — et étiquette directe pour qu'elle ne
+                dépende pas de la légende.
+                Elle n'apparaît QUE si elle tient dans le tracé : quand le plafond est très
+                au-dessus du chiffre d'affaires, l'y forcer tassait toutes les courbes dans
+                le bas du graphe. Dans ce cas il se lit sur la jauge, sous la figure. */}
+            {projection.plafondVisible && projection.plafond !== null && projection.plafond <= haut && (
               <g>
                 <line
                   x1={MARGE.gauche}
@@ -337,6 +341,62 @@ export function CourbeProjection({
         )}
         <BoutonTableau ouvert={tableau} onBasculer={() => setTableau((v) => !v)} />
       </div>
+
+      {/* Le plafond sort du tracé quand il l'écraserait. Il reste lisible ici, sous une
+          forme qui convient mieux à une valeur unique : une jauge de consommation. */}
+      {!projection.plafondVisible && projection.plafond !== null && (
+        <div className="mt-5 rounded-xl border border-border bg-secondary/40 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="rule-label text-muted-foreground">
+              Plafond du régime · {projection.plafondLibelle ?? "votre catégorie"}
+            </p>
+            <p className="num text-xs text-muted-foreground">
+              {formatEuros(projection.plafond)}
+            </p>
+          </div>
+          <ul className="mt-3 space-y-2.5">
+            {series.map((serie, index) => (
+              <li key={serie.id}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="flex min-w-0 items-center gap-2 text-xs">
+                    <span
+                      aria-hidden
+                      className="inline-block size-2.5 shrink-0 rounded-[3px]"
+                      style={{ background: couleurSerie(index) }}
+                    />
+                    <span className="truncate text-muted-foreground">{serie.libelle}</span>
+                  </p>
+                  <p className="num shrink-0 text-xs font-medium">
+                    {serie.pctPlafond === null ? "—" : formatPct(serie.pctPlafond)}
+                  </p>
+                </div>
+                <div
+                  className="mt-1.5 h-2 w-full overflow-hidden rounded-full"
+                  style={{ background: "var(--color-dv-track)" }}
+                  role="meter"
+                  aria-valuenow={Math.round(serie.pctPlafond ?? 0)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`${serie.libelle} : part du plafond consommée en fin d'année`}
+                >
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, serie.pctPlafond ?? 0))}%`,
+                      background: couleurSerie(index),
+                      transition: "width 0.8s var(--ease-out-expo)",
+                    }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Le plafond est trop éloigné de vos montants pour figurer sur la courbe sans
+            l'aplatir : il se lit ici, en part consommée en fin d'année.
+          </p>
+        </div>
+      )}
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         Les mois écoulés portent le chiffre d'affaires réellement facturé. Au-delà du trait
