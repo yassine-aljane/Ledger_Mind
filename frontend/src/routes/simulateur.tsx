@@ -1,33 +1,41 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CircleAlert, Loader2, Play, TriangleAlert } from "lucide-react";
+import { ChevronDown, CircleAlert, Loader2, Table2, TriangleAlert } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { AccessGate } from "@/components/lm/AccessGate";
 import { AppShell, PageHeader } from "@/components/lm/AppShell";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  BarresDecomposition,
-  CourbeProjection,
-  TuileProvision,
-} from "@/components/lm/ScenariosCharts";
-import { couleurSerie } from "@/lib/scenarios-series";
+import { PanneauFigures } from "@/components/lm/PanneauFigures";
+import { DetailCalcul, RepereAbattement } from "@/components/lm/ScenariosAnalyse";
 import { ScenarioSaisie } from "@/components/lm/ScenarioSaisie";
+import {
+  CarteVerdict,
+  ListeRecommandations,
+} from "@/components/lm/ScenarioRecommandations";
+import { construireRecommandations, construireVerdict } from "@/lib/recommandations";
+import { couleurSerie } from "@/lib/scenarios-series";
 import { isAuthed } from "@/lib/auth";
 import { construireSynthese, formatEuros, formatPct } from "@/lib/finance";
 import { listerFactures, type Facture } from "@/lib/facturation-api";
 import {
   avertissementsUniques,
   chargerContexte,
+  construireCascade,
+  construireComparaisonOption,
   construireDecomposition,
   construireEcarts,
+  construireFluxEuro,
   construireProjection,
   construireProvisions,
   depassementsParScenario,
+  etapesCalcul,
+  lireProvenance,
   simulerScenarios,
+  versVariante,
   type CategorieFiscale,
   type ContexteSimulation,
   type ReponseScenarios,
-  type VarianteScenario,
+  type ScenarioInterprete,
 } from "@/lib/scenarios";
 
 export const Route = createFileRoute("/simulateur")({
@@ -50,10 +58,22 @@ function SimulateurRoute() {
   );
 }
 
+const PHRASE_INITIALE = "Si je signe ce contrat de 5 000 € avec un client français, combien je garde ?";
+
+/**
+ * L'écran suit un récit en trois temps : ce que j'ai compris, ce que ça change, pourquoi.
+ *
+ * L'ordre n'est pas cosmétique. Un chiffre fiscal n'a de valeur que si son hypothèse est
+ * vérifiable : montrer le résultat avant la compréhension inviterait à faire confiance à
+ * une lecture qu'on n'a pas relue.
+ */
 function SimulateurPage() {
   const [contexte, setContexte] = useState<ContexteSimulation | null>(null);
   const [factures, setFactures] = useState<Facture[]>([]);
-  const [variantes, setVariantes] = useState<VarianteScenario[]>([]);
+  const [phrase, setPhrase] = useState(PHRASE_INITIALE);
+  const [compris, setCompris] = useState<ScenarioInterprete[]>([]);
+  const [resume, setResume] = useState<string | null>(null);
+  const [retenus, setRetenus] = useState<string[]>([]);
   const [reponse, setReponse] = useState<ReponseScenarios | null>(null);
   const [chargement, setChargement] = useState(true);
   const [calcul, setCalcul] = useState(false);
@@ -84,6 +104,20 @@ function SimulateurPage() {
     };
   }, []);
 
+  const categorieParDefaut: CategorieFiscale =
+    contexte?.base?.activites?.[0]?.categorie ?? "BNC";
+
+  // Les variantes envoyées au moteur découlent de ce que l'utilisateur a RETENU, dans
+  // l'ordre où il l'a retenu : c'est ce même ordre qui fixe les teintes des courbes.
+  const variantes = useMemo(
+    () =>
+      retenus
+        .map((id) => compris.find((s) => s.id === id))
+        .filter((s): s is ScenarioInterprete => s != null)
+        .map((s) => versVariante(s, categorieParDefaut)),
+    [retenus, compris, categorieParDefaut],
+  );
+
   const lancer = useCallback(async () => {
     if (!contexte) return;
     setCalcul(true);
@@ -97,14 +131,12 @@ function SimulateurPage() {
     }
   }, [contexte, variantes]);
 
-  // Première simulation dès que le contexte est là : l'écran s'ouvre sur la situation
-  // actuelle plutôt que sur un cadre vide en attente d'un clic.
+  // Toute modification de ce qui est retenu relance le calcul : l'écran n'affiche jamais
+  // des chiffres qui ne correspondent plus à ce qui est coché au-dessus.
   useEffect(() => {
-    if (contexte && reponse === null && !calcul) void lancer();
-  }, [contexte, reponse, calcul, lancer]);
+    if (contexte) void lancer();
+  }, [contexte, lancer]);
 
-  // Sans mémorisation, `?? []` rendrait un tableau neuf à chaque rendu et recalculerait
-  // toutes les séries en dessous — le graphe se reconstruirait à chaque frappe du clavier.
   const scenarios = useMemo(() => reponse?.scenarios ?? [], [reponse]);
   const synthese = useMemo(() => construireSynthese(factures, "12m"), [factures]);
   const projection = useMemo(
@@ -117,9 +149,82 @@ function SimulateurPage() {
   const depassements = useMemo(() => depassementsParScenario(scenarios), [scenarios]);
   const avertissements = useMemo(() => avertissementsUniques(scenarios), [scenarios]);
 
-  const champsManquants = reponse?.champs_manquants ?? contexte?.champs_manquants ?? [];
-  const categorieParDefaut: CategorieFiscale =
-    contexte?.base?.activites?.[0]?.categorie ?? "BNC";
+  // L'analyse détaillée porte sur le scénario le plus parlant : le premier retenu si
+  // l'utilisateur en a choisi un, la situation actuelle sinon.
+  const scenarioAnalyse = scenarios[1] ?? scenarios[0] ?? null;
+  const flux = useMemo(() => construireFluxEuro(scenarioAnalyse), [scenarioAnalyse]);
+  const cascade = useMemo(() => construireCascade(scenarioAnalyse), [scenarioAnalyse]);
+  const comparaison = useMemo(
+    () => construireComparaisonOption(scenarioAnalyse),
+    [scenarioAnalyse],
+  );
+  const etapes = useMemo(() => etapesCalcul(scenarioAnalyse), [scenarioAnalyse]);
+  const sources = useMemo(() => lireProvenance(scenarioAnalyse), [scenarioAnalyse]);
+
+  const champsManquants = useMemo(
+    () => reponse?.champs_manquants ?? contexte?.champs_manquants ?? [],
+    [reponse, contexte],
+  );
+
+  // Les recommandations croisent les sorties du moteur avec les factures réelles : c'est
+  // ce croisement, et lui seul, qui distingue un conseil d'un lieu commun.
+  const recommandations = useMemo(
+    () =>
+      construireRecommandations({
+        scenario: scenarioAnalyse,
+        ecart: ecarts.find((e) => e.id === scenarioAnalyse?.id),
+        provision: provisions.find((p) => p.id === scenarioAnalyse?.id),
+        projection,
+        synthese,
+        factures,
+        champsManquants,
+      }),
+    [scenarioAnalyse, ecarts, provisions, projection, synthese, factures, champsManquants],
+  );
+
+  const provisionAnalysee = provisions.find((p) => p.id === scenarioAnalyse?.id);
+
+  const verdict = useMemo(
+    () =>
+      construireVerdict(
+        scenarioAnalyse,
+        ecarts.find((e) => e.id === scenarioAnalyse?.id),
+        recommandations,
+      ),
+    [scenarioAnalyse, ecarts, recommandations],
+  );
+
+  const basculer = (id: string) =>
+    setRetenus((liste) =>
+      liste.includes(id)
+        ? liste.filter((autre) => autre !== id)
+        : // Le plafond des teintes catégorielles validées borne la comparaison.
+          liste.length >= 3
+          ? liste
+          : [...liste, id],
+    );
+
+  const corrigerCategorie = (id: string, categorie: CategorieFiscale) =>
+    setCompris((liste) =>
+      liste.map((scenario) =>
+        scenario.id !== id
+          ? scenario
+          : {
+              ...scenario,
+              categorie,
+              // La valeur devient explicite : elle vient désormais de l'utilisateur.
+              elements: (scenario.elements ?? []).map((element) =>
+                element.champ !== "categorie"
+                  ? element
+                  : {
+                      ...element,
+                      provenance: "explicite" as const,
+                      libelle: LIBELLE_COURT[categorie],
+                    },
+              ),
+            },
+      ),
+    );
 
   return (
     <AppShell>
@@ -146,30 +251,31 @@ function SimulateurPage() {
         <EtatIndisponible />
       ) : (
         <div className="space-y-8">
+          {/* --- Temps 1 : ce que j'ai compris ------------------------------------ */}
           <ScenarioSaisie
-            variantes={variantes}
-            onAjouter={(v) => {
-              setVariantes((liste) => [...liste, v]);
-              setReponse(null);
+            phrase={phrase}
+            onPhraseChange={setPhrase}
+            scenarios={compris}
+            retenus={retenus}
+            onBasculerScenario={basculer}
+            onCorrigerCategorie={corrigerCategorie}
+            onInterpretation={(liste, texte) => {
+              setCompris(liste);
+              setResume(texte);
+              // Ce que la phrase décrit est retenu d'office ; les suggestions, non :
+              // l'utilisateur ne doit jamais subir des chiffres qu'il n'a pas demandés.
+              setRetenus(liste.filter((s) => !s.propose).slice(0, 3).map((s) => s.id));
             }}
-            onRetirer={(id) => {
-              setVariantes((liste) => liste.filter((v) => v.id !== id));
-              setReponse(null);
-            }}
-            categorieParDefaut={categorieParDefaut}
+            resume={resume}
             desactive={calcul}
           />
 
-          <div className="flex flex-wrap items-center gap-4">
-            <Button size="lg" variant="accent" onClick={() => void lancer()} disabled={calcul}>
-              {calcul ? <Loader2 className="animate-spin" /> : <Play />} Simuler
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              {contexte.ca_source} · {contexte.nb_factures_prises_en_compte} facture
-              {contexte.nb_factures_prises_en_compte > 1 ? "s" : ""} prise
-              {contexte.nb_factures_prises_en_compte > 1 ? "s" : ""} en compte pour {contexte.annee}.
-            </p>
-          </div>
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {calcul && <Loader2 className="size-3.5 animate-spin" />}
+            {contexte.ca_source} · {contexte.nb_factures_prises_en_compte} facture
+            {contexte.nb_factures_prises_en_compte > 1 ? "s" : ""} prise
+            {contexte.nb_factures_prises_en_compte > 1 ? "s" : ""} en compte pour {contexte.annee}.
+          </p>
 
           {champsManquants.length > 0 && <BlocNonCalculable champs={champsManquants} />}
 
@@ -177,85 +283,61 @@ function SimulateurPage() {
             <ChargementResultats />
           ) : scenarios.length === 0 ? null : (
             <>
-              <section className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
-                <h2 className="text-lg">Où vous mène chaque scénario</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Chiffre d'affaires cumulé sur l'année civile, face au plafond de votre régime.
-                </p>
-                <div className="mt-6">
-                  <CourbeProjection projection={projection} />
-                </div>
-                {projection.series.some((s) => s.moisFranchissement !== null) && (
-                  <ul className="mt-4 space-y-2">
-                    {projection.series
-                      .filter((s) => s.moisFranchissement !== null)
-                      .map((s) => (
-                        <li
-                          key={s.id}
-                          className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs text-warning-ink"
-                        >
-                          <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
-                          <span>
-                            <strong>{s.libelle}</strong> franchirait le plafond en{" "}
-                            {s.points[s.moisFranchissement ?? 0]?.label}. Un dépassement n'est
-                            pas une sortie du régime — celle-ci suppose deux années
-                            consécutives.
-                          </span>
-                        </li>
-                      ))}
-                  </ul>
-                )}
-              </section>
+              {/* 1 · La réponse — deux chiffres et une phrase. */}
+              {verdict && (
+                <CarteVerdict
+                  verdict={verdict}
+                  provisionMensuelle={
+                    provisionAnalysee?.parMois != null
+                      ? formatEuros(provisionAnalysee.parMois)
+                      : null
+                  }
+                />
+              )}
 
-              <section className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
-                <h2 className="text-lg">Ce que devient votre chiffre d'affaires</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Cotisations, impôt et formation professionnelle déduits — le reste est pour vous.
-                </p>
-                <div className="mt-6">
-                  <BarresDecomposition decompositions={decompositions} />
-                </div>
-              </section>
+              {/* 2 · Les figures, une à la fois — elles s'affichent DÈS le premier
+                     scénario, ce qui n'était plus le cas. */}
+              <PanneauFigures
+                cascade={cascade}
+                cascadeComplete={flux?.complet ?? false}
+                projection={projection}
+                decompositions={decompositions}
+                comparaison={comparaison}
+                nbScenarios={scenarios.length}
+              />
 
-              <section className="space-y-4">
-                <div>
-                  <h2 className="text-lg">Ce qu'il faut mettre de côté</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Total des prélèvements de l'année, ramené au mois.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {provisions.map((provision, index) => (
-                    <TuileProvision
-                      key={provision.id}
-                      libelle={provision.libelle}
-                      parMois={provision.parMois}
-                      tauxEffectif={provision.tauxEffectif}
-                      index={index}
-                      accent={index === 0}
-                    />
-                  ))}
-                </div>
-              </section>
+              {/* 3 · Ce qu'il faut vérifier — trois points au plus, le reste sur demande. */}
+              {recommandations.length > 0 && (
+                <section className="space-y-4">
+                  <div>
+                    <h2 className="text-lg">Ce qu'il faut vérifier</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Croisement des calculs avec vos factures et votre profil.
+                    </p>
+                  </div>
+                  <ListeRecommandations recommandations={recommandations} />
+                </section>
+              )}
 
-              <TableauComparatif
+              {/* 4 · Tout le reste, replié : le détail ne doit encombrer que ceux qui
+                     le demandent. */}
+              <DetailCalcul
+                etapes={etapes}
+                sources={sources}
+                titre={
+                  scenarioAnalyse
+                    ? `Comment « ${scenarioAnalyse.libelle} » est calculé`
+                    : "Comment ce chiffre est obtenu"
+                }
+              />
+
+              <BlocDetail
                 scenarios={scenarios}
                 ecarts={ecarts}
                 depassements={depassements}
+                scenarioAnalyse={scenarioAnalyse}
+                avertissements={avertissements}
               />
-
-              {avertissements.length > 0 && (
-                <section className="animate-rise rounded-2xl border border-border bg-secondary/40 p-5">
-                  <h2 className="rule-label text-muted-foreground">Ce que le moteur signale</h2>
-                  <ul className="mt-3 space-y-2">
-                    {avertissements.map((message) => (
-                      <li key={message} className="text-xs leading-relaxed text-muted-foreground">
-                        {message}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
             </>
           )}
         </div>
@@ -264,9 +346,90 @@ function SimulateurPage() {
   );
 }
 
+const LIBELLE_COURT: Record<CategorieFiscale, string> = {
+  BIC_VENTE: "vente de marchandises",
+  BIC_SERVICE: "prestation commerciale",
+  BNC: "prestation libérale",
+};
+
+/**
+ * Le reste, replié.
+ *
+ * Tableau chiffré, abattement et avertissements du moteur : ces trois blocs occupaient
+ * l'écran principal alors qu'ils ne servent qu'à celui qui veut vérifier. Les replier n'est
+ * pas les cacher — c'est cesser de les imposer à quelqu'un qui cherchait juste un montant.
+ */
+function BlocDetail({
+  scenarios,
+  ecarts,
+  depassements,
+  scenarioAnalyse,
+  avertissements,
+}: {
+  scenarios: ReponseScenarios["scenarios"];
+  ecarts: ReturnType<typeof construireEcarts>;
+  depassements: ReturnType<typeof depassementsParScenario>;
+  scenarioAnalyse: ReponseScenarios["scenarios"][number] | null;
+  avertissements: string[];
+}) {
+  const [ouvert, setOuvert] = useState(false);
+
+  return (
+    <section className="animate-rise overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+      <button
+        type="button"
+        onClick={() => setOuvert((v) => !v)}
+        aria-expanded={ouvert}
+        className="flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-secondary/40"
+      >
+        <span className="flex items-center gap-2">
+          <Table2 className="size-4 shrink-0 text-muted-foreground" />
+          <span className="text-sm font-medium">Les chiffres en détail</span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+            ouvert && "rotate-180",
+          )}
+        />
+      </button>
+
+      {ouvert && (
+        <div className="space-y-6 border-t border-border p-5">
+          {scenarioAnalyse && (
+            <RepereAbattement
+              lignes={scenarioAnalyse.resultat.lignes ?? []}
+              caTotal={scenarioAnalyse.resultat.ca_total}
+            />
+          )}
+
+          <TableauComparatif
+            scenarios={scenarios}
+            ecarts={ecarts}
+            depassements={depassements}
+          />
+
+          {avertissements.length > 0 && (
+            <div className="rounded-xl border border-border bg-secondary/40 p-4">
+              <p className="rule-label text-muted-foreground">Ce que le moteur signale</p>
+              <ul className="mt-3 space-y-2">
+                {avertissements.map((message) => (
+                  <li key={message} className="text-xs leading-relaxed text-muted-foreground">
+                    {message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /**
  * L'écart entre deux scénarios est le vrai sujet : la courbe le montre, ce tableau le
- * chiffre. Les deux se lisent ensemble, d'où sa place juste en dessous.
+ * chiffre.
  */
 function TableauComparatif({
   scenarios,
@@ -397,12 +560,12 @@ function ChargementEcran() {
 function ChargementResultats() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-72 w-full rounded-2xl" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-28 w-full rounded-2xl" />
         ))}
       </div>
+      <Skeleton className="h-72 w-full rounded-2xl" />
     </div>
   );
 }

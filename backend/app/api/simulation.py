@@ -15,13 +15,13 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.agents.facture import store as facture_store
-from app.agents.facture.generator import _ligne_totaux
+from app.agents.facture.generator import _ligne_totaux, alerte_seuil_tva
 from app.agents.facture.schemas import LigneFacture
 from app.agents.impots.constantes import CaisseBNC, CategorieFiscale
 from app.agents.impots.moteur import plafond_applicable, simuler
@@ -86,6 +86,25 @@ class DemandeScenarios(BaseModel):
     variantes: List[VarianteScenario] = Field(default_factory=list, max_length=_MAX_VARIANTES)
 
 
+class AlerteTva(BaseModel):
+    """Franchise en base de TVA — la conséquence la plus concrète d'un contrat signé.
+
+    Le plafond du RÉGIME et le seuil de FRANCHISE DE TVA sont deux choses distinctes, et
+    le second se franchit bien plus tôt. Un contrat peut donc obliger à facturer la TVA
+    sans rien changer au régime micro : c'est ce que cette alerte rend visible.
+
+    Le calcul vient de `app.agents.facture.generator.alerte_seuil_tva`, qui lit les seuils
+    réglementaires du projet. Rien n'est recalculé ici.
+    """
+
+    niveau: str
+    message: str
+    seuil_base: Optional[float] = None
+    seuil_majore: Optional[float] = None
+    note: Optional[str] = None
+    source: Optional[str] = None
+
+
 class ScenarioCalcule(BaseModel):
     id: str
     libelle: str
@@ -93,6 +112,8 @@ class ScenarioCalcule(BaseModel):
     # vérifier sur quelles hypothèses un chiffre a été produit.
     demande: DemandeSimulation
     resultat: ResultatSimulation
+    # `None` quand le seuil est encore loin : l'agent ne crie pas sans raison.
+    alerte_tva: Optional[AlerteTva] = None
 
 
 class PlafondCategorie(BaseModel):
@@ -129,22 +150,59 @@ class DemandeInterpretation(BaseModel):
     phrase: str = Field(min_length=3, max_length=500)
 
 
+Provenance = Literal["explicite", "suppose"]
+
+
+class ElementCompris(BaseModel):
+    """Un paramètre extrait de la phrase, avec l'origine de sa valeur.
+
+    `provenance` est la pièce maîtresse de l'écran. Une saisie en langage naturel n'est
+    honnête que si l'utilisateur peut distinguer ce qu'il a DIT de ce que la machine a
+    DEVINÉ à sa place : confondre les deux, c'est lui faire porter une erreur qui n'est
+    pas la sienne. Une supposition doit se voir et se corriger.
+    """
+
+    champ: Literal["montant", "categorie", "recurrence", "duree"]
+    libelle: str = Field(description="Ce qui est affiché à l'utilisateur, en toutes lettres")
+    provenance: Provenance
+
+
+class ScenarioInterprete(BaseModel):
+    """Un scénario compris dans la phrase, prêt à devenir une variante.
+
+    `montant` est le CA de la période, pas un montant d'impôt : le modèle ne calcule rien.
+    """
+
+    id: str
+    libelle: str
+    montant: float = Field(gt=0, description="CA HT ajouté, hors récurrence")
+    categorie: Optional[CategorieFiscale] = None
+    recurrent: bool = False
+    mois: Optional[int] = Field(default=None, ge=1, le=12)
+    # CA effectivement ajouté sur l'année, récurrence appliquée. Voir `_ca_annuel`.
+    ca_annuel: float = 0.0
+    elements: List[ElementCompris] = Field(default_factory=list)
+    # Vrai pour un contre-scénario proposé par le modèle, faux pour ce que la phrase dit.
+    propose: bool = False
+
+
 class InterpretationScenario(BaseModel):
     """Ce que le modèle a compris — proposé, jamais appliqué d'office.
 
     Le modèle TRADUIT une phrase en paramètres. Il ne produit aucun montant d'impôt : le
-    calcul appartient au moteur. `comprise` à faux signale qu'il faut passer par le
-    formulaire plutôt que d'inventer un scénario.
+    calcul appartient au moteur. `comprise` à faux signale qu'aucun scénario n'est
+    exploitable et que l'écran doit demander une reformulation.
     """
 
     comprise: bool
-    montant: Optional[float] = None
-    categorie: Optional[CategorieFiscale] = None
-    recurrent: bool = False
-    mois: Optional[int] = Field(default=None, ge=1, le=12)
-    libelle: Optional[str] = None
     resume: Optional[str] = None
     motif: Optional[str] = None
+    # Ce que la phrase décrit. Plusieurs entrées si elle contient plusieurs scénarios.
+    scenarios: List[ScenarioInterprete] = Field(default_factory=list)
+    # Comparaisons utiles suggérées par le modèle. L'utilisateur les accepte ou les écarte —
+    # elles ne sont JAMAIS appliquées d'office, sans quoi il subirait des chiffres qu'il
+    # n'a pas demandés.
+    contre_scenarios: List[ScenarioInterprete] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------- Pré-remplissage
@@ -320,6 +378,26 @@ def _appliquer(base: DemandeSimulation, variante: VarianteScenario) -> DemandeSi
     )
 
 
+def _alerte_tva(demande: DemandeSimulation) -> Optional[AlerteTva]:
+    """Alerte de franchise TVA pour un scénario.
+
+    Le seuil de franchise dépend de la nature de l'activité : on interroge la catégorie qui
+    porte le plus de chiffre d'affaires, et on retient l'alerte la plus sévère rencontrée.
+    """
+    pire: Optional[Dict[str, Any]] = None
+    rang = {"proche": 1, "depasse_base": 2, "depasse_majore": 3}
+
+    for activite in demande.activites:
+        nature = "vente" if activite.categorie == CategorieFiscale.bic_vente else "services"
+        alerte = alerte_seuil_tva(activite.ca, nature)
+        if alerte is None:
+            continue
+        if pire is None or rang.get(alerte["niveau"], 0) > rang.get(pire["niveau"], 0):
+            pire = alerte
+
+    return AlerteTva.model_validate(pire) if pire else None
+
+
 def _plafonds(calcules: List[ScenarioCalcule], jours_activite: Optional[int]) -> List[PlafondCategorie]:
     """Plafonds des catégories effectivement en jeu, base et variantes confondues."""
     categories: List[CategorieFiscale] = []
@@ -350,6 +428,7 @@ async def scenarios(demande: DemandeScenarios, user: UserPublic = Depends(get_cu
             libelle="Situation actuelle",
             demande=demande.base,
             resultat=simuler(demande.base),
+            alerte_tva=_alerte_tva(demande.base),
         )
     ]
 
@@ -361,6 +440,7 @@ async def scenarios(demande: DemandeScenarios, user: UserPublic = Depends(get_cu
                 libelle=variante.libelle,
                 demande=appliquee,
                 resultat=simuler(appliquee),
+                alerte_tva=_alerte_tva(appliquee),
             )
         )
 
@@ -376,66 +456,201 @@ async def scenarios(demande: DemandeScenarios, user: UserPublic = Depends(get_cu
 _SYSTEME_INTERPRETATION = """Tu traduis une phrase française en paramètres de simulation fiscale.
 
 Tu ne calcules JAMAIS d'impôt, de cotisation ni de montant net : un moteur déterministe
-s'en charge. Tu extrais uniquement ce que la phrase dit.
+s'en charge. Tu extrais uniquement ce que la phrase dit, et tu déclares ce que tu supposes.
 
 Réponds avec cet objet JSON :
 {
   "comprise": true|false,
-  "montant": nombre en euros HT ou null,
-  "categorie": "BIC_VENTE" | "BIC_SERVICE" | "BNC" | null,
-  "recurrent": true|false,
-  "mois": nombre de mois si récurrent, sinon null,
-  "libelle": "étiquette courte du scénario, ex. « Contrat 5 000 € »",
   "resume": "une phrase disant ce que tu as compris, en français",
-  "motif": "si comprise vaut false, ce qui manque dans la phrase"
+  "motif": "si comprise vaut false, ce qui manque dans la phrase",
+  "scenarios": [
+    {
+      "libelle": "étiquette courte, ex. « Contrat 5 000 € »",
+      "montant": nombre en euros HT (le montant d'UNE occurrence, pas le total annuel),
+      "categorie": "BIC_VENTE" | "BIC_SERVICE" | "BNC" | null,
+      "recurrent": true|false,
+      "mois": nombre de mois si récurrent, sinon null,
+      "montant_explicite": true|false,
+      "categorie_explicite": true|false,
+      "recurrence_explicite": true|false
+    }
+  ],
+  "contre_scenarios": [ même forme, 0 à 2 entrées ]
 }
 
 Règles :
 - "BIC_VENTE" = vente de marchandises ou de biens. "BIC_SERVICE" = prestation de services
   commerciale. "BNC" = prestation libérale, conseil, création de contenu, sponsoring.
-- En cas de doute sur la catégorie, mets null : le formulaire la demandera.
-- Si aucun montant n'est identifiable, "comprise" vaut false.
+- En cas de doute sur la catégorie, mets null : l'écran la demandera.
+- Une phrase peut contenir PLUSIEURS scénarios (« deux clients à 3 000 € et un à 8 000 »).
+  Mets-en un par entrée de "scenarios", au maximum 3.
+- Pour un contrat récurrent, "montant" est le montant d'UNE échéance et "mois" leur nombre.
+  Ne multiplie pas toi-même : le serveur s'en charge.
+- Les champs "*_explicite" disent si la valeur est LUE dans la phrase (true) ou SUPPOSÉE
+  par toi (false). Sois honnête : une supposition annoncée vaut mieux qu'une erreur muette.
+- "contre_scenarios" : au plus deux comparaisons utiles que l'utilisateur n'a pas demandées
+  mais qu'il a intérêt à voir (le même contrat à la moitié, deux fois ce contrat…).
+  Donne-leur un libellé qui dit clairement que c'est une hypothèse alternative.
+- Si aucun montant n'est identifiable nulle part, "comprise" vaut false et "scenarios" est vide.
 """
+
+_REFUS_INDISPONIBLE = (
+    "L'interprétation automatique est indisponible. Reformulez ou réessayez dans un moment."
+)
+_REFUS_INCOMPRIS = (
+    "La phrase n'a pas pu être interprétée. Précisez un montant, par exemple "
+    "« un contrat de 5 000 € en prestation »."
+)
+
+
+def _ca_annuel(montant: float, recurrent: bool, mois: Optional[int]) -> float:
+    """CA ajouté sur l'année civile par un scénario.
+
+    RÈGLE, explicite parce qu'elle change le résultat du simple au double : `montant` est
+    le montant d'UNE échéance. Un contrat récurrent ajoute donc `montant × mois`, et un
+    récurrent sans durée précisée est traité comme courant jusqu'à la fin de l'année, soit
+    douze échéances. C'est l'hypothèse la plus défavorable en termes de plafond — celle qui
+    alerte plutôt que celle qui rassure, puisque c'est le franchissement du plafond que
+    l'écran doit rendre visible.
+    """
+    if not recurrent:
+        return round(montant, 2)
+    echeances = mois if mois is not None and mois > 0 else 12
+    return round(montant * min(echeances, 12), 2)
+
+
+def _element(champ: str, libelle: str, explicite: Any) -> ElementCompris:
+    return ElementCompris(
+        champ=champ,  # type: ignore[arg-type] — champ vient d'un littéral local
+        libelle=libelle,
+        provenance="explicite" if explicite is True else "suppose",
+    )
+
+
+def _lire_scenario(brut: Dict[str, Any], index: int, propose: bool) -> Optional[ScenarioInterprete]:
+    """Une entrée de la sortie du modèle → un scénario exploitable, ou `None`.
+
+    Toute entrée sans montant utilisable est ÉCARTÉE plutôt que complétée : simuler sur un
+    chiffre inventé produirait une réponse fausse d'apparence sûre.
+    """
+    if not isinstance(brut, dict):
+        return None
+
+    montant = brut.get("montant")
+    if not isinstance(montant, (int, float)) or isinstance(montant, bool):
+        return None
+    montant = float(montant)
+    if not (montant > 0) or montant != montant or montant in (float("inf"), float("-inf")):
+        return None
+
+    categorie_brute = brut.get("categorie")
+    categorie = (
+        CategorieFiscale(categorie_brute)
+        if categorie_brute in {c.value for c in CategorieFiscale}
+        else None
+    )
+
+    recurrent = bool(brut.get("recurrent"))
+    mois_brut = brut.get("mois")
+    mois = int(mois_brut) if isinstance(mois_brut, int) and 1 <= mois_brut <= 12 else None
+
+    libelle = brut.get("libelle")
+    if not isinstance(libelle, str) or not libelle.strip():
+        libelle = f"Scénario {index + 1}"
+
+    elements = [
+        _element("montant", f"{montant:,.0f} € HT".replace(",", " "), brut.get("montant_explicite")),
+        _element(
+            "categorie",
+            _LIBELLE_CATEGORIE.get(categorie, "nature à préciser"),
+            brut.get("categorie_explicite") if categorie is not None else False,
+        ),
+        _element(
+            "recurrence",
+            "contrat récurrent" if recurrent else "contrat unique",
+            brut.get("recurrence_explicite"),
+        ),
+    ]
+    if recurrent:
+        elements.append(
+            _element(
+                "duree",
+                f"sur {mois} mois" if mois else "sur 12 mois",
+                mois is not None and brut.get("recurrence_explicite") is True,
+            )
+        )
+
+    return ScenarioInterprete(
+        id=f"{'contre' if propose else 'sc'}-{index}",
+        libelle=libelle.strip(),
+        montant=montant,
+        categorie=categorie,
+        recurrent=recurrent,
+        mois=mois,
+        ca_annuel=_ca_annuel(montant, recurrent, mois),
+        elements=elements,
+        propose=propose,
+    )
+
+
+_LIBELLE_CATEGORIE = {
+    CategorieFiscale.bic_vente: "vente de marchandises",
+    CategorieFiscale.bic_service: "prestation commerciale",
+    CategorieFiscale.bnc: "prestation libérale",
+    None: "nature à préciser",
+}
+
+# Trois scénarios décrits + la base saturent déjà les quatre teintes catégorielles
+# validées de la charte dataviz ; les contre-scénarios se substituent, ils ne s'ajoutent pas.
+_MAX_SCENARIOS = 3
+_MAX_CONTRE_SCENARIOS = 2
 
 
 @router.post("/interpreter", response_model=InterpretationScenario)
 async def interpreter(demande: DemandeInterpretation, user: UserPublic = Depends(get_current_user)):
     """Traduit une phrase en paramètres. Le résultat est une PROPOSITION corrigeable.
 
-    Le modèle n'est jamais sur le chemin d'un montant fiscal : il choisit un montant de CA
-    et une catégorie, le moteur fait le reste. Si le modèle est indisponible, on le dit —
-    le formulaire structuré reste utilisable sans lui.
+    Le modèle n'est jamais sur le chemin d'un montant fiscal : il choisit un CA, une nature
+    et une récurrence, le moteur fait le reste. Toute sortie hors contrat est écartée en
+    silence plutôt que rattrapée : un scénario à demi compris vaut moins que pas de scénario.
     """
     try:
         brut: Dict[str, Any] = await chat_json_with_system(
-            _SYSTEME_INTERPRETATION, demande.phrase, temperature=0.0, max_tokens=400
+            _SYSTEME_INTERPRETATION, demande.phrase, temperature=0.0, max_tokens=900
         )
     except MistralIndisponible as exc:
         logger.info("Interprétation indisponible : %s", exc)
-        return InterpretationScenario(
-            comprise=False,
-            motif="L'interprétation automatique est indisponible. Renseignez le scénario à la main.",
-        )
+        return InterpretationScenario(comprise=False, motif=_REFUS_INDISPONIBLE)
     except Exception as exc:  # noqa: BLE001 — une extraction ratée n'est pas une panne d'écran
         logger.warning("Interprétation en échec : %s", exc)
+        return InterpretationScenario(comprise=False, motif=_REFUS_INCOMPRIS)
+
+    if not isinstance(brut, dict):
+        return InterpretationScenario(comprise=False, motif=_REFUS_INCOMPRIS)
+
+    scenarios = [
+        s
+        for i, entree in enumerate(brut.get("scenarios") or [])
+        if (s := _lire_scenario(entree, i, propose=False)) is not None
+    ][:_MAX_SCENARIOS]
+
+    if not scenarios:
+        motif = brut.get("motif")
         return InterpretationScenario(
             comprise=False,
-            motif="La phrase n'a pas pu être interprétée. Renseignez le scénario à la main.",
+            motif=motif if isinstance(motif, str) and motif.strip() else _REFUS_INCOMPRIS,
         )
 
-    try:
-        interpretation = InterpretationScenario.model_validate(brut)
-    except Exception:  # noqa: BLE001 — sortie de modèle hors contrat
-        return InterpretationScenario(
-            comprise=False,
-            motif="La phrase n'a pas pu être interprétée. Renseignez le scénario à la main.",
-        )
+    contre = [
+        s
+        for i, entree in enumerate(brut.get("contre_scenarios") or [])
+        if (s := _lire_scenario(entree, i, propose=True)) is not None
+    ][:_MAX_CONTRE_SCENARIOS]
 
-    # Un montant absent ou absurde vide le scénario plutôt que de produire une simulation
-    # sur un chiffre inventé.
-    if interpretation.montant is None or interpretation.montant <= 0:
-        return InterpretationScenario(
-            comprise=False,
-            motif=interpretation.motif or "Aucun montant identifiable dans la phrase.",
-        )
-    return interpretation
+    resume = brut.get("resume")
+    return InterpretationScenario(
+        comprise=True,
+        resume=resume.strip() if isinstance(resume, str) and resume.strip() else None,
+        scenarios=scenarios,
+        contre_scenarios=contre,
+    )
