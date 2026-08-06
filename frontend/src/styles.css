@@ -569,6 +569,168 @@
   animation: lm-caret 1s step-end infinite;
 }
 
+/* Chatbot produit — le pixel-chat ouvre la voie pendant que l'accroche se compose. */
+@keyframes lm-product-copy-write {
+  from {
+    width: 0;
+  }
+  to {
+    width: 205px;
+  }
+}
+
+@keyframes lm-product-cat-cross {
+  0% {
+    transform: translateX(0) scaleX(1);
+  }
+  45% {
+    transform: translateX(210px) scaleX(1);
+  }
+  50% {
+    transform: translateX(210px) scaleX(-1);
+  }
+  95% {
+    transform: translateX(0) scaleX(-1);
+  }
+  100% {
+    transform: translateX(0) scaleX(1);
+  }
+}
+
+@keyframes lm-product-cat-step {
+  0%,
+  100% {
+    transform: translateY(1px) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(1deg);
+  }
+}
+
+@keyframes lm-product-search-walk {
+  0% {
+    transform: translateX(-8px) translateY(1px);
+  }
+  50% {
+    transform: translateX(8px) translateY(-2px);
+  }
+  100% {
+    transform: translateX(-8px) translateY(1px);
+  }
+}
+
+.lm-product-launcher {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 999px;
+  transition:
+    width 0.5s var(--ease-out-expo),
+    height 0.5s var(--ease-out-expo),
+    border-radius 0.5s var(--ease-out-expo),
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.lm-product-launcher__icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--foreground);
+  transition:
+    opacity 0.2s ease,
+    transform 0.3s var(--ease-out-expo);
+}
+
+.lm-product-launcher__copy {
+  position: absolute;
+  left: 18px;
+  top: 15px;
+  display: flex;
+  width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: left;
+  opacity: 0;
+}
+
+.lm-product-launcher__copy strong {
+  font-size: 0.78rem;
+  line-height: 1.1rem;
+}
+
+.lm-product-launcher__copy small {
+  margin-top: 0.2rem;
+  font-size: 0.66rem;
+  color: var(--muted-foreground);
+}
+
+.dark .lm-product-launcher__copy,
+.dark .lm-product-launcher__copy small {
+  color: #fff;
+}
+
+.lm-product-launcher__cat-track {
+  position: absolute;
+  bottom: 5px;
+  left: 4px;
+  display: block;
+  opacity: 0;
+  will-change: transform;
+}
+
+.lm-product-launcher__cat {
+  filter: drop-shadow(0 4px 4px rgb(17 23 38 / 0.12));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lm-product-launcher:hover,
+  .lm-product-launcher:focus-visible {
+    width: min(304px, calc(100vw - 2rem));
+    height: 74px;
+    border-radius: 1.35rem;
+  }
+
+  .lm-product-launcher:hover .lm-product-launcher__icon,
+  .lm-product-launcher:focus-visible .lm-product-launcher__icon {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+
+  .lm-product-launcher:hover .lm-product-launcher__copy,
+  .lm-product-launcher:focus-visible .lm-product-launcher__copy {
+    opacity: 1;
+    animation: lm-product-copy-write 3.2s steps(28, end) 0.15s both;
+  }
+
+  .lm-product-launcher:hover .lm-product-launcher__cat-track,
+  .lm-product-launcher:focus-visible .lm-product-launcher__cat-track {
+    opacity: 1;
+    animation: lm-product-cat-cross 7s steps(56, end) 0.15s infinite;
+  }
+
+  .lm-product-launcher:hover .lm-product-launcher__cat,
+  .lm-product-launcher:focus-visible .lm-product-launcher__cat {
+    animation: lm-product-cat-step 0.32s steps(2, end) infinite;
+  }
+}
+
+.lm-product-search-cat {
+  animation: lm-product-search-walk 0.9s steps(4, end) infinite;
+}
+
+.lm-product-type-caret {
+  position: absolute;
+  right: -4px;
+  bottom: 1px;
+  width: 2px;
+  height: 0.95rem;
+  border-radius: 999px;
+  background: currentColor;
+  animation: lm-caret 0.7s step-end infinite;
+}
+
 /* Justificatifs — portail cadeau (GIF pixel fond noir → blend screen) */
 .lm-gift-portal {
   --tilt-x: 0deg;
@@ -1568,8 +1730,21 @@
   .lm-gift-cube__scene,
   .lm-gift-portal__ring--pulse,
   .lm-gift-hint__dot,
-  .lm-gift-cat--out {
+  .lm-gift-cat--out,
+  .lm-product-launcher__copy,
+  .lm-product-launcher__cat-track,
+  .lm-product-launcher__cat,
+  .lm-product-search-cat,
+  .lm-product-type-caret {
     animation: none !important;
+  }
+
+  .lm-product-launcher__copy {
+    width: 205px;
+  }
+
+  .lm-product-launcher__cat-track {
+    transform: translateX(210px);
   }
 
   .lm-gift-cat,

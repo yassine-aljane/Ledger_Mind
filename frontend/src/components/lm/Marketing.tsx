@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getStoredUser, isAuthed, postAuthPath, type AuthUser } from "@/lib/auth";
 import { usePlan } from "@/lib/plan";
@@ -96,6 +97,20 @@ export function SiteFooter() {
             Connexion
           </Link>
         </nav>
+      </div>
+      <div className="border-t border-border/70 bg-background/65">
+        <div className="mx-auto flex max-w-6xl items-start gap-3 px-5 py-4 sm:items-center">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent/20 text-primary ring-1 ring-accent/30">
+            <Sparkles className="size-4" aria-hidden />
+          </span>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <strong className="mr-1.5 font-semibold text-foreground">
+              Conçu avec l&apos;IA, en toute transparence.
+            </strong>
+            LedgerMind a été conçu et développé avec l&apos;aide de l&apos;intelligence artificielle.
+            Les contenus générés peuvent nécessiter une vérification humaine.
+          </p>
+        </div>
       </div>
     </footer>
   );
