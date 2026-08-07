@@ -177,3 +177,36 @@ def test_corpus_vide_message_explicite(embeddings_simules, llm_simule):
 
 def test_mots_cles_pour_la_recherche_bofip():
     assert pedagogue.mots_cles("Est-ce que je dois déclarer mes cadeaux ?") == "déclarer cadeaux"
+
+
+def test_extrait_graphe_et_tableau_valides_de_la_reponse():
+    brut = (
+        "Voici la comparaison sourcée.\n"
+        '<visualisation>{"type":"bar","title":"Abattements",'
+        '"unit":"%","data":[{"label":"Micro-BNC","value":34},'
+        '{"label":"Micro-BIC","value":50}]}</visualisation>\n'
+        '<visualisation>{"type":"table","title":"Comparaison",'
+        '"columns":["Critère","BNC","BIC"],'
+        '"rows":[["Activité","Libérale","Commerciale"]]}</visualisation>'
+    )
+
+    texte, visualisations = pedagogue.extraire_visualisations(brut)
+
+    assert texte == "Voici la comparaison sourcée."
+    assert visualisations[0]["type"] == "bar"
+    assert visualisations[0]["data"][0] == {"label": "Micro-BNC", "value": 34.0}
+    assert visualisations[1]["type"] == "table"
+    assert visualisations[1]["rows"] == [["Activité", "Libérale", "Commerciale"]]
+
+
+def test_rejette_un_graphe_incomplet_ou_non_numerique():
+    brut = (
+        "Réponse normale. "
+        '<visualisation>{"type":"bar","title":"Comparaison",'
+        '"data":[{"label":"A","value":"inconnu"}]}</visualisation>'
+    )
+
+    texte, visualisations = pedagogue.extraire_visualisations(brut)
+
+    assert texte == "Réponse normale."
+    assert visualisations == []

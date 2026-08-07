@@ -547,15 +547,17 @@ async def respond(session_id: str | None, message: str, mode: str = "guidance",
     sid = store.ensure_session(session_id, uid=uid, type=stype)
     historique = store.history(sid, limit=12)
 
-    def _paquet(reponse, sources, roadmap, options, debug, suggestions=None):
+    def _paquet(reponse, sources, roadmap, options, debug, suggestions=None,
+                visualisations=None):
         if roadmap is not None:
             store.save_roadmap(sid, roadmap=roadmap)
-        store.add_message(sid, "assistant", reponse, sources)
+        store.add_message(sid, "assistant", reponse, sources, visualisations)
         profil_courant = store.get_profil(uid)
         return {
             "session_id": sid,
             "reponse": reponse,
             "sources": sources,
+            "visualisations": visualisations or [],
             "profil": profil_courant,
             "roadmap": roadmap,
             "options": options,
@@ -594,6 +596,7 @@ async def respond(session_id: str | None, message: str, mode: str = "guidance",
                  "avertissement_fraicheur": resultat.get("avertissement_fraicheur", False),
                  "bofip_live_utilise": resultat.get("bofip_live_utilise", False)},
                 suggestions=[],
+                visualisations=resultat.get("visualisations", []),
             )
 
         manquantes = questions_manquantes(profil)

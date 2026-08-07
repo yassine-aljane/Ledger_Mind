@@ -143,3 +143,13 @@ def test_pdf_se_genere_sans_erreur_franchise_et_avec_tva():
     f2 = generer_facture("u2", "FA-2026-000002", _profil_societe(), req2)
     pdf2 = facture_to_pdf(f2)
     assert pdf2[:5] == b"%PDF-"
+
+
+@pytest.mark.parametrize("template_id", ["minimal", "grid", "azure", "mint", "lilac"])
+def test_chaque_modele_est_conserve_et_genere_un_pdf(template_id):
+    """Le choix visuel fait partie du brouillon et doit survivre jusqu'au PDF final."""
+    requete = _requete(template_id=template_id)
+    facture = generer_facture("u-template", "FA-2026-000010", _profil_micro(), requete)
+
+    assert facture.template_id == template_id
+    assert facture_to_pdf(facture)[:5] == b"%PDF-"

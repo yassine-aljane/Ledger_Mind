@@ -55,6 +55,22 @@ export type ChatSource = {
   extrait?: string;
 };
 
+export type FiscalChartVisualisation = {
+  type: "bar" | "line";
+  title: string;
+  unit?: string;
+  data: { label: string; value: number }[];
+};
+
+export type FiscalTableVisualisation = {
+  type: "table";
+  title: string;
+  columns: string[];
+  rows: string[][];
+};
+
+export type FiscalVisualisation = FiscalChartVisualisation | FiscalTableVisualisation;
+
 /** Options cliquables décidées par le BACKEND — le front n'en code aucune en dur. */
 export type ChatOptions = {
   kind: string;
@@ -79,6 +95,7 @@ export type GuidanceChatResponse = {
   session_id: string;
   reponse: string;
   sources: ChatSource[];
+  visualisations: FiscalVisualisation[];
   profil: GuidanceProfile;
   roadmap: Record<string, any> | null;
   options: ChatOptions | null;
@@ -100,7 +117,13 @@ export type ConversationDetail = {
   session_id: string;
   type: string;
   title: string | null;
-  messages: { role: string; content: string; sources: ChatSource[]; created_at: string }[];
+  messages: {
+    role: string;
+    content: string;
+    sources: ChatSource[];
+    visualisations?: FiscalVisualisation[];
+    created_at: string;
+  }[];
   profil: GuidanceProfile;
   roadmap: Record<string, any> | null;
   checked: Record<string, boolean>;

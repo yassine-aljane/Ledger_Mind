@@ -627,46 +627,6 @@ function Landing() {
         </div>
       </section>
 
-      {/* ---------- CTA final ---------- */}
-      <section className="relative overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-[0.5]"
-          style={{ background: "var(--gradient-ink)" }}
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -right-20 top-0 h-full w-1/2 opacity-30 blur-3xl"
-          style={{ background: "var(--gradient-safran)" }}
-          aria-hidden
-        />
-        <div className="relative mx-auto flex max-w-6xl flex-col items-start gap-8 px-5 py-20 text-ink-foreground sm:flex-row sm:items-center sm:justify-between sm:py-24">
-          <div>
-            <p className="font-display text-safran text-sm">LedgerMind</p>
-            <h2 className="mt-2 max-w-lg font-display text-3xl leading-tight sm:text-4xl">
-              Commencez par une question —{" "}
-              <span className="italic">pas par un parcours.</span>
-            </h2>
-            <p className="mt-3 max-w-md text-sm text-ink-foreground/70">
-              La démo ci-dessus tourne déjà. Votre vraie question, c&apos;est la suite.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="accent" className="rounded-full px-7">
-              <Link to="/education">
-                Ouvrir l&apos;Assistant fiscal <ArrowRight />
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="rounded-full border-ink-foreground/35 bg-transparent px-7 text-ink-foreground hover:bg-ink-foreground/10 hover:text-ink-foreground"
-            >
-              <Link to="/auth">Créer un compte</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
     </MarketingLayout>
   );
 }

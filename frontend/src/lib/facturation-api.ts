@@ -63,6 +63,8 @@ export type StatutFacture =
   | "payee"
   | "annulee";
 
+export type TemplateFactureId = "minimal" | "grid" | "azure" | "mint" | "lilac";
+
 export type ClientFacture = {
   nom: string;
   est_professionnel: boolean;
@@ -104,12 +106,14 @@ export type Facture = {
   facture_origine_numero?: string | null;   // rempli sur un avoir
   avoir_numero?: string | null;             // rempli sur la facture annulée
   mentions: MentionFacture[];
+  template_id: TemplateFactureId;
   template_source: string;
 };
 
 export type FacturePayload = {
   client: ClientFacture;
   lignes: LigneFacture[];
+  template_id: TemplateFactureId;
   date_prestation?: string | null;
   numero_contrat?: string | null;
   numero_bon_commande?: string | null;
