@@ -8,6 +8,8 @@ lui est fourni (jamais de contradiction avec la feuille de route).
 from __future__ import annotations
 
 import logging
+import json
+import math
 import re
 
 from app.llm import chat_text
@@ -76,6 +78,21 @@ DÉCLARATION : le micro (BNC comme BIC) se déclare à l'impôt sur la déclarat
 régime réel ajoute une liasse fiscale spécifique. La déclaration de chiffre d'affaires à l'URSSAF
 est un circuit DISTINCT (cotisations sociales) qui se CUMULE avec la déclaration fiscale : n'oppose
 jamais « micro-entrepreneur » et « régime réel » sur le formulaire 2042-C-PRO.
+
+VISUALISATIONS (facultatives) :
+- La réponse textuelle reste obligatoire et autonome.
+- Ajoute une visualisation UNIQUEMENT si elle rend une comparaison, une évolution ou plusieurs
+  valeurs nettement plus compréhensibles. N'en ajoute pas à une réponse simple.
+- Toutes les valeurs doivent provenir explicitement des extraits fournis ou de la position
+  déterministe. N'invente aucune donnée pour compléter un graphe ou un tableau.
+- Un graphe exige au moins 2 valeurs numériques comparables avec la même unité. Utilise `bar`
+  pour comparer des catégories et `line` seulement pour une évolution ordonnée dans le temps.
+- Utilise `table` pour une comparaison mêlant du texte et des valeurs.
+- Maximum 2 visualisations et 8 points/lignes par visualisation.
+- Place chaque structure APRÈS la réponse sous cette forme exacte, sans bloc Markdown :
+  <visualisation>{"type":"bar","title":"Titre","unit":"%","data":[{"label":"A","value":10},{"label":"B","value":20}]}</visualisation>
+  ou
+  <visualisation>{"type":"table","title":"Titre","columns":["Critère","Option A","Option B"],"rows":[["Règle","Valeur A","Valeur B"]]}</visualisation>
 """
 
 CORPUS_VIDE = (
@@ -87,6 +104,79 @@ RECHERCHE_INDISPONIBLE = (
     "Je ne peux pas interroger ma base documentaire pour le moment. Réessayez dans un instant — "
     "je préfère ne rien affirmer plutôt que de répondre sans source."
 )
+
+_VISUALISATION_RE = re.compile(
+    r"<visualisation>\s*(\{.*?\})\s*</visualisation>", re.DOTALL | re.IGNORECASE,
+)
+
+
+def _texte_court(value: object, limite: int = 120) -> str:
+    """Cellule/étiquette bornée : évite qu'un payload LLM gonfle la réponse ou le DOM."""
+    if value is None:
+        return "—"
+    return str(value).strip()[:limite]
+
+
+def _valider_visualisation(brut: object) -> dict | None:
+    """Valide et normalise le petit contrat de dataviz produit par le modèle."""
+    if not isinstance(brut, dict):
+        return None
+    kind = brut.get("type")
+    titre = _texte_court(brut.get("title"), 100)
+    if not titre or kind not in {"bar", "line", "table"}:
+        return None
+
+    if kind in {"bar", "line"}:
+        data = brut.get("data")
+        if not isinstance(data, list) or not 2 <= len(data) <= 8:
+            return None
+        points: list[dict] = []
+        for point in data:
+            if not isinstance(point, dict):
+                return None
+            label = _texte_court(point.get("label"), 50)
+            value = point.get("value")
+            if (not label or isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(float(value))):
+                return None
+            points.append({"label": label, "value": float(value)})
+        return {
+            "type": kind,
+            "title": titre,
+            "unit": _texte_court(brut.get("unit"), 16),
+            "data": points,
+        }
+
+    columns = brut.get("columns")
+    rows = brut.get("rows")
+    if (not isinstance(columns, list) or not 2 <= len(columns) <= 6
+            or not isinstance(rows, list) or not 1 <= len(rows) <= 8):
+        return None
+    entetes = [_texte_court(c, 60) for c in columns]
+    if any(not c for c in entetes):
+        return None
+    lignes: list[list[str]] = []
+    for row in rows:
+        if not isinstance(row, list) or len(row) != len(entetes):
+            return None
+        lignes.append([_texte_court(cell) for cell in row])
+    return {"type": "table", "title": titre, "columns": entetes, "rows": lignes}
+
+
+def extraire_visualisations(reponse: str) -> tuple[str, list[dict]]:
+    """Retire les payloads structurés du texte et ne conserve que ceux qui sont valides."""
+    visualisations: list[dict] = []
+    for match in _VISUALISATION_RE.finditer(reponse or ""):
+        if len(visualisations) >= 2:
+            break
+        try:
+            validee = _valider_visualisation(json.loads(match.group(1)))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            validee = None
+        if validee:
+            visualisations.append(validee)
+    texte = _VISUALISATION_RE.sub("", reponse or "").strip()
+    return texte, visualisations
 
 
 def mots_cles(question: str) -> str:
@@ -130,9 +220,11 @@ async def answer(question: str, concerne: str | None = None, profil: dict | None
     resultat = await search(question, k=8, concerne=concerne)
 
     if resultat["corpus_vide"]:
-        return {"reponse": CORPUS_VIDE, "sources": [], "avertissement_fraicheur": False}
+        return {"reponse": CORPUS_VIDE, "sources": [], "visualisations": [],
+                "avertissement_fraicheur": False}
     if resultat.get("recherche_indisponible"):
-        return {"reponse": RECHERCHE_INDISPONIBLE, "sources": [], "avertissement_fraicheur": False}
+        return {"reponse": RECHERCHE_INDISPONIBLE, "sources": [], "visualisations": [],
+                "avertissement_fraicheur": False}
 
     hits = list(resultat["hits"])
     meilleure_similarite = hits[0].get("similarite", 0.0) if hits else 0.0
@@ -160,10 +252,12 @@ async def answer(question: str, concerne: str | None = None, profil: dict | None
         f"Historique récent (contexte, jamais une source) : {historique or []}"
         f"{verdict_txt}\n\nExtraits du corpus :\n{extraits}"
     )
-    reponse = await chat_text(SYSTEME, prompt, temperature=0.0, max_tokens=2000)
+    reponse_brute = await chat_text(SYSTEME, prompt, temperature=0.0, max_tokens=2400)
+    reponse, visualisations = extraire_visualisations(reponse_brute)
 
     return {
         "reponse": reponse,
+        "visualisations": visualisations,
         "sources": [
             {"source": h["source"], "titre": h["titre"], "url": h["url"],
              "date_publication": h["date_publication"], "score": h["score"], "perime": h["perime"]}

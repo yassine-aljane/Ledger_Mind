@@ -7,6 +7,7 @@
 import { Library, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConversationHistory } from "@/components/lm/ConversationHistory";
+import { FiscalVisualisations } from "@/components/lm/FiscalVisualisations";
 import { Markdown } from "@/components/lm/Markdown";
 import { Sources } from "@/components/lm/Sources";
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,9 @@ import {
   type ChatSource,
   type ConversationSummary,
   type CorpusStatus,
+  type FiscalVisualisation,
 } from "@/lib/guidance-api";
 import { cn } from "@/lib/utils";
-
-const SESSION_KEY = "ledgermind_pedagogue_session";
 
 const QUESTIONS_DEPART = [
   "Je reçois des produits gratuits de marques, dois-je les déclarer ?",
@@ -39,6 +39,7 @@ type Turn = {
   sources?: ChatSource[];
   fraicheur?: boolean;
   bofipLive?: boolean;
+  visualisations?: FiscalVisualisation[];
   error?: string;
 };
 
@@ -83,7 +84,7 @@ export function FiscalAssistant() {
       .catch(() => setConversations([]));
   }, []);
 
-  const openConversation = useCallback(async (id: string, silent = false) => {
+  const openConversation = useCallback(async (id: string) => {
     try {
       const detail = await fetchConversation(id);
       setSessionId(id);
@@ -93,11 +94,12 @@ export function FiscalAssistant() {
           role: m.role === "user" ? "user" : "assistant",
           text: m.content,
           sources: m.sources,
+          visualisations: m.visualisations,
         })),
       );
     } catch {
-      if (!silent) localStorage.removeItem(SESSION_KEY);
       setSessionId(null);
+      setTurns([]);
     }
   }, []);
 
@@ -106,13 +108,7 @@ export function FiscalAssistant() {
     fetchCorpusStatus()
       .then(setCorpus)
       .catch(() => setCorpus(null));
-    const stored = typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
-    if (stored) void openConversation(stored, true);
-  }, [openConversation, refreshConversations]);
-
-  useEffect(() => {
-    if (sessionId) localStorage.setItem(SESSION_KEY, sessionId);
-  }, [sessionId]);
+  }, [refreshConversations]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -140,6 +136,7 @@ export function FiscalAssistant() {
           role: "assistant",
           text: data.reponse,
           sources: data.sources,
+          visualisations: data.visualisations,
           fraicheur: Boolean(debug?.avertissement_fraicheur),
           bofipLive: Boolean(debug?.bofip_live_utilise),
         },
@@ -160,7 +157,6 @@ export function FiscalAssistant() {
   const startNew = () => {
     setSessionId(null);
     setTurns([]);
-    localStorage.removeItem(SESSION_KEY);
     inputRef.current?.focus();
   };
 
@@ -249,13 +245,20 @@ export function FiscalAssistant() {
             <>
               {turns.map((turn) =>
                 turn.role === "assistant" ? (
-                  <div key={turn.id} className="lm-bubble-in flex max-w-[92%] flex-col gap-1">
+                  <div
+                    key={turn.id}
+                    className={cn(
+                      "lm-bubble-in flex flex-col gap-1",
+                      turn.visualisations?.length ? "w-full max-w-full" : "max-w-[92%]",
+                    )}
+                  >
                     <div className="rounded-2xl rounded-bl-md border border-border bg-background/90 p-4 text-sm leading-relaxed shadow-soft">
                       {turn.error ? (
                         <span className="text-destructive">Erreur : {turn.error}</span>
                       ) : (
                         <>
                           <Markdown text={turn.text} />
+                          <FiscalVisualisations items={turn.visualisations} />
                           <Sources
                             sources={turn.sources}
                             fraicheur={turn.fraicheur}

@@ -13,6 +13,7 @@ import { accessState, isParcoursDone, landingPathFor } from "@/lib/entitlements"
 import { consumePremiumPending, getPlan } from "@/lib/plan";
 import { Wordmark } from "@/components/lm/Logo";
 import { cn } from "@/lib/utils";
+import authVisual from "@/assets/auth-visual.png";
 
 type Mode = "login" | "signup";
 
@@ -86,33 +87,22 @@ export function AuthPage() {
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="surface-ink relative flex flex-col justify-between overflow-hidden px-8 py-10 md:w-[46%] md:px-14 md:py-14">
-        <div aria-hidden className="surface-grain absolute inset-0 opacity-40" />
-        <div
-          aria-hidden
-          className="absolute -right-24 -top-24 size-[420px] rounded-full bg-success/20 blur-3xl"
+      <aside className="relative flex h-64 shrink-0 flex-col justify-between overflow-hidden px-8 py-8 md:h-auto md:min-h-screen md:w-[48%] md:px-12 md:py-12">
+        <img
+          src={authVisual}
+          alt="Créatrice indépendante travaillant sur ses documents entre deux ordinateurs"
+          className="absolute inset-0 size-full object-cover object-center"
         />
         <div
           aria-hidden
-          className="absolute bottom-[-140px] left-[-80px] size-[360px] rounded-full bg-accent/20 blur-3xl"
+          className="absolute inset-0 bg-linear-to-b from-black/50 via-black/5 to-black/45"
         />
 
         <Link to="/" className="relative w-fit shrink-0" aria-label="LedgerMind, accueil">
           <Wordmark onInk />
         </Link>
 
-        <div className="relative my-12 max-w-md">
-          <p className="rule-label mb-4 text-accent">Espace membre</p>
-          <blockquote className="text-balance text-2xl leading-snug md:text-3xl">
-            « LedgerMind a transformé ma gestion d&apos;auto-entrepreneur en{" "}
-            <span className="font-normal italic text-accent">un jeu d&apos;enfant.</span> »
-          </blockquote>
-          <p className="mt-6 text-sm font-medium text-ink-foreground/60">
-            Clara V. — Créatrice de contenu &amp; Designer
-          </p>
-        </div>
-
-        <p className="rule-label relative text-ink-foreground/40">© 2026 LedgerMind</p>
+        <p className="rule-label relative text-white/65">© 2026 LedgerMind</p>
       </aside>
 
       <main className="flex flex-1 items-center justify-center px-6 py-10 md:py-16">

@@ -21,6 +21,16 @@ import {
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Wordmark } from "@/components/lm/Logo";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   alerteTva,
@@ -40,7 +50,46 @@ import {
   type FacturePayload,
   type LigneFacture,
   type StatutFacture,
+  type TemplateFactureId,
 } from "@/lib/facturation-api";
+
+const TEMPLATES_FACTURE: Array<{
+  id: TemplateFactureId;
+  nom: string;
+  description: string;
+  image: string;
+}> = [
+  {
+    id: "minimal",
+    nom: "Épure",
+    description: "Sobre et professionnelle",
+    image: "/invoice-templates/minimal.png",
+  },
+  {
+    id: "grid",
+    nom: "Quadrillage",
+    description: "Détaillée et structurée",
+    image: "/invoice-templates/grid.png",
+  },
+  {
+    id: "azure",
+    nom: "Azur",
+    description: "Classique et dynamique",
+    image: "/invoice-templates/azure.png",
+  },
+  {
+    id: "mint",
+    nom: "Menthe",
+    description: "Légère et moderne",
+    image: "/invoice-templates/mint.png",
+  },
+  {
+    id: "lilac",
+    nom: "Lilas",
+    description: "Créative et élégante",
+    image: "/invoice-templates/lilac.webp",
+  },
+];
 
 const ligneVide = (): LigneFacture => ({
   designation: "",
@@ -204,6 +253,8 @@ function Total({
 
 export function FactureCycleVie() {
   // -- Saisie ---------------------------------------------------------------
+  const [templateId, setTemplateId] = useState<TemplateFactureId>("minimal");
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [clientNom, setClientNom] = useState("");
   const [clientPro, setClientPro] = useState(false);
   const [clientAdresse, setClientAdresse] = useState("");
@@ -250,6 +301,7 @@ export function FactureCycleVie() {
 
   function payload(): FacturePayload {
     return {
+      template_id: templateId,
       client: {
         nom: clientNom.trim(),
         est_professionnel: clientPro,
@@ -271,6 +323,8 @@ export function FactureCycleVie() {
   }
 
   function reinitialiser() {
+    setTemplateId("minimal");
+    setTemplatePickerOpen(false);
     setClientNom("");
     setClientPro(false);
     setClientAdresse("");
@@ -395,6 +449,82 @@ export function FactureCycleVie() {
               </span>
             </div>
           )}
+
+          <section className="border-b border-border pb-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-background px-4 py-3">
+              <div>
+                <p className="rule-label text-accent-ink">Modèle de facture</p>
+                <p className="mt-1 text-sm font-medium">
+                  {TEMPLATES_FACTURE.find((modele) => modele.id === templateId)?.nom}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {TEMPLATES_FACTURE.find((modele) => modele.id === templateId)?.description}
+                </p>
+              </div>
+
+              <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+                <DialogTrigger asChild>
+                  <Button type="button" variant="outline">
+                    Choisir un modèle
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Choisir un modèle de facture</DialogTitle>
+                    <DialogDescription>
+                      Cliquez sur le modèle qui sera utilisé pour le PDF de cette facture.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                    {TEMPLATES_FACTURE.map((modele) => {
+                      const selectionne = modele.id === templateId;
+                      return (
+                        <button
+                          key={modele.id}
+                          type="button"
+                          onClick={() => {
+                            setTemplateId(modele.id);
+                            setTemplatePickerOpen(false);
+                          }}
+                          className={cn(
+                            "group relative overflow-hidden rounded-xl border bg-card text-left transition",
+                            selectionne
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-border hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md",
+                          )}
+                        >
+                          <div className="relative aspect-[3/4] overflow-hidden bg-white">
+                            <img
+                              src={modele.image}
+                              alt={`Aperçu du modèle ${modele.nom}`}
+                              className="size-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+                            />
+                            <Wordmark
+                              className="absolute left-1.5 top-1.5 gap-1 rounded-md bg-white/95 px-1.5 py-1 shadow-sm"
+                              markClassName="size-4"
+                            />
+                            {selectionne && (
+                              <span className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                                <Check className="size-3.5" />
+                              </span>
+                            )}
+                          </div>
+                          <span className="block px-3 py-2.5">
+                            <span className="block text-sm font-semibold">{modele.nom}</span>
+                            <span className="mt-0.5 block text-[11px] leading-tight text-muted-foreground">
+                              {modele.description}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </section>
+
           <div className="space-y-4">
             <h3 className="rule-label text-accent-ink">Client</h3>
             <Champ label="Nom ou raison sociale du client">
