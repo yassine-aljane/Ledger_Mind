@@ -88,7 +88,7 @@ export function CarteVerdict({
         style.fond,
       )}
     >
-      <p className="rule-label flex items-center gap-2 text-muted-foreground">
+      <p className="rule-label-lg flex items-center gap-2 text-label-ink">
         <Icone className={cn("size-4 shrink-0", style.texte)} aria-hidden />
         La réponse à votre question
       </p>
@@ -98,7 +98,7 @@ export function CarteVerdict({
           <p>
             {/* Chiffre-repère : chasse proportionnelle, pas tabulaire — il est seul. */}
             <span className="block text-4xl font-medium tracking-tight">{verdict.chiffre}</span>
-            <span className="mt-1 block text-sm text-muted-foreground">
+            <span className="mt-1 block text-[0.9375rem] text-muted-foreground">
               {verdict.chiffreLibelle}
             </span>
           </p>
@@ -108,25 +108,25 @@ export function CarteVerdict({
             <span className="block text-2xl font-medium tracking-tight">
               {provisionMensuelle}
             </span>
-            <span className="mt-1 block text-sm text-muted-foreground">
+            <span className="mt-1 block text-[0.9375rem] text-muted-foreground">
               à mettre de côté chaque mois
             </span>
           </p>
         )}
       </div>
 
-      <p className="mt-5 text-sm leading-relaxed text-pretty">{verdict.reponse}</p>
+      <p className="mt-5 text-[0.9375rem] leading-relaxed text-pretty">{verdict.reponse}</p>
 
       {(verdict.bloquants > 0 || verdict.vigilances > 0) && (
         <ul className="mt-4 flex flex-wrap gap-2">
           {verdict.bloquants > 0 && (
-            <li className="inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-card px-3 py-1 text-xs text-destructive">
+            <li className="inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-card px-3 py-1 text-[0.8125rem] text-destructive">
               <TriangleAlert className="size-3" aria-hidden />
               {verdict.bloquants} bloquant{verdict.bloquants > 1 ? "s" : ""}
             </li>
           )}
           {verdict.vigilances > 0 && (
-            <li className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-card px-3 py-1 text-xs text-warning-ink">
+            <li className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-card px-3 py-1 text-[0.8125rem] text-warning-ink">
               <CircleAlert className="size-3" aria-hidden />
               {verdict.vigilances} à vérifier
             </li>
@@ -134,7 +134,7 @@ export function CarteVerdict({
         </ul>
       )}
 
-      <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+      <p className="mt-4 text-[0.8125rem] leading-relaxed text-muted-foreground">
         Cette synthèse rapproche des faits — elle ne prend pas la décision à votre place, et
         ne remplace pas l'avis d'un expert-comptable.
       </p>
@@ -162,12 +162,12 @@ function CarteRecommandation({ recommandation }: { recommandation: Recommandatio
         <Icone className={cn("mt-0.5 size-4 shrink-0", style.texte)} aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-sm font-medium">{recommandation.titre}</span>
+            <span className="text-[0.9375rem] font-medium">{recommandation.titre}</span>
             {/* La gravité ne repose jamais sur la seule couleur : icône + mot. */}
-            <span className={cn("rule-label", style.texte)}>{style.label}</span>
+            <span className={cn("rule-label-lg", style.texte)}>{style.label}</span>
           </span>
           {!ouvert && (
-            <span className="mt-1 block truncate text-xs text-muted-foreground">
+            <span className="mt-1 block truncate text-[0.8125rem] text-muted-foreground">
               {recommandation.constat}
             </span>
           )}
@@ -183,20 +183,20 @@ function CarteRecommandation({ recommandation }: { recommandation: Recommandatio
       {ouvert && (
         <div className="space-y-3 border-t border-border bg-card p-4">
           <div>
-            <p className="rule-label text-muted-foreground">Constat</p>
-            <p className="mt-1 text-sm leading-relaxed">{recommandation.constat}</p>
+            <p className="rule-label-lg text-label-ink">Constat</p>
+            <p className="mt-1 text-[0.9375rem] leading-relaxed">{recommandation.constat}</p>
           </div>
           <div>
-            <p className="rule-label text-muted-foreground">Ce que ça implique</p>
-            <p className="mt-1 text-sm leading-relaxed text-pretty">
+            <p className="rule-label-lg text-label-ink">Ce que ça implique</p>
+            <p className="mt-1 text-[0.9375rem] leading-relaxed text-pretty">
               {recommandation.consequence}
             </p>
           </div>
           <div>
-            <p className="rule-label text-muted-foreground">Ce que vous pouvez faire</p>
-            <p className="mt-1 text-sm leading-relaxed text-pretty">{recommandation.action}</p>
+            <p className="rule-label-lg text-label-ink">Ce que vous pouvez faire</p>
+            <p className="mt-1 text-[0.9375rem] leading-relaxed text-pretty">{recommandation.action}</p>
           </div>
-          <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+          <p className="border-t border-border pt-3 text-[0.8125rem] text-muted-foreground">
             Source : {recommandation.source}
           </p>
         </div>
@@ -217,7 +217,7 @@ export function ListeRecommandations({
 
   if (recommandations.length === 0) {
     return (
-      <p className="rounded-2xl border border-border bg-secondary/40 p-5 text-sm leading-relaxed text-muted-foreground">
+      <p className="rounded-2xl border border-border bg-secondary/40 p-5 text-[0.9375rem] leading-relaxed text-muted-foreground">
         Aucun point particulier détecté sur ce scénario, au vu de vos factures et de votre
         profil. C'est un résultat, pas une absence d'analyse : les règles qui n'ont rien à
         signaler restent silencieuses.
@@ -240,7 +240,7 @@ export function ListeRecommandations({
         <button
           type="button"
           onClick={() => setTout(true)}
-          className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          className="text-[0.8125rem] text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
         >
           Voir {restantes} point{restantes > 1 ? "s" : ""} de moindre importance
         </button>

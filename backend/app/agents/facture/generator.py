@@ -362,6 +362,7 @@ def construire_document(
         numero_bon_commande=requete.numero_bon_commande,
         facture_origine_numero=facture_origine_numero,
         mentions=mentions,
+        template_id=requete.template_id,
         template_source=template_source,
         template_upload_note=template_upload_note,
         created_at=datetime.now(timezone.utc).isoformat(),

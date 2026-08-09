@@ -93,8 +93,8 @@ function EcheanceCard({ e, onMarquerPaye }: { e: Echeance; onMarquerPaye: (e: Ec
         <div className="flex items-start gap-2.5">
           <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", COULEUR_STATUT[e.statut])} />
           <div className="min-w-0">
-            <p className="text-sm font-medium">{e.libelle}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[0.9375rem] font-medium">{e.libelle}</p>
+            <p className="text-[0.8125rem] text-muted-foreground">
               {e.date_limite
                 ? `Avant le ${new Date(e.date_limite).toLocaleDateString("fr-FR")}`
                 : e.fenetre_indicative}
@@ -119,7 +119,7 @@ function EcheanceCard({ e, onMarquerPaye }: { e: Echeance; onMarquerPaye: (e: Ec
           </Button>
         </div>
       )}
-      <p className="text-xs text-muted-foreground/70">Source : {e.source}</p>
+      <p className="text-[0.8125rem] text-muted-foreground/70">Source : {e.source}</p>
     </div>
   );
 }
@@ -155,19 +155,19 @@ function FormulaireParametres({
 
   return (
     <div className="animate-rise space-y-4 rounded-2xl border border-accent/40 bg-accent/10 p-5">
-      <p className="text-sm font-medium">
+      <p className="text-[0.9375rem] font-medium">
         Quelques informations pour affiner votre agenda (demandées une seule fois) :
       </p>
       {manquants.includes("periodicite_urssaf") && (
         <div>
-          <label htmlFor="ca-periodicite" className="rule-label text-muted-foreground">
+          <label htmlFor="ca-periodicite" className="rule-label-lg text-label-ink">
             Périodicité URSSAF
           </label>
           <select
             id="ca-periodicite"
             value={periodicite}
             onChange={(e) => setPeriodicite(e.target.value as typeof periodicite)}
-            className="input-boxed mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
+            className="input-boxed mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-[0.9375rem]"
           >
             <option value="mensuelle">Mensuelle</option>
             <option value="trimestrielle">Trimestrielle</option>
@@ -176,14 +176,14 @@ function FormulaireParametres({
       )}
       {manquants.includes("regime_tva") && (
         <div>
-          <label htmlFor="ca-tva" className="rule-label text-muted-foreground">
+          <label htmlFor="ca-tva" className="rule-label-lg text-label-ink">
             Régime de TVA
           </label>
           <select
             id="ca-tva"
             value={regimeTva}
             onChange={(e) => setRegimeTva(e.target.value as typeof regimeTva)}
-            className="input-boxed mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
+            className="input-boxed mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-[0.9375rem]"
           >
             <option value="franchise">Franchise en base (pas de TVA)</option>
             <option value="reel_simplifie">Réel simplifié</option>
@@ -192,7 +192,7 @@ function FormulaireParametres({
         </div>
       )}
       {manquants.includes("revenus_intracommunautaires") && (
-        <label className="flex items-start gap-2 text-sm">
+        <label className="flex items-start gap-2 text-[0.9375rem]">
           <input
             type="checkbox"
             checked={clientsUe}
@@ -384,8 +384,8 @@ function CalendrierFiscal({
   return (
     <div className="animate-rise space-y-4 rounded-2xl border border-border bg-card p-5 shadow-soft">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium capitalize">{label}</p>
-        <div className="rule-label flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+        <p className="text-[0.9375rem] font-medium capitalize">{label}</p>
+        <div className="rule-label-lg flex flex-wrap items-center gap-x-3 gap-y-1 text-label-ink">
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-destructive" />
             En retard / urgent
@@ -404,7 +404,7 @@ function CalendrierFiscal({
 
       <div className="grid grid-cols-7 gap-1">
         {["L", "M", "M", "J", "V", "S", "D"].map((j, i) => (
-          <span key={i} className="rule-label pb-1 text-center text-muted-foreground">
+          <span key={i} className="rule-label-lg pb-1 text-center text-label-ink">
             {j}
           </span>
         ))}
@@ -423,7 +423,7 @@ function CalendrierFiscal({
             <div
               key={i}
               className={cn(
-                "num flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-xs transition-all duration-200",
+                "num flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-[0.8125rem] transition-all duration-200",
                 couleur === "rouge"
                   ? "bg-destructive font-medium text-destructive-foreground"
                   : couleur === "orange"
@@ -455,9 +455,9 @@ function CalendrierFiscal({
 
       {docsDuMois.length > 0 && (
         <div className="space-y-1.5 border-t border-border pt-3">
-          <p className="rule-label text-muted-foreground">Documents du mois</p>
+          <p className="rule-label-lg text-label-ink">Documents du mois</p>
           {docsDuMois.map((d) => (
-            <div key={d.id} className="flex items-center gap-2 text-xs">
+            <div key={d.id} className="flex items-center gap-2 text-[0.8125rem]">
               <span
                 className={cn("size-1.5 shrink-0 rounded-full", PASTILLE_DOCUMENT[d.etat])}
               />
@@ -487,9 +487,9 @@ function CalendrierFiscal({
 
       {(horsMois.length > 0 || docsHorsMois.length > 0) && (
         <div className="space-y-1.5 border-t border-border pt-3">
-          <p className="rule-label text-muted-foreground">Plus loin</p>
+          <p className="rule-label-lg text-label-ink">Plus loin</p>
           {horsMois.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div key={e.id} className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
               <span
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
@@ -501,7 +501,7 @@ function CalendrierFiscal({
             </div>
           ))}
           {docsHorsMois.map((d) => (
-            <div key={d.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div key={d.id} className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
               <span className={cn("size-1.5 shrink-0 rounded-full", PASTILLE_DOCUMENT[d.etat])} />
               <span className="num">
                 {new Date(`${d.date}T00:00:00`).toLocaleDateString("fr-FR")}
@@ -517,13 +517,13 @@ function CalendrierFiscal({
 
 function EtatVide({ children }: { children: React.ReactNode }) {
   return (
-    <p className="py-10 text-center text-sm text-muted-foreground">{children}</p>
+    <p className="py-10 text-center text-[0.9375rem] text-muted-foreground">{children}</p>
   );
 }
 
 function EtatChargement({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+    <p className="flex items-center justify-center gap-2 py-10 text-[0.9375rem] text-muted-foreground">
       <Loader2 className="size-3.5 animate-spin" />
       {children}
     </p>
@@ -563,7 +563,7 @@ function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
   if (erreur) {
     return (
       <div className="space-y-4 rounded-2xl border border-border bg-card p-8 text-center shadow-soft">
-        <p className="text-sm text-muted-foreground">{erreur}</p>
+        <p className="text-[0.9375rem] text-muted-foreground">{erreur}</p>
         <Button asChild>
           <Link to="/onboarding/verification">Vérifier mon SIREN</Link>
         </Button>
@@ -587,7 +587,7 @@ function VueAgenda({ onOuvrirHistorique }: { onOuvrirHistorique: () => void }) {
       <button
         type="button"
         onClick={onOuvrirHistorique}
-        className="inline-flex w-full items-center justify-center gap-1 pt-2 text-center text-sm font-medium text-primary hover:underline"
+        className="inline-flex w-full items-center justify-center gap-1 pt-2 text-center text-[0.9375rem] font-medium text-primary hover:underline"
       >
         Voir l&apos;historique fiscal complet <ArrowRight className="size-3" />
       </button>
@@ -610,7 +610,7 @@ function VueHistorique({ onRetour }: { onRetour: () => void }) {
       <button
         type="button"
         onClick={onRetour}
-        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+        className="inline-flex items-center gap-1 text-[0.9375rem] font-medium text-primary hover:underline"
       >
         <ArrowLeft className="size-3" /> Retour à l&apos;agenda
       </button>
@@ -626,12 +626,12 @@ function VueHistorique({ onRetour }: { onRetour: () => void }) {
               className="card-hover rounded-2xl border border-border bg-card p-4 shadow-soft"
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium">{it.libelle}</p>
+                <p className="text-[0.9375rem] font-medium">{it.libelle}</p>
                 <Badge variant="outline" className="shrink-0">
                   {it.statut}
                 </Badge>
               </div>
-              <p className="num mt-1 text-xs text-muted-foreground">
+              <p className="num mt-1 text-[0.8125rem] text-muted-foreground">
                 {new Date(it.date).toLocaleDateString("fr-FR")}
                 {it.montant != null ? ` · ${it.montant.toFixed(2)} €` : ""}
               </p>
@@ -707,44 +707,44 @@ function VeilleCard({ n, age = "ancien" }: { n: Nouveaute; age?: AgeVeille }) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={impact.variante}>{impact.label}</Badge>
           {age === "nouveau" && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 font-mono text-[0.55rem] font-semibold uppercase tracking-[0.12em] text-accent-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-semibold uppercase tracking-[0.12em] text-accent-foreground">
               <Sparkles className="size-2.5" /> Nouveau
             </span>
           )}
           {age === "recent" && (
-            <span className="rule-label rounded-full border border-info/40 px-2 py-0.5 text-info-ink">
+            <span className="rule-label-lg rounded-full border border-info/40 px-2 py-0.5 text-info-ink">
               Cette semaine
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {n.echeance && (
-            <span className="num text-xs text-muted-foreground">
+            <span className="num text-[0.8125rem] text-muted-foreground">
               Avant le {new Date(`${n.echeance}T00:00:00`).toLocaleDateString("fr-FR")}
             </span>
           )}
         </div>
       </div>
 
-      <p className="text-sm font-medium">{n.titre}</p>
-      {n.resume && <p className="text-sm leading-relaxed text-muted-foreground">{n.resume}</p>}
+      <p className="text-[0.9375rem] font-medium">{n.titre}</p>
+      {n.resume && <p className="text-[0.9375rem] leading-relaxed text-muted-foreground">{n.resume}</p>}
 
       {/* Pourquoi CETTE personne la voit : sans cette phrase, une veille personnalisée est
           indiscernable d'une lettre d'information générique. */}
       {n.pourquoi_vous && (
-        <p className="rounded-lg border border-info/25 bg-info/8 px-3 py-2 text-xs text-info-ink">
+        <p className="rounded-lg border border-info/25 bg-info/8 px-3 py-2 text-[0.8125rem] text-info-ink">
           {n.pourquoi_vous}
         </p>
       )}
 
       {n.perime && (
-        <p className="rounded-lg border border-warning/40 bg-warning/12 px-3 py-2 text-xs text-warning-ink">
+        <p className="rounded-lg border border-warning/40 bg-warning/12 px-3 py-2 text-[0.8125rem] text-warning-ink">
           Publication ancienne — vérifiez qu'elle est toujours applicable.
         </p>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <span className="rule-label text-muted-foreground">
+        <span className="rule-label-lg text-label-ink">
           {source ? `${source.libelle} · ${AUTORITE_LABEL[source.autorite] ?? ""}` : ""}
         </span>
         {source && (
@@ -752,7 +752,7 @@ function VeilleCard({ n, age = "ancien" }: { n: Nouveaute; age?: AgeVeille }) {
             href={source.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-primary hover:underline"
           >
             Voir la source <ExternalLink className="size-3" />
           </a>
@@ -862,7 +862,7 @@ function VueVeille() {
 
   if (erreur) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border bg-card p-8 text-center text-[0.9375rem] text-muted-foreground">
         {erreur}
       </div>
     );
@@ -914,7 +914,7 @@ function VueVeille() {
           pourquoi. Le dire est plus honnête que de laisser croire à un écran figé. */}
       {profilIncomplet && (
         <div className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-accent/8 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
             <span className="font-medium text-foreground">Veille non personnalisée.</span> Sans
             régime ni catégorie fiscale connus, vous ne recevez que les obligations qui
             s&apos;imposent à tous.
@@ -930,7 +930,7 @@ function VueVeille() {
           {/* Deux causes opposées derrière un même écran vide. Les confondre rendait la veille
               impossible à diagnostiquer : « rien ne me concerne » et « rien n'a été collecté »
               appellent des gestes différents. */}
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <p className="text-[0.9375rem] leading-relaxed text-muted-foreground">
             {catalogueVide
               ? "Le catalogue de veille est vide : aucune collecte n'a encore abouti sur les sources officielles."
               : "Aucune nouveauté réglementaire pour votre situation pour l'instant — vous ne verrez ici que ce qui change réellement quelque chose pour vous."}
@@ -958,7 +958,7 @@ function VueVeille() {
       )}
 
       {catalogue?.derniere_collecte && (
-        <p className="rule-label pt-1 text-center text-muted-foreground">
+        <p className="rule-label-lg pt-1 text-center text-label-ink">
           Dernière collecte&nbsp;:{" "}
           {new Date(catalogue.derniere_collecte).toLocaleDateString("fr-FR", {
             day: "numeric",
@@ -1093,7 +1093,7 @@ export function CentreActionsButton({
               />
               <span
                 aria-hidden
-                className="num absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-destructive text-[0.5rem] font-semibold text-destructive-foreground ring-2 ring-background"
+                className="num absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-destructive text-xs font-semibold text-destructive-foreground ring-2 ring-background"
               >
                 {nonLues > 9 ? "9+" : nonLues}
               </span>
@@ -1104,7 +1104,7 @@ export function CentreActionsButton({
 
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
         <SheetHeader className="shrink-0 space-y-1 border-b border-border px-6 py-5 pr-14 text-left">
-          <SheetDescription className="rule-label text-accent-ink">
+          <SheetDescription className="rule-label-lg text-accent-ink">
             Échéances &amp; veille
           </SheetDescription>
           <SheetTitle className="font-display text-lg font-medium">Centre d&apos;Actions</SheetTitle>
@@ -1113,7 +1113,7 @@ export function CentreActionsButton({
         <div className="chat-scroll flex-1 space-y-5 overflow-y-auto p-6">
           {plan === "free" ? (
             <div className="space-y-4 rounded-2xl border border-accent/35 bg-accent/8 p-8 text-center">
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className="text-[0.9375rem] leading-relaxed text-muted-foreground">
                 L&apos;agenda fiscal et la veille personnalisée font partie des fonctionnalités
                 Premium.
               </p>
@@ -1139,7 +1139,7 @@ export function CentreActionsButton({
                       onClick={() => setVue(onglet.value)}
                       aria-pressed={vue === onglet.value}
                       className={cn(
-                        "flex-1 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200",
+                        "flex-1 rounded-xl px-4 py-2 text-[0.9375rem] font-medium transition-all duration-200",
                         vue === onglet.value
                           ? "bg-primary text-primary-foreground"
                           : "border border-border bg-card text-muted-foreground hover:border-ink hover:text-foreground",

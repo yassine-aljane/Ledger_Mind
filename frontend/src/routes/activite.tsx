@@ -139,7 +139,7 @@ function ActiviteGate() {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-6 text-[0.9375rem] font-medium text-primary-foreground"
           >
             Réessayer
           </button>
@@ -167,7 +167,7 @@ function ActiviteGate() {
           </p>
           <Link
             to="/onboarding/verification"
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-6 text-[0.9375rem] font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
           >
             Lancer la vérification SIREN
           </Link>

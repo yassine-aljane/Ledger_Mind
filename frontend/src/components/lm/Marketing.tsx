@@ -75,41 +75,53 @@ export function SiteFooter() {
   const plan = usePlan();
 
   return (
-    <footer className="border-t border-border bg-secondary/40">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <Wordmark />
-          <p className="mt-3 max-w-sm text-sm text-muted-foreground">
-            LedgerMind fournit une information fiscale sourcée. Il ne remplace pas un conseil
-            personnalisé d&apos;expert-comptable.
+    <footer className="border-t border-ink-foreground/10 bg-ink text-ink-foreground">
+      <div className="mx-auto grid max-w-6xl gap-9 px-5 py-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr] lg:gap-14">
+        <div className="sm:col-span-2 lg:col-span-1">
+          <Wordmark onInk />
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-ink-foreground/60">
+            Information fiscale sourcée et outils de préparation pour indépendants et créateurs.
+            LedgerMind ne remplace pas un conseil personnalisé d&apos;expert-comptable.
           </p>
         </div>
-        <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-          <Link to="/education" className="hover:text-foreground">
+
+        <nav aria-label="Produit" className="space-y-2.5 text-sm">
+          <p className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-safran">
+            Produit
+          </p>
+          <Link to="/education" className="block text-ink-foreground/65 transition-colors hover:text-ink-foreground">
             Assistant fiscal
           </Link>
+          <Link to="/onboarding" className="block text-ink-foreground/65 transition-colors hover:text-ink-foreground">
+            Mise en route
+          </Link>
           {plan === "free" && (
-            <Link to="/premium" className="hover:text-foreground">
-              Tarifs
+            <Link to="/premium" className="block text-ink-foreground/65 transition-colors hover:text-ink-foreground">
+              Offre Premium
             </Link>
           )}
-          <Link to="/auth" className="hover:text-foreground">
-            Connexion
+        </nav>
+
+        <nav aria-label="Compte" className="space-y-2.5 text-sm">
+          <p className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-safran">
+            Compte
+          </p>
+          <Link to="/auth" className="block text-ink-foreground/65 transition-colors hover:text-ink-foreground">
+            Se connecter
+          </Link>
+          <Link to="/auth" className="block text-ink-foreground/65 transition-colors hover:text-ink-foreground">
+            Créer un compte
           </Link>
         </nav>
       </div>
-      <div className="border-t border-border/70 bg-background/65">
-        <div className="mx-auto flex max-w-6xl items-start gap-3 px-5 py-4 sm:items-center">
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent/20 text-primary ring-1 ring-accent/30">
-            <Sparkles className="size-4" aria-hidden />
-          </span>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            <strong className="mr-1.5 font-semibold text-foreground">
-              Conçu avec l&apos;IA, en toute transparence.
-            </strong>
-            LedgerMind a été conçu et développé avec l&apos;aide de l&apos;intelligence artificielle.
-            Les contenus générés peuvent nécessiter une vérification humaine.
+
+      <div className="border-t border-ink-foreground/10">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-4 text-xs text-ink-foreground/45 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-center gap-2 leading-relaxed">
+            <Sparkles className="size-3.5 shrink-0 text-safran" aria-hidden />
+            Conçu avec l&apos;IA en toute transparence · Les réponses importantes restent à vérifier.
           </p>
+          <p className="shrink-0">© 2026 LedgerMind</p>
         </div>
       </div>
     </footer>

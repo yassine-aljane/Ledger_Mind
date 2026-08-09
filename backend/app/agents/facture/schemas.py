@@ -31,6 +31,7 @@ StatutFacture = Literal[
 ]
 
 TypeDocument = Literal["facture", "avoir"]
+TemplateFacture = Literal["minimal", "grid", "azure", "mint", "lilac"]
 
 
 class LigneFacture(BaseModel):
@@ -76,6 +77,7 @@ class FactureRequest(BaseModel):
 
     client: ClientFacture
     lignes: list[LigneFacture] = Field(min_length=1)
+    template_id: TemplateFacture = "minimal"
     date_prestation: date | None = None  # défaut : date d'émission
     numero_bon_commande: str | None = None
     numero_contrat: str | None = None    # traçabilité vers le contrat source
@@ -152,6 +154,7 @@ class Facture(BaseModel):
 
     mentions: list[MentionFacture]
 
+    template_id: TemplateFacture = "minimal"
     template_source: str = "standard"  # "standard" | "upload" (voir garde-fous 1.1)
     template_upload_note: str | None = None  # motif du repli, si un template a été tenté
 

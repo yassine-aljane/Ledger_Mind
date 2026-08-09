@@ -16,7 +16,7 @@
  */
 
 import { useState } from "react";
-import { Check, CircleHelp, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { Check, CircleHelp, History, Loader2, Plus, RotateCcw, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatEuros } from "@/lib/finance";
@@ -42,7 +42,7 @@ function MarqueProvenance({ element }: { element: ElementCompris }) {
   if (element.provenance === "explicite") {
     return (
       <span
-        className="inline-flex items-center gap-1 text-[0.65rem] text-muted-foreground"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground"
         title="Lu dans votre phrase"
       >
         <Check className="size-3" aria-hidden />
@@ -52,7 +52,7 @@ function MarqueProvenance({ element }: { element: ElementCompris }) {
   }
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full bg-warning/20 px-1.5 py-0.5 text-[0.65rem] font-medium text-warning-ink"
+      className="inline-flex items-center gap-1 rounded-full bg-warning/20 px-1.5 py-0.5 text-xs font-medium text-warning-ink"
       title="Supposé — vérifiez cet élément"
     >
       <CircleHelp className="size-3" aria-hidden />
@@ -115,7 +115,7 @@ function ElementCorrigeable({
                 onCorrigerCategorie(categorie);
                 setOuvert(false);
               }}
-              className="block w-full rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-secondary"
+              className="block w-full rounded-lg px-3 py-2 text-left text-[0.8125rem] transition-colors hover:bg-secondary"
             >
               {CATEGORIE_LIBELLE[categorie]}
             </button>
@@ -158,9 +158,9 @@ function CarteScenario({
               style={{ background: couleurSerie(index) }}
             />
           )}
-          <p className="truncate text-sm font-medium">{scenario.libelle}</p>
+          <p className="truncate text-[0.9375rem] font-medium">{scenario.libelle}</p>
           {scenario.propose && (
-            <span className="rule-label shrink-0 text-muted-foreground">suggestion</span>
+            <span className="rule-label-lg shrink-0 text-label-ink">suggestion</span>
           )}
         </div>
         <button
@@ -168,7 +168,7 @@ function CarteScenario({
           onClick={onBasculer}
           aria-pressed={retenu}
           className={cn(
-            "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+            "shrink-0 rounded-full px-3 py-1 text-[0.8125rem] font-medium transition-colors",
             retenu
               ? "border border-border text-muted-foreground hover:border-ink hover:text-foreground"
               : "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -178,7 +178,7 @@ function CarteScenario({
         </button>
       </div>
 
-      <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm leading-relaxed">
+      <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.9375rem] leading-relaxed">
         {elements.map((element, i) => (
           <span key={element.champ} className="inline-flex items-center gap-2">
             {i > 0 && <span className="text-muted-foreground">·</span>}
@@ -191,14 +191,14 @@ function CarteScenario({
       </p>
 
       {scenario.recurrent && scenario.ca_annuel !== scenario.montant && (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-[0.8125rem] text-muted-foreground">
           Soit <span className="num">{formatEuros(scenario.ca_annuel)}</span> ajoutés au chiffre
           d'affaires de l'année.
         </p>
       )}
 
       {suppositions > 0 && (
-        <p className="mt-2 text-xs text-warning-ink">
+        <p className="mt-2 text-[0.8125rem] text-warning-ink">
           {suppositions === 1
             ? "1 élément a été supposé : relisez-le avant de vous fier au résultat."
             : `${suppositions} éléments ont été supposés : relisez-les avant de vous fier au résultat.`}
@@ -218,6 +218,8 @@ export function ScenarioSaisie({
   onInterpretation,
   resume,
   desactive,
+  repris = false,
+  onReinitialiser,
 }: {
   phrase: string;
   onPhraseChange: (phrase: string) => void;
@@ -229,6 +231,15 @@ export function ScenarioSaisie({
   onInterpretation: (scenarios: ScenarioInterprete[], resume: string | null) => void;
   resume: string | null;
   desactive: boolean;
+  /**
+   * Ce qui est affiché a été repris d'une saisie précédente, pas analysé à l'instant.
+   * On le dit : sans cette mention, retrouver un scénario qu'on n'a pas relancé donne
+   * l'impression que l'écran a gardé des chiffres tout seul.
+   */
+  repris?: boolean;
+  /** Vide la saisie et le brouillon mémorisé. Sans porte de sortie, un brouillon persistant
+   *  devient impossible à enlever. */
+  onReinitialiser?: () => void;
 }) {
   const [enCours, setEnCours] = useState(false);
   const [avertissement, setAvertissement] = useState<string | null>(null);
@@ -261,7 +272,7 @@ export function ScenarioSaisie({
 
   return (
     <div className="animate-rise rounded-2xl border border-border bg-card p-6 shadow-soft">
-      <label htmlFor="sim-situation" className="rule-label text-muted-foreground">
+      <label htmlFor="sim-situation" className="rule-label-lg text-label-ink">
         Votre situation
       </label>
       <textarea
@@ -276,12 +287,28 @@ export function ScenarioSaisie({
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button onClick={interpreter} disabled={enCours || phrase.trim().length < 3 || desactive}>
           {enCours ? <Loader2 className="animate-spin" /> : <Sparkles />}
-          Analyser ma situation
+          {scenarios.length > 0 ? "Réanalyser ma situation" : "Analyser ma situation"}
         </Button>
-        <p className="text-xs text-muted-foreground">
+        {onReinitialiser && (scenarios.length > 0 || phrase.trim().length > 0) && (
+          <Button variant="ghost" onClick={onReinitialiser} disabled={enCours || desactive}>
+            <RotateCcw /> Repartir de zéro
+          </Button>
+        )}
+        <p className="text-[0.8125rem] text-muted-foreground">
           La phrase est traduite en paramètres. Les montants, eux, viennent du moteur fiscal.
         </p>
       </div>
+
+      {repris && (
+        <p className="mt-4 flex items-start gap-2 rounded-xl border border-border bg-secondary/50 p-3 text-[0.8125rem] leading-relaxed text-muted-foreground">
+          <History className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span>
+            Reprise de votre dernière saisie. Les montants ci-dessous ont été{" "}
+            <strong className="font-medium text-foreground">recalculés à l&apos;instant</strong> sur
+            votre situation actuelle — ce ne sont pas d&apos;anciens chiffres remis à l&apos;écran.
+          </span>
+        </p>
+      )}
 
       {scenarios.length === 0 && !avertissement && (
         <ul className="mt-5 flex flex-wrap gap-2">
@@ -290,7 +317,7 @@ export function ScenarioSaisie({
               <button
                 type="button"
                 onClick={() => onPhraseChange(exemple)}
-                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-ink hover:text-foreground"
+                className="rounded-full border border-border px-3 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:border-ink hover:text-foreground"
               >
                 {exemple.length > 46 ? `${exemple.slice(0, 45)}…` : exemple}
               </button>
@@ -300,7 +327,7 @@ export function ScenarioSaisie({
       )}
 
       {avertissement && (
-        <p className="mt-5 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm text-warning-ink">
+        <p className="mt-5 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-[0.9375rem] text-warning-ink">
           <X className="mt-0.5 size-4 shrink-0" />
           {avertissement}
         </p>
@@ -308,8 +335,8 @@ export function ScenarioSaisie({
 
       {scenarios.length > 0 && (
         <section className="mt-6">
-          <h2 className="rule-label text-muted-foreground">Ce que j'ai compris</h2>
-          {resume && <p className="mt-2 text-sm leading-relaxed text-pretty">{resume}</p>}
+          <h2 className="rule-label-lg text-label-ink">Ce que j'ai compris</h2>
+          {resume && <p className="mt-2 text-[0.9375rem] leading-relaxed text-pretty">{resume}</p>}
 
           <ul className="mt-4 space-y-3">
             {scenarios.map((scenario) => {
@@ -328,7 +355,7 @@ export function ScenarioSaisie({
           </ul>
 
           {placesRestantes <= 0 && (
-            <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <p className="mt-3 flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
               <Plus className="size-3" />
               Trois scénarios comparés au maximum : au-delà, les courbes ne se distinguent plus
               de façon fiable.

@@ -81,11 +81,11 @@ function Infobulle({
         top: Math.max(0, y - 12),
       }}
     >
-      <p className="rule-label mb-2 text-muted-foreground">{titre}</p>
+      <p className="rule-label-lg mb-2 text-label-ink">{titre}</p>
       <ul className="space-y-1.5">
         {lignes.map((l) => (
           <li key={l.label} className="flex items-center justify-between gap-4">
-            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
               <span
                 aria-hidden
                 className="inline-block h-0.5 w-3 rounded-full"
@@ -93,7 +93,7 @@ function Infobulle({
               />
               {l.label}
             </span>
-            <span className="num text-xs font-medium text-foreground">{l.valeur}</span>
+            <span className="num text-[0.8125rem] font-medium text-foreground">{l.valeur}</span>
           </li>
         ))}
       </ul>
@@ -158,7 +158,7 @@ export function CourbeProjection({
                   x={MARGE.gauche - 8}
                   y={y(b) + 3}
                   textAnchor="end"
-                  className="num fill-muted-foreground text-[10px]"
+                  className="num fill-muted-foreground text-xs"
                 >
                   {formatCompact(b)}
                 </text>
@@ -186,7 +186,7 @@ export function CourbeProjection({
                   x={largeur - MARGE.droite}
                   y={y(projection.plafond) - 6}
                   textAnchor="end"
-                  className="fill-destructive text-[10px] font-medium"
+                  className="fill-destructive text-xs font-medium"
                 >
                   Plafond {formatCompact(projection.plafond)} €
                 </text>
@@ -242,7 +242,7 @@ export function CourbeProjection({
                       x={x(fin.mois) - 4}
                       y={y(fin.cumul) - 8}
                       textAnchor="end"
-                      className="num fill-foreground text-[10px] font-medium"
+                      className="num fill-foreground text-xs font-medium"
                     >
                       {formatCompact(fin.cumul)} €
                     </text>
@@ -309,7 +309,7 @@ export function CourbeProjection({
                   x={x(p.mois)}
                   y={hauteur - 8}
                   textAnchor="middle"
-                  className="fill-muted-foreground text-[10px]"
+                  className="fill-muted-foreground text-xs"
                 >
                   {p.label}
                 </text>
@@ -347,10 +347,10 @@ export function CourbeProjection({
       {!projection.plafondVisible && projection.plafond !== null && (
         <div className="mt-5 rounded-xl border border-border bg-secondary/40 p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="rule-label text-muted-foreground">
+            <p className="rule-label-lg text-label-ink">
               Plafond du régime · {projection.plafondLibelle ?? "votre catégorie"}
             </p>
-            <p className="num text-xs text-muted-foreground">
+            <p className="num text-[0.8125rem] text-muted-foreground">
               {formatEuros(projection.plafond)}
             </p>
           </div>
@@ -358,7 +358,7 @@ export function CourbeProjection({
             {series.map((serie, index) => (
               <li key={serie.id}>
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="flex min-w-0 items-center gap-2 text-xs">
+                  <p className="flex min-w-0 items-center gap-2 text-[0.8125rem]">
                     <span
                       aria-hidden
                       className="inline-block size-2.5 shrink-0 rounded-[3px]"
@@ -366,7 +366,7 @@ export function CourbeProjection({
                     />
                     <span className="truncate text-muted-foreground">{serie.libelle}</span>
                   </p>
-                  <p className="num shrink-0 text-xs font-medium">
+                  <p className="num shrink-0 text-[0.8125rem] font-medium">
                     {serie.pctPlafond === null ? "—" : formatPct(serie.pctPlafond)}
                   </p>
                 </div>
@@ -391,14 +391,14 @@ export function CourbeProjection({
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="mt-3 text-[0.8125rem] text-muted-foreground">
             Le plafond est trop éloigné de vos montants pour figurer sur la courbe sans
             l'aplatir : il se lit ici, en part consommée en fin d'année.
           </p>
         </div>
       )}
 
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+      <p className="mt-3 text-[0.8125rem] leading-relaxed text-muted-foreground">
         Les mois écoulés portent le chiffre d'affaires réellement facturé. Au-delà du trait
         vertical, le tracé prolonge votre rythme moyen et y répartit le contrat simulé — c'est
         une mise en forme, pas une prévision d'encaissement.
@@ -415,7 +415,7 @@ function TableauProjection({ projection }: { projection: Projection }) {
 
   return (
     <div className="mt-4 max-h-64 overflow-auto rounded-xl border border-border">
-      <table className="w-full text-left text-xs">
+      <table className="w-full text-left text-[0.8125rem]">
         <caption className="sr-only">
           Chiffre d&apos;affaires cumulé par mois et par scénario
         </caption>
@@ -454,7 +454,7 @@ function BoutonTableau({ ouvert, onBasculer }: { ouvert: boolean; onBasculer: ()
       type="button"
       onClick={onBasculer}
       aria-expanded={ouvert}
-      className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+      className="text-[0.8125rem] text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
     >
       {ouvert ? "Masquer le tableau" : "Voir les valeurs en tableau"}
     </button>
@@ -519,7 +519,7 @@ export function BarresDecomposition({
                   <text
                     x={0}
                     y={y + hauteurBarre / 2 + 4}
-                    className="fill-foreground text-[11px]"
+                    className="fill-foreground text-xs"
                   >
                     {decomposition.libelle.length > 20
                       ? `${decomposition.libelle.slice(0, 19)}…`
@@ -559,7 +559,7 @@ export function BarresDecomposition({
                       <text
                         x={labelL + 10}
                         y={y + hauteurBarre / 2 + 4}
-                        className="fill-muted-foreground text-[10px]"
+                        className="fill-muted-foreground text-xs"
                       >
                         Impôt non calculable — complétez votre foyer fiscal
                       </text>
@@ -610,7 +610,7 @@ function TableauDecomposition({
 }) {
   return (
     <div className="mt-4 max-h-64 overflow-auto rounded-xl border border-border">
-      <table className="w-full text-left text-xs">
+      <table className="w-full text-left text-[0.8125rem]">
         <caption className="sr-only">Répartition du chiffre d&apos;affaires par scénario</caption>
         <thead className="sticky top-0 bg-secondary/80 backdrop-blur">
           <tr>
@@ -677,7 +677,7 @@ export function TuileProvision({
         accent ? "border-ink" : "border-border",
       )}
     >
-      <p className="rule-label flex items-center gap-2 text-muted-foreground">
+      <p className="rule-label-lg flex items-center gap-2 text-label-ink">
         <span
           aria-hidden
           className="inline-block size-2.5 shrink-0 rounded-[3px]"
@@ -688,14 +688,14 @@ export function TuileProvision({
       {parMois === null ? (
         <>
           <p className="num mt-2 text-2xl text-muted-foreground">—</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-[0.8125rem] text-muted-foreground">
             Non calculable sans votre foyer fiscal.
           </p>
         </>
       ) : (
         <>
           <p className="num mt-2 text-2xl">{formatEuros(parMois)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-[0.8125rem] text-muted-foreground">
             à provisionner chaque mois
             {tauxEffectif !== null ? ` · ${formatPct(tauxEffectif * 100)} du CA` : ""}
           </p>
