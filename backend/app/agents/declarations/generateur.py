@@ -37,6 +37,7 @@ from .schemas import (
     ContexteDeclaratif,
     DemandeDeclarations,
     JeuDeclarations,
+    MoisAttestation,
     Rappel,
     RevenuUE,
 )
@@ -64,6 +65,69 @@ def _ventiler(ca_par_nature: Dict[str, float], contexte: ContexteDeclaratif) -> 
         categorie = _CATEGORIE.get(nature) or contexte.categorie_par_defaut
         ventile[categorie] = round(ventile.get(categorie, 0.0) + montant, 2)
     return ventile
+
+
+_MOIS_FR = (
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+)
+
+
+def _ventilation_mensuelle(
+    encaissements, annee: int, contexte: ContexteDeclaratif, aujourdhui: date,
+    cadeaux: Optional[List[Dict[str, Any]]] = None,
+) -> List[MoisAttestation]:
+    """Le tableau de l'attestation URSSAF : douze mois, quatre natures.
+
+    Un mois non échu ne vaut pas zéro. L'attestation officielle y porte « - » (période en
+    cours), et la nuance compte : un mois clos sans recette se déclare bien à 0 €, un mois
+    à venir ne se déclare pas du tout.
+
+    Les avantages en nature y figurent au même titre que les virements : ils sont du chiffre
+    d'affaires, et les omettre ferait que la somme des mois ne retomberait pas sur le CA
+    annuel déclaré — un écart inexplicable au moment du contrôle.
+    """
+    cumuls: Dict[int, Dict[str, float]] = {m: {} for m in range(1, 13)}
+
+    def ajouter(jour_iso: Any, categorie: str, montant: float) -> None:
+        try:
+            jour = date.fromisoformat(str(jour_iso)[:10])
+        except (ValueError, TypeError):
+            return
+        if jour.year != annee:
+            return
+        seau = cumuls[jour.month]
+        seau[categorie] = round(seau.get(categorie, 0.0) + montant, 2)
+
+    for e in encaissements:
+        if not e.date_valeur:
+            continue
+        ajouter(e.date_valeur, _CATEGORIE.get(e.categorie) or contexte.categorie_par_defaut,
+                e.montant_ht)
+
+    # Un cadeau reçu en contrepartie d'un service rémunère une PRESTATION : le créateur n'a
+    # rien vendu, il a reçu — d'où la catégorie par défaut, jamais « vente ».
+    for c in cadeaux or []:
+        ajouter(c.get("date"), contexte.categorie_par_defaut, float(c.get("valeur_eur") or 0))
+
+    lignes: List[MoisAttestation] = []
+    for mois in range(1, 13):
+        # Un mois n'est échu qu'une fois terminé : tant qu'il court, l'URSSAF ne peut pas
+        # attester d'un chiffre d'affaires définitif.
+        en_cours = (annee, mois) >= (aujourdhui.year, aujourdhui.month)
+        seau = cumuls[mois]
+        lignes.append(MoisAttestation(
+            mois=mois,
+            libelle=_MOIS_FR[mois - 1],
+            prestations_bnc=None if en_cours else seau.get("BNC", 0.0),
+            ventes=None if en_cours else seau.get("BIC_VENTE", 0.0),
+            prestations_bic=None if en_cours else seau.get("BIC_SERVICE", 0.0),
+            # Location de meublé de tourisme classé : aucune pièce ne la distingue
+            # aujourd'hui. Zéro serait une affirmation ; la colonne reste vide.
+            lmtc=None,
+            periode_en_cours=en_cours,
+        ))
+    return lignes
 
 
 def _annee_activite(date_creation: Optional[str], a_la_date: date) -> Optional[int]:
@@ -603,10 +667,16 @@ def generer_declarations(
     ecart_rapport = pieces_decl.ecart_avec_rapport(
         ca_encaisse, rapports, debut, fin
     )
-    # La CFE s'assoit sur le CA de l'ANNÉE, pas sur celui de la période déclarée.
-    ca_annuel = rappro.rapprocher(
+    # L'année civile entière sert à trois usages — assiette de la CFE, tableau mensuel de
+    # l'attestation URSSAF, et explication d'une période à zéro. Un seul rapprochement.
+    annuel = rappro.rapprocher(
         factures, virements, date(debut.year, 1, 1), date(debut.year, 12, 31),
-    ).ca_encaisse
+    )
+    ca_annuel = annuel.ca_encaisse
+    ca_mensuel = _ventilation_mensuelle(
+        annuel.encaissements, debut.year, contexte, date.today(),
+        cadeaux=pieces.cadeaux_recus(uid, date(debut.year, 1, 1), date(debut.year, 12, 31)),
+    )
 
     brouillons = [
         _brouillon_ca_urssaf(ventile, prelevements, contexte, debut, fin,
@@ -621,9 +691,6 @@ def generer_declarations(
     # il doit être DIT. Sans cela, l'utilisateur croit l'outil cassé au lieu de comprendre que
     # son chiffre d'affaires se trouve sur une autre période.
     if ca_encaisse <= 0:
-        annuel = rappro.rapprocher(
-            factures, virements, date(debut.year, 1, 1), date(debut.year, 12, 31),
-        )
         if annuel.ca_encaisse > 0:
             periodes = sorted({
                 (e.date_valeur or "")[:7] for e in annuel.encaissements if e.date_valeur
@@ -684,6 +751,7 @@ def generer_declarations(
         frequence=contexte.frequence,
         ca_encaisse=ca_encaisse,
         ca_par_categorie=ventile,
+        ca_mensuel=ca_mensuel,
         brouillons=brouillons,
         rappels=_rappels(brouillons, revenus, contexte) + _rappels_recoupement(ecart_rapport),
         revenus_ue=revenus,

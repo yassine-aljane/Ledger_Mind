@@ -161,15 +161,30 @@ async def obtenir(jeu_id: str, user: UserPublic = Depends(get_current_user)):
 
 
 def _emetteur(user: UserPublic) -> dict:
-    """Identité portée sur le document. Sans elle, aucune signature n'engage personne."""
+    """Identité portée sur le document. Sans elle, aucune signature n'engage personne.
+
+    Les formulaires officiels en demandent plus que la facture : le SIRET de l'établissement
+    et le code NACE pour la CFE, l'activité exercée, la date de création. Chaque valeur est
+    reprise telle quelle du profil — une donnée absente reste absente, le formulaire porte
+    alors une ligne à compléter à la main plutôt qu'une valeur reconstituée.
+    """
     profil = _profil(user)
     if profil is None:
-        return {}
+        return {"nom_utilisateur": user.name, "email": user.email}
     return {
         "denomination": profil.denomination,
         "siren": profil.siren,
+        "siret": profil.siret,
         "adresse": profil.company_address or profil.registry_address,
+        "adresse_registre": profil.registry_address,
         "numero_tva_intracom": profil.numero_tva_intracommunautaire,
+        "code_ape": profil.ape_code,
+        "activite": profil.activity_declared or profil.sirene_document_activity_label,
+        "forme_juridique": profil.legal_form,
+        "date_creation": profil.activity_start_date or profil.creation_date,
+        "artisan": profil.rcs_registered,
+        "nom_utilisateur": user.name,
+        "email": user.email,
     }
 
 

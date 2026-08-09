@@ -38,8 +38,10 @@ const NAV = [
   { to: "/declaration", label: "Déclaration", icon: Landmark, feature: "activite" },
   // « Expert-comptable » n'est plus une entrée du rail : on y accède depuis la page
   // Déclaration, au moment précis où la question d'un contrôle humain se pose.
-  { to: "/historique", label: "Historiques", icon: History, feature: "historique" },
   { to: "/simulateur", label: "Scénarios", icon: FileStack, feature: "simulateur" },
+  // « Historiques » ferme le rail : on y revient sur ce qui est fait, alors que tout ce qui
+  // précède sert à faire.
+  { to: "/historique", label: "Historiques", icon: History, feature: "historique" },
   // « Mon compte » n'est plus une entrée du rail : le bloc de compte, en bas, y mène
   // directement — c'est là que l'utilisateur cherche son profil.
 ] as const satisfies readonly {
