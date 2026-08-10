@@ -234,11 +234,13 @@ def clear_profil_field(uid: str, field: str) -> dict:
 
 
 # --------------------------------------------------------------------------- Messages
-def add_message(session_id: str, role: str, content: str, sources: list | None = None) -> None:
+def add_message(session_id: str, role: str, content: str, sources: list | None = None,
+                visualisations: list | None = None) -> None:
     _ensure_schema()
     now = _now()
     _messages().insert_one({"conversation_id": session_id, "role": role, "content": content,
-                            "sources": sources or [], "created_at": now})
+                            "sources": sources or [], "visualisations": visualisations or [],
+                            "created_at": now})
     _conversations().update_one({"id": session_id}, {"$set": {"updated_at": now}})
     # Titre automatique depuis le premier message utilisateur (aucun appel LLM).
     if role == "user":
@@ -253,6 +255,7 @@ def history(session_id: str, limit: int | None = None) -> list[dict]:
     docs = list(_messages().find({"conversation_id": session_id}, {"_id": 0})
                 .sort("created_at", ASCENDING))
     out = [{"role": d["role"], "content": d["content"], "sources": d.get("sources") or [],
+            "visualisations": d.get("visualisations") or [],
             "created_at": _iso(d.get("created_at"))} for d in docs]
     return out[-limit:] if limit else out
 

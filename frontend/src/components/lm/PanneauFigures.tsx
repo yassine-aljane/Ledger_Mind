@@ -117,7 +117,7 @@ export function PanneauFigures({
             aria-selected={actif === onglet.cle}
             onClick={() => setActif(onglet.cle)}
             className={cn(
-              "rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-200 active:scale-[0.97]",
+              "rounded-full px-4 py-1.5 text-[0.8125rem] font-medium transition-all duration-200 active:scale-[0.97]",
               actif === onglet.cle
                 ? "bg-primary text-primary-foreground shadow-soft"
                 : "border border-border text-muted-foreground hover:border-ink hover:text-foreground",
@@ -129,7 +129,7 @@ export function PanneauFigures({
       </div>
 
       <div className="p-6">
-        <p className="mb-6 text-sm text-muted-foreground">{courant?.aide}</p>
+        <p className="mb-6 text-[0.9375rem] text-muted-foreground">{courant?.aide}</p>
 
         {actif === "argent" && (
           <CascadeFiscale marches={cascade} complet={cascadeComplete} />
@@ -145,7 +145,7 @@ export function PanneauFigures({
                   .map((s) => (
                     <li
                       key={s.id}
-                      className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs text-warning-ink"
+                      className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-[0.8125rem] text-warning-ink"
                     >
                       <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
                       <span>

@@ -91,7 +91,7 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
         <SheetHeader className="shrink-0 space-y-1 border-b border-border px-6 py-5 pr-14 text-left">
-          <SheetDescription className="rule-label text-accent-ink">
+          <SheetDescription className="rule-label-lg text-accent-ink">
             Question sur ce document
           </SheetDescription>
           <SheetTitle className="truncate font-display text-base font-medium">{label}</SheetTitle>
@@ -99,12 +99,12 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
 
         <div ref={scrollRef} className="chat-scroll flex-1 space-y-4 overflow-y-auto px-6 py-6">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-[0.9375rem] text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" />
               Chargement de la conversation…
             </div>
           ) : turns.length === 0 ? (
-            <p className="pt-10 text-center text-sm text-muted-foreground">
+            <p className="pt-10 text-center text-[0.9375rem] text-muted-foreground">
               Posez une question sur ce document — montant, échéance, cohérence, IBAN…
             </p>
           ) : (
@@ -117,13 +117,13 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
                   {/* Le modèle répond en markdown : sans rendu, les `**` et les `#`
                       s'affichaient littéralement au milieu du texte. La réponse de
                       l'utilisateur, elle, reste du texte brut — c'est sa saisie. */}
-                  <div className="min-w-0 rounded-2xl rounded-bl-none border border-border bg-secondary/50 p-3.5 text-sm leading-relaxed">
+                  <div className="min-w-0 rounded-2xl rounded-bl-none border border-border bg-secondary/50 p-3.5 text-[0.9375rem] leading-relaxed">
                     <Markdown text={t.content} />
                   </div>
                 </div>
               ) : (
                 <div key={i} className="animate-rise flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-br-none bg-primary p-3.5 text-sm font-medium text-primary-foreground">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-none bg-primary p-3.5 text-[0.9375rem] font-medium text-primary-foreground">
                     {t.content}
                   </div>
                 </div>
@@ -151,7 +151,7 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ex. Ce virement est-il cohérent ?"
             aria-label="Votre question sur ce document"
-            className="input-boxed flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+            className="input-boxed flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-[0.9375rem] focus:border-ink focus:outline-none"
           />
           <Button type="submit" size="icon" disabled={sending || !question.trim()}>
             {sending ? <Loader2 className="animate-spin" /> : <Send />}

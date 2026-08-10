@@ -58,6 +58,14 @@
   --color-success-ink: var(--success-ink);
   --color-warning-ink: var(--warning-ink);
   --color-info-ink: var(--info-ink);
+  /* Encre des micro-titres et des étiquettes d'axe.
+     `muted-foreground` tient déjà AA (5,86:1 sur carte en clair, 6,88:1 en sombre) : ce n'est
+     pas un jeton de rattrapage de contraste. Il répond à un problème de FORME — les capitales
+     espacées en mono et les graduations de graphe ont des fûts fins et beaucoup d'air entre
+     les lettres, donc elles se délavent à un ratio qui suffit largement à une phrase courante.
+     Mesuré sur carte : 8,25:1 en clair, 9,13:1 en sombre — soit entre le gris de corps de
+     texte et l'encre pleine, sans jamais concurrencer un titre. */
+  --color-label-ink: var(--label-ink);
 
   --color-border: var(--border);
   --color-input: var(--input);
@@ -147,6 +155,7 @@
   --success-ink: oklch(0.44 0.09 160);
   --warning-ink: oklch(0.45 0.11 72);
   --info-ink: oklch(0.45 0.09 230);
+  --label-ink: oklch(0.42 0.022 155);
 
   --border: oklch(0.9 0.014 95);
   --input: oklch(0.9 0.014 95);
@@ -209,6 +218,14 @@
   --dv-grid: oklch(0.9 0.014 95);
   /* Gris de mise en retrait : séries de contexte, sparklines hors période courante. */
   --dv-muted: oklch(0.78 0.012 155);
+  /* Hachure « valeur indéterminée » : une jauge sans plafond connu ne doit PAS se lire comme
+     une jauge à 0 %. Défini une seule fois — `muted-foreground` est résolu dans le thème de
+     l'élément qui l'utilise, donc la hachure suit clair et sombre sans duplication. */
+  --dv-hatch: repeating-linear-gradient(
+    45deg,
+    color-mix(in oklab, var(--muted-foreground) 38%, transparent) 0 3px,
+    transparent 3px 8px
+  );
 }
 
 .dark {
@@ -240,6 +257,7 @@
   --success-ink: oklch(0.8 0.11 158);
   --warning-ink: oklch(0.86 0.12 82);
   --info-ink: oklch(0.79 0.09 225);
+  --label-ink: oklch(0.8 0.02 130);
 
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
@@ -356,6 +374,20 @@
   font-family: var(--font-mono);
   font-size: 0.5rem;
   letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Même micro-titre, taille lisible — 11 px et interlettrage ramené de 0,16em à 0,08em.
+   `rule-label` plafonne à 8 px : c'est CETTE taille, et non son contraste, qui rendait les
+   sur-titres du cockpit illisibles. Mais le jeton est posé dans 42 fichiers — le monter
+   globalement recalibrerait toute l'app. Cette variante est donc réservée aux écrans où
+   l'étiquette porte VRAIMENT de l'information à lire (cockpit « Ma situation »), pas seulement
+   une respiration typographique. À employer avec `text-label-ink` (voir ce jeton). */
+@utility rule-label-lg {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 

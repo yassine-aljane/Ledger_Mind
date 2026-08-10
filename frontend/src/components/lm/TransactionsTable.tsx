@@ -43,7 +43,7 @@ function BoutonJustificatif({ transaction }: { transaction: TransactionUnifiee }
 
   if (!transaction.has_file) {
     return (
-      <p className="flex items-center gap-2 text-xs text-warning-ink">
+      <p className="flex items-center gap-2 text-[0.8125rem] text-warning-ink">
         <FileWarning className="size-3.5 shrink-0" />
         Aucun justificatif attaché — à fournir en cas de contrôle.
       </p>
@@ -75,7 +75,7 @@ function BoutonJustificatif({ transaction }: { transaction: TransactionUnifiee }
         type="button"
         onClick={ouvrir}
         disabled={etat === "chargement"}
-        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-ink disabled:opacity-60"
+        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-[0.8125rem] font-medium transition-colors hover:border-ink disabled:opacity-60"
       >
         {etat === "chargement" ? (
           <Loader2 className="size-3.5 animate-spin" />
@@ -87,7 +87,7 @@ function BoutonJustificatif({ transaction }: { transaction: TransactionUnifiee }
         {transaction.document_id ? "Voir le justificatif" : "Télécharger le PDF"}
       </button>
       {etat === "erreur" && (
-        <span className="text-xs text-destructive">Pièce indisponible.</span>
+        <span className="text-[0.8125rem] text-destructive">Pièce indisponible.</span>
       )}
     </div>
   );
@@ -98,18 +98,18 @@ function DetailTransaction({ transaction }: { transaction: TransactionUnifiee })
     <div className="space-y-4 border-t border-border bg-secondary/30 px-5 py-5">
       {transaction.analysis ? (
         <div>
-          <p className="rule-label mb-2 text-muted-foreground">Ce que dit l'analyse</p>
-          <p className="text-sm leading-relaxed text-pretty">{transaction.analysis}</p>
+          <p className="rule-label-lg mb-2 text-label-ink">Ce que dit l'analyse</p>
+          <p className="text-[0.9375rem] leading-relaxed text-pretty">{transaction.analysis}</p>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[0.9375rem] text-muted-foreground">
           Cette pièce n'a pas encore été analysée.
         </p>
       )}
 
       {transaction.incoherences.length > 0 && (
         <div>
-          <p className="rule-label mb-2 flex items-center gap-2 text-warning-ink">
+          <p className="rule-label-lg mb-2 flex items-center gap-2 text-warning-ink">
             <AlertTriangle className="size-3.5" />
             Points à vérifier
           </p>
@@ -117,7 +117,7 @@ function DetailTransaction({ transaction }: { transaction: TransactionUnifiee })
             {transaction.incoherences.map((message) => (
               <li
                 key={message}
-                className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-ink"
+                className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[0.8125rem] text-warning-ink"
               >
                 {message}
               </li>
@@ -126,17 +126,17 @@ function DetailTransaction({ transaction }: { transaction: TransactionUnifiee })
         </div>
       )}
 
-      <dl className="grid gap-3 text-xs sm:grid-cols-3">
+      <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-3">
         <div>
-          <dt className="rule-label text-muted-foreground">Type de pièce</dt>
+          <dt className="rule-label-lg text-label-ink">Type de pièce</dt>
           <dd className="mt-1">{SOURCE_LIBELLE[transaction.source]}</dd>
         </div>
         <div>
-          <dt className="rule-label text-muted-foreground">Catégorie fiscale</dt>
+          <dt className="rule-label-lg text-label-ink">Catégorie fiscale</dt>
           <dd className="mt-1">{transaction.expense_category ?? "—"}</dd>
         </div>
         <div>
-          <dt className="rule-label text-muted-foreground">Sens</dt>
+          <dt className="rule-label-lg text-label-ink">Sens</dt>
           <dd className="mt-1">
             {!transaction.est_flux
               ? "Engagement (hors totaux)"
@@ -174,7 +174,7 @@ function LigneTransaction({ transaction }: { transaction: TransactionUnifiee }) 
                 ouvert && "rotate-180",
               )}
             />
-            <span className="num text-xs text-muted-foreground">
+            <span className="num text-[0.8125rem] text-muted-foreground">
               {transaction.reference ?? "—"}
             </span>
             {!transaction.has_file && (
@@ -194,12 +194,12 @@ function LigneTransaction({ transaction }: { transaction: TransactionUnifiee }) 
         <td className="px-5 py-4">
           <p className="truncate">{transaction.contrepartie ?? transaction.libelle}</p>
           {transaction.contrepartie && (
-            <p className="truncate text-xs text-muted-foreground">{transaction.libelle}</p>
+            <p className="truncate text-[0.8125rem] text-muted-foreground">{transaction.libelle}</p>
           )}
         </td>
         <td className="px-5 py-4 text-muted-foreground">{formatDateCourte(transaction.date)}</td>
         <td className="px-5 py-4">
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[0.8125rem] text-muted-foreground">
             {SOURCE_LIBELLE[transaction.source]}
           </span>
         </td>
@@ -243,16 +243,16 @@ export function TransactionsTable({
   return (
     <div className="animate-rise overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-[0.9375rem]">
           <thead className="border-b border-border bg-secondary/50">
             <tr>
               {COLONNES_GAUCHE.map((h) => (
-                <th key={h} className="rule-label px-5 py-3.5 text-left text-muted-foreground">
+                <th key={h} className="rule-label-lg px-5 py-3.5 text-left text-label-ink">
                   {h}
                 </th>
               ))}
               {COLONNES_DROITE.map((h) => (
-                <th key={h} className="rule-label px-5 py-3.5 text-right text-muted-foreground">
+                <th key={h} className="rule-label-lg px-5 py-3.5 text-right text-label-ink">
                   {h}
                 </th>
               ))}
