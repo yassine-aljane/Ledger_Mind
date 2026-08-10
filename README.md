@@ -1,177 +1,298 @@
 # LedgerMind Assistant
 
-Fiscal onboarding assistant for **French freelancers and creators**.  
-It helps users clarify their administrative status, collect the right facts, and get either:
+Assistant fiscal pour les **créateurs et indépendants français** : comprendre son statut, produire
+ses justificatifs, préparer ses déclarations — sans jamais rien transmettre à l'administration à
+la place de l'utilisateur.
 
-- **Branch A (intake)** — if they already have a SIREN/SIRET: registry verification + profile Q&A + tax/compliance signals  
-- **Branch B (guidance)** — if they do not: conversational diagnostic + **deterministic** régularisation roadmap
+Le produit couvre la chaîne complète, de la première question (« dois-je m'immatriculer ? ») à la
+préparation des cinq obligations déclaratives du régime micro, en passant par la facturation, la
+lecture des pièces reçues et le calcul de l'impôt.
 
-This README is the map for teammates: how the system works end-to-end, where code lives, and how to add features safely.
-
----
-
-## Table of contents
-
-1. [Product overview](#1-product-overview)
-2. [High-level architecture](#2-high-level-architecture)
-3. [Repository layout](#3-repository-layout)
-4. [Prerequisites & local setup](#4-prerequisites--local-setup)
-5. [User journeys (UI)](#5-user-journeys-ui)
-6. [Backend: orchestrator & agents](#6-backend-orchestrator--agents)
-7. [API reference](#7-api-reference)
-8. [Sessions & data model](#8-sessions--data-model)
-9. [LLM vs deterministic logic](#9-llm-vs-deterministic-logic)
-10. [Frontend structure](#10-frontend-structure)
-11. [How to add a feature](#11-how-to-add-a-feature)
-12. [Tests](#12-tests)
-13. [Integrations & external services](#13-integrations--external-services)
-14. [Conventions & pitfalls](#14-conventions--pitfalls)
+> **Ce README est la carte du dépôt** : comment le système fonctionne de bout en bout, où vit
+> chaque morceau de code, et quelles règles respecter pour ajouter une fonctionnalité sans casser
+> la promesse du produit.
 
 ---
 
-## 1. Product overview
+## Sommaire
 
-**LedgerMind** is not a full tax-filing product. The current core is an **onboarding / diagnostic pipeline**:
-
-| Question at entry | Path | Outcome |
-|-------------------|------|---------|
-| “I already have a SIREN / SIRET” | Branch **A · intake** | Verify identity in public registries, collect activity/revenue facts, classify tax category signals |
-| “I don’t / I’m not sure” | Branch **B · guidance** | Ask a short diagnostic, then show a **feuille de route** (steps + recommended regime) |
-
-Auth is **MongoDB-backed** (email/password + JWT). No Supabase.  
-Each user document also stores **`agent_context.intake`** and **`agent_context.guidance`** snapshots so later features can resume either agent.
+1. [Le produit en cinq minutes](#1-le-produit-en-cinq-minutes)
+2. [Les six règles qui commandent tout le code](#2-les-six-règles-qui-commandent-tout-le-code)
+3. [Architecture d'ensemble](#3-architecture-densemble)
+4. [Arborescence du dépôt](#4-arborescence-du-dépôt)
+5. [Installation et premier démarrage](#5-installation-et-premier-démarrage)
+6. [Les parcours utilisateur, écran par écran](#6-les-parcours-utilisateur-écran-par-écran)
+7. [Les agents backend, un par un](#7-les-agents-backend-un-par-un)
+8. [Le moteur de calcul fiscal](#8-le-moteur-de-calcul-fiscal)
+9. [Référence API](#9-référence-api)
+10. [Données : MongoDB et `data/*.yaml`](#10-données--mongodb-et-datayaml)
+11. [LLM contre déterministe](#11-llm-contre-déterministe)
+12. [Frontend](#12-frontend)
+13. [Tests](#13-tests)
+14. [Ajouter une fonctionnalité](#14-ajouter-une-fonctionnalité)
+15. [Conventions et pièges](#15-conventions-et-pièges)
+16. [Intégrations externes](#16-intégrations-externes)
+17. [Documents de référence](#17-documents-de-référence)
+18. [Aide-mémoire](#18-aide-mémoire)
 
 ---
 
-## 2. High-level architecture
+## 1. Le produit en cinq minutes
+
+### Deux portes d'entrée
+
+Tout commence par une seule question : **avez-vous déjà un SIREN ?**
+
+| Réponse | Branche | Ce qui se passe |
+|---|---|---|
+| « Oui » | **A · intake** | Vérification de l'identité dans les registres publics (SIRENE / RNE), dépôt éventuel du Kbis ou de l'avis de situation, puis questions de profil → catégorie fiscale, alertes de conformité |
+| « Non » ou « je ne sais pas » | **B · guidance** | Diagnostic **conversationnel** (l'utilisateur décrit son activité, le profil se construit tout seul) → **feuille de route** déterministe de régularisation |
+
+Les deux branches alimentent le même compte. Une fois le parcours terminé, l'utilisateur accède
+aux outils : facturation, lecture de pièces, rapport fiscal, déclarations, scénarios.
+
+### Free contre Premium
+
+La règle de fond, tenue par `frontend/src/lib/entitlements.ts` : **le gratuit sert à COMPRENDRE,
+le Premium à AGIR.**
+
+| État d'accès | Qui | Ce qui est ouvert |
+|---|---|---|
+| `invite` | non connecté | Landing publique + Assistant fiscal (`/education`) |
+| `free` | connecté, sans Premium | idem |
+| `premium_parcours` | Premium, mise en route inachevée | Mise en route + feuille de route |
+| `premium_complet` | Premium, mise en route terminée | Tous les outils |
+
+> La bascule Premium est **une démo côté client** (`frontend/src/lib/plan.ts`, clé
+> `lm.plan.<uid>` du `localStorage`). Aucun endpoint de paiement n'existe côté backend.
+
+### Les espaces du produit
+
+| Espace | Route | Ce qu'on y fait |
+|---|---|---|
+| Assistant fiscal | `/education` | Question fiscale libre, réponse sourcée (BOFiP, Légifrance, URSSAF) |
+| Ma situation | `/dashboard`, `/rapport` | Tableau de bord chiffré + génération du rapport fiscal |
+| Mise en route | `/onboarding/*` | Branche A (vérification) ou branche B (diagnostic) |
+| Versements | `/capture` | Dépôt de factures reçues, virements, contrats, cadeaux en nature |
+| Facturation | `/activite` | Cycle de vie complet d'une facture émise |
+| Déclaration | `/declaration` | Brouillons des cinq obligations déclaratives |
+| Scénarios | `/simulateur` | Comparaison de variantes fiscales « et si… » |
+| Historiques | `/historique` | Flux unifié de toutes les pièces, avec anomalies et justificatifs manquants |
+| Expert-comptable | `/referral` | Recherche de cabinets + brouillons d'e-mails de prise de contact |
+| Centre d'Actions | panneau global | Agenda fiscal (échéances) + veille réglementaire personnalisée |
+
+---
+
+## 2. Les six règles qui commandent tout le code
+
+Ces règles ne sont pas des préférences de style : chacune évite une classe de bug qui produirait
+un chiffre faux **sans que rien ne le signale**.
+
+### 1. Aucun montant fiscal n'est calculé deux fois
+
+Un seul module calcule de l'argent : **`backend/app/agents/impots`**. Le rapport fiscal, les
+déclarations et les scénarios l'appellent — ils ne recalculent jamais. Deux implémentations de la
+même formule finiraient par diverger.
+
+### 2. Aucun seuil, taux ou mention légale codé en dur
+
+Toute valeur réglementaire vit dans `data/*.yaml`, avec sa `source` (URL officielle) et sa
+`date_verif`. Le code ne fait que lire. Une valeur absente lève une exception plutôt que de
+retomber sur un défaut silencieux.
+
+### 3. Ce qui n'est pas calculable reste `None`
+
+Un champ non calculé s'affiche « non calculable », **jamais « 0 € »**. Sans contexte de foyer,
+l'IR au barème n'est pas estimé : un zéro se lit « vous ne paierez rien », ce qui est faux et
+coûteux.
+
+### 4. Rien n'est transmis à l'administration
+
+Il n'existe **aucun endpoint de transmission**, et un test le vérifie. Les documents produits sont
+des aides à la préparation : l'utilisateur relit, valide, et va lui-même sur le portail officiel.
+Les boutons « Payer » / « Déclarer » ouvrent le vrai site (`autoentrepreneur.urssaf.fr`,
+`impots.gouv.fr`, `PayFiP`, `portailpro.gouv.fr`, `douane.gouv.fr`) dans un nouvel onglet. Aucune
+donnée bancaire ne transite par LedgerMind.
+
+### 5. L'humain fait autorité sur la machine
+
+Une estimation automatique n'est jamais une déclaration. La valeur d'un cadeau reçu, par exemple,
+exige une confirmation explicite (`valeur_confirmee`) avant d'entrer en comptabilité, et
+l'arbitrage humain est tracé (`valeur_corrigee`). Toute correction manuelle écrase l'extraction
+automatique.
+
+### 6. Chaque chiffre porte sa provenance
+
+Une ligne de déclaration sait de quelles factures elle vient. Un rattachement incertain est
+marqué `a_verifier` plutôt que présenté comme sûr. Le LLM ne conclut jamais en droit : il
+reformule, extrait, ou accompagne.
+
+---
+
+## 3. Architecture d'ensemble
 
 ```text
-┌─────────────────────┐         HTTP JSON          ┌──────────────────────────────┐
-│  Frontend           │  ←──────────────────────→  │  Backend (FastAPI)            │
-│  TanStack Start     │   localhost:3000 ↔ :8000   │                              │
-│  React + Tailwind   │                            │  orchestrator (state machine)│
-│                     │                            │    ├─ intake  (branch A)     │
-│  Auth (static)      │                            │    └─ guidance (branch B)    │
-│  Onboarding UI      │                            │  api/  schemas/ services/    │
-│  Chatbot            │                            │  llm/gemini.py               │
-└─────────────────────┘                            │  core/session_store (Mongo)  │
-                                                   └──────────────────────────────┘
-                                                              │
-                                                              ▼
-                                                         MongoDB
-                                                      (sessions)
+┌──────────────────────────────┐        HTTP JSON        ┌──────────────────────────────────────┐
+│  Frontend                    │  ←──────────────────→   │  Backend — FastAPI                   │
+│  TanStack Start · React 19   │  :3000  ↔  :8000        │                                      │
+│  Tailwind 4 · shadcn/ui      │                         │  api/       16 routeurs              │
+│                              │                         │  agents/    14 agents                │
+│  Landing publique            │                         │    ├─ orchestrator (machine à états) │
+│  Mise en route (A / B)       │                         │    ├─ intake · guidance · pedagogue  │
+│  Outils Premium              │                         │    ├─ capture (LangGraph)            │
+│  Centre d'Actions            │                         │    ├─ facture · impots               │
+└──────────────────────────────┘                         │    ├─ rapport_fiscal · declarations  │
+                                                         │    ├─ echeancier · referral          │
+                                                         │    └─ …                              │
+                                                         │  rag/  veille/  mcp/  product_rag/   │
+                                                         └──────────────────────────────────────┘
+                                                                │            │            │
+                                     ┌──────────────────────────┘            │            └────────────┐
+                                     ▼                                       ▼                         ▼
+                              MongoDB                                Mistral · Gemini            Pinecone
+                     ledgermind + ledgermind_checkpoints            (LLM + embeddings)      (corpus produit)
+                                                                                                   │
+                                                                     ┌─────────────────────────────┘
+                                                                     ▼
+                                                     Sources officielles via MCP
+                                        (Légifrance/PISTE · BOFiP · INSEE · docs officiels · web)
 ```
 
-**Design rule:** the **orchestrator** owns phases and persistence. Agents contain domain logic. The LLM is used for **natural language** (phrasing / understanding / short accompaniment), **not** for inventing legal thresholds or roadmap structure.
+### Deux fournisseurs LLM, par domaine
+
+Les quotas sont **séparés** : l'épuisement de l'un n'éteint pas l'autre.
+
+| Fournisseur | Utilisé par | Code |
+|---|---|---|
+| **Mistral** | guidance, pédagogue, veille, appréciation de rapport, interprétation de scénarios, assistant produit, **embeddings du corpus**, OCR de l'agent capture | `app/llm/mistral.py`, `app/agents/capture/app/mistral_client.py` |
+| **Gemini** | agent `intake` (branche A : formulation des questions et compréhension des réponses), repli d'extraction du profil guidance, classification d'un document de registre ambigu | `app/llm/gemini.py` |
+
+`app/llm/__init__.py` exporte `chat_text` / `chat_json_with_system` (Mistral) et `chat_json`
+(Gemini) : les agents ignorent le fournisseur.
+
+### Deux corpus RAG, jamais mélangés
+
+| Corpus | Contenu | Stockage | Sert |
+|---|---|---|---|
+| **Fiscal** | BOFiP, Légifrance, URSSAF, impots.gouv | MongoDB `corpus_chunks`, similarité cosinus en Python | Assistant fiscal (`pedagogue`), mentions de facture, sources des rapports |
+| **Produit** | `DOCUMENTATION_RAG_LEDGERMIND.md` | Pinecone, namespace `product-docs` | Chatbot public de la landing page |
+
+La séparation est délibérée : une question sur le prix ne doit jamais remonter un article BOFiP,
+et une question fiscale ne doit jamais prendre une page marketing pour source juridique.
 
 ---
 
-## 3. Repository layout
+## 4. Arborescence du dépôt
 
 ```text
 ledgermind-assistant/
-├── README.md                 ← only product docs (this file)
-├── requirements.txt          ← Python deps (install from repo root)
-├── pytest.ini                ← pythonpath=backend
+├── README.md                          ← ce fichier
+├── DECLARATIONS-AGENT.md              ← agent déclaratif : ce qu'il décide, ce qu'il refuse
+├── RAPPORT-FISCAL-HYPOTHESES.md       ← rapport fiscal : hypothèses et valeurs à recouper
+├── DOCUMENTATION_RAG_LEDGERMIND.md    ← corpus du chatbot produit (indexé dans Pinecone)
+├── NOTE-CALCULS-FISCAUX.pdf           ← note générée DEPUIS le moteur (scripts/generer_doc_calculs)
+├── requirements.txt                   ← dépendances Python (installer depuis la racine)
+├── pytest.ini                         ← pythonpath=backend, asyncio_mode=auto
+│
 ├── backend/
 │   ├── .env.example
 │   ├── app/
-│   │   ├── main.py           ← FastAPI app + CORS
-│   │   ├── config.py         ← settings (pydantic-settings)
-│   │   ├── api/              ← HTTP routers
-│   │   │   ├── auth.py
-│   │   │   ├── orchestrator.py
-│   │   │   ├── guidance.py   ← Branch B: chat, memory, roadmap, PDF, corpus, watch
-│   │   │   ├── verification.py
-│   │   │   ├── facture.py, rapport.py, declaration.py, expert_comptable.py
-│   │   │   └──  ↑ registered space (Facture → Rapport → Déclaration → Expert-comptable)
+│   │   ├── main.py                    ← app FastAPI, CORS, planificateur de veille
+│   │   ├── config.py                  ← settings (pydantic-settings), lit backend/.env
+│   │   ├── api/                       ← 16 routeurs HTTP, aucune logique métier
 │   │   ├── agents/
-│   │   │   ├── orchestrator.py
-│   │   │   ├── intake/       ← Branch A
-│   │   │   ├── guidance/     ← Branch B (conversation.py, chat.py, roadmap/)
-│   │   │   ├── pedagogue/    ← sourced fiscal Q&A (RAG)
-│   │   │   ├── facture/      ← generator, mentions (sourced), store, pdf
-│   │   │   ├── rapport/      ← consolidation, signaux, appreciation (LLM+guardrails), pdf
-│   │   │   ├── declaration/  ← pre-fill from report/regime, provenance per line, pdf
-│   │   │   ├── expert_comptable/  ← official/open sources only, no scraping
-│   │   │   └── echeancier/   ← Rule Engine + Decision Engine + Scheduler (see §7)
-│   │   ├── rag/              ← corpus: embeddings, Mongo vector store, retriever
-│   │   ├── mcp/              ← MCP client (official sources)
-│   │   ├── veille/           ← regulatory watch + threshold checks
-│   │   ├── llm/gemini.py     ← shared Gemini client (chat, JSON, embeddings)
-│   │   ├── schemas/          ← Pydantic models (API + session state)
-│   │   ├── services/         ← recherche-entreprises, OCR, etc.
-│   │   └── core/             ← Mongo (users, sessions, conversation memory)
-│   ├── mcp_servers/          ← Légifrance/PISTE, BOFiP, web sources, INSEE, official docs
-│   ├── scripts/              ← seed_corpus, enrich_corpus (MCP), enrich_legifrance (PISTE)
-│   └── tests/
-├── data/                     ← product data, reviewed by hand — not backend code
-│   ├── seuils.yaml           ← thresholds & rates, each sourced and dated
-│   ├── sources.yaml          ← corpus seed list, with authority rank
-│   └── regimes/              ← Rule Engine data (one YAML per tax regime, see §7)
+│   │   │   ├── orchestrator.py        ← machine à états des branches A et B
+│   │   │   ├── intake/                ← branche A : vérification + questions de profil
+│   │   │   ├── guidance/              ← branche B : chat, profil, feuille de route
+│   │   │   │   └── roadmap/           ← moteur juridique déterministe
+│   │   │   ├── pedagogue/             ← Q&R fiscale sourcée (RAG)
+│   │   │   ├── capture/               ← LangGraph : lecture des pièces reçues
+│   │   │   ├── facture/               ← émission : brouillon → émise → avoir → réglée
+│   │   │   ├── impots/                ← LE moteur de calcul (abattements, IR, cotisations)
+│   │   │   ├── rapport_fiscal/        ← rapport sur CA ENCAISSÉ (rapprochement bancaire)
+│   │   │   ├── declarations/          ← les cinq obligations, brouillons jamais transmis
+│   │   │   ├── echeancier/            ← agenda fiscal (règles + décision + calendrier)
+│   │   │   ├── referral/              ← recherche de cabinets + e-mails de contact
+│   │   │   ├── expert_comptable/      ← recherche en sources officielles/ouvertes
+│   │   │   ├── rapport/               ← rapport d'activité (CA facturé) — chantier antérieur
+│   │   │   └── declaration/           ← 2042-C-PRO sur CA facturé — chantier antérieur
+│   │   ├── rag/                       ← corpus fiscal : embeddings, vectorstore, retriever
+│   │   ├── product_rag/               ← corpus produit : Pinecone, agent public
+│   │   ├── veille/                    ← veille réglementaire personnalisée + planificateur
+│   │   ├── mcp/                       ← client MCP (sources officielles)
+│   │   ├── llm/                       ← clients Mistral et Gemini
+│   │   ├── schemas/                   ← modèles Pydantic partagés (API + état de session)
+│   │   ├── services/                  ← recherche-entreprises, INSEE, INPI, OCR
+│   │   └── core/                      ← Mongo, users, sessions, mémoire conversationnelle, JWT
+│   ├── mcp_servers/                   ← serveurs MCP : Légifrance/PISTE, BOFiP, INSEE, docs, web
+│   ├── scripts/                       ← amorçage de corpus, backfills, générateurs de documents
+│   └── tests/                         ← 39 fichiers, 741 tests
+│
+├── data/                              ← données PRODUIT, revues à la main — pas du code
+│   ├── seuils.yaml                    ← plafonds micro, cotisations, franchise TVA, VL
+│   ├── impot_revenu.yaml              ← barème IR, quotient familial, décote, CFP, ACRE
+│   ├── declarations.yaml              ← cases officielles, TFCC, CFE, DES
+│   ├── facturation.yaml               ← mentions obligatoires, délais, numérotation
+│   ├── sources.yaml                   ← registre des sources du corpus RAG (avec autorité)
+│   └── regimes/micro.yaml             ← règles d'obligations du moteur d'échéances
+│
 ├── frontend/
 │   ├── package.json
 │   └── src/
-│       ├── routes/           ← file-based TanStack Router routes
-│       ├── components/       ← AuthPage, Chatbot, AppShell, GuidanceChat, StatusCard, …
-│       └── lib/              ← api.ts, guidance-api.ts, facturation-api.ts, echeancier-api.ts, auth.ts
+│       ├── routes/                    ← routage par fichiers (TanStack Router)
+│       ├── components/lm/             ← composants métier LedgerMind
+│       ├── components/ui/             ← shadcn/ui (Radix + Tailwind)
+│       └── lib/                       ← clients API, droits d'accès, calculs d'affichage
+│
 ├── docs/
-│   └── AGENT2-INSIGHTS.md    ← design doc for the post-registration insights agent
-├── CONTRIBUTING.md           ← branching, conflicts, shared files
-└── .github/CODEOWNERS        ← who reviews what
+│   ├── ARCHITECTURE-BASE-DE-DONNEES.md      ← toutes les collections, index et pièges
+│   ├── FACTURATION-VALEURS-REGLEMENTAIRES.md ← valeurs à vérifier en direct
+│   ├── veille-personnalisee.md               ← ce que la veille garantit, et ce qu'elle ne garantit pas
+│   ├── AGENT2-INSIGHTS.md
+│   └── Guide_LedgerMind_Rapport_Fiscal.pdf
+│
+├── CONTRIBUTING.md                    ← branches, conflits, fichiers partagés
+└── .github/CODEOWNERS                 ← qui relit quoi
 ```
 
 ---
 
-## 4. Prerequisites & local setup
+## 5. Installation et premier démarrage
 
-### Required
+### Prérequis
 
-Le chatbot produit de la landing page nécessite également une clé **Mistral** (génération et
-embeddings) et une clé **Pinecone** (recherche vectorielle).
-
-- **Python 3.11+** (3.12 used in development)
-- **Node.js** 20+ (for Vite / TanStack Start)
-- **MongoDB** running locally (or a reachable URI)
-- **Gemini API key** — [Google AI Studio](https://aistudio.google.com/apikey)
+- **Python 3.11+** (3.12 en développement)
+- **Node.js 20+**
+- **MongoDB** accessible en local (ou une URI joignable)
+- Une clé **Mistral** — [console.mistral.ai](https://console.mistral.ai) — guidance, pédagogue,
+  veille, capture, embeddings
+- Une clé **Gemini** — [Google AI Studio](https://aistudio.google.com/apikey) — branche intake et OCR
+- *Facultatif* : une clé **Pinecone** (chatbot produit de la landing page) et des clés **PISTE**
+  (Légifrance dans la veille)
 
 ### Backend
 
 ```bash
-# from repo root
+# depuis la racine du dépôt
 python -m venv .venv
 
 # Windows
 .\.venv\Scripts\activate
-
 # macOS / Linux
 source .venv/bin/activate
 
 pip install -r requirements.txt
 
-copy backend\.env.example backend\.env   # Windows
-# cp backend/.env.example backend/.env  # macOS / Linux
+copy backend\.env.example backend\.env    # Windows
+# cp backend/.env.example backend/.env    # macOS / Linux
 
-# edit backend/.env — at least GEMINI_API_KEY and MONGO_URI
+# renseigner au minimum GEMINI_API_KEY, MISTRAL_API_KEY et MONGO_URI
 cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
-Health check: [http://localhost:8000/health](http://localhost:8000/health)  
-Interactive API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
-
-### Indexer le chatbot produit
-
-Après avoir renseigné `MISTRAL_API_KEY` et `PINECONE_API_KEY` dans `backend/.env`, lancer une fois
-depuis la racine du dépôt :
-
-```bash
-python -m backend.scripts.index_product_knowledge
-```
-
-Le script lit `DOCUMENTATION_RAG_LEDGERMIND.md`, crée l'index Pinecone s'il n'existe pas et
-remplace uniquement le namespace `product-docs`. Il faut le relancer après une modification du
-document. Le statut est visible sur `GET /api/product-assistant/status`.
+- Santé : [http://localhost:8000/health](http://localhost:8000/health)
+- Documentation interactive : [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### Frontend
 
@@ -181,179 +302,330 @@ npm install
 npm run dev
 ```
 
-App: [http://localhost:3000](http://localhost:3000)
+Application : [http://localhost:3000](http://localhost:3000)
 
-### Environment variables
+### Variables d'environnement
 
-Defined in `backend/.env` (see `backend/.env.example`):
+Définies dans `backend/.env` (modèle complet et commenté dans `backend/.env.example`).
 
-| Variable | Purpose | Typical value |
-|----------|---------|----------------|
-| `GEMINI_API_KEY` | Gemini calls for NL | your key |
-| `GEMINI_MODEL` | Model id — mind the free-tier daily cap (see `.env.example`) | `gemini-2.5-flash-lite` |
-| `AUTH_SECRET` | JWT signing key (≥ 32 chars) | see `.env.example` |
-| `MISTRAL_API_KEY` | Réponses et embeddings du chatbot produit | your key |
-| `MISTRAL_MODEL` | Modèle de génération Mistral | `mistral-small-latest` |
-| `EMBEDDING_MODEL` | Modèle vectoriel ; réindexer après tout changement | `mistral-embed` |
-| `PINECONE_API_KEY` | Accès à la base vectorielle produit | your key |
-| `PINECONE_INDEX_NAME` | Index dédié à l'aide produit | `ledgermind-product` |
-| `PINECONE_NAMESPACE` | Namespace remplacé lors de l'indexation | `product-docs` |
-| `AUTH_TOKEN_DAYS` | Token lifetime | `14` |
-| `MONGO_URI` | Session + **users** store | `mongodb://localhost:27017` |
-| `MONGO_DB_NAME` | Database name | `ledgermind` |
-| `FRONTEND_ORIGIN` | CORS allowlist | `http://localhost:3000` |
+| Variable | Rôle | Valeur typique |
+|---|---|---|
+| `GEMINI_API_KEY` | Branche intake + OCR | votre clé |
+| `GEMINI_MODEL` | Modèle Gemini — attention au palier gratuit | `gemini-2.5-flash-lite` |
+| `MISTRAL_API_KEY` | Guidance, pédagogue, veille, capture, embeddings | votre clé |
+| `MISTRAL_MODEL` | Modèle de génération | `mistral-small-latest` |
+| `EMBEDDING_MODEL` | Modèle vectoriel du corpus fiscal | `mistral-embed` |
+| `MONGO_URI` | Comptes, sessions, pièces, corpus | `mongodb://localhost:27017` |
+| `MONGO_DB_NAME` | Nom de la base | `ledgermind` |
+| `AUTH_SECRET` | Clé de signature JWT (**≥ 32 caractères**) | à changer en production |
+| `AUTH_TOKEN_DAYS` | Durée de vie du jeton | `14` |
+| `FRONTEND_ORIGIN` | Liste CORS, séparée par des virgules | `http://localhost:3000` |
+| `PINECONE_API_KEY` | Chatbot produit (facultatif) | votre clé |
+| `PINECONE_INDEX_NAME` / `_NAMESPACE` | Index et namespace produit | `ledgermind-product` / `product-docs` |
+| `PRODUCT_RAG_TOP_K` / `_MIN_SCORE` | Réglage de la recherche produit | `6` / `0.45` |
+| `VEILLE_ENABLED` | Cycle de veille quotidien | `true` |
+| `VEILLE_CRON_HOUR` | Heure du cycle | `6` |
+| `PISTE_CLIENT_ID` / `_SECRET` | Légifrance (facultatif — sans elles, les autres sources restent actives) | — |
+| `FRESHNESS_MAX_DAYS` | Âge maximal toléré d'une valeur sourcée | `120` |
 
-Optional frontend override:
+Surcharge côté frontend :
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `VITE_API_BASE` | Backend base URL | `http://localhost:8000` |
+| Variable | Rôle | Défaut |
+|---|---|---|
+| `VITE_API_BASE` | URL de base du backend | `http://localhost:8000` |
 
----
+> **CORS** — `FRONTEND_ORIGIN` accepte plusieurs origines séparées par des virgules, et
+> `main.py` reflète automatiquement `localhost` ↔ `127.0.0.1` ainsi que tout port local
+> (Vite peut basculer sur `:3001` ou `:5173`).
 
-## 5. User journeys (UI)
+### Amorçage : les corpus ne se remplissent pas tout seuls
 
-### Auth (MongoDB + JWT)
+```bash
+# 1. Corpus fiscal (assistant fiscal, mentions sourcées) — MongoDB
+python -m backend.scripts.seed_corpus          # télécharge et ingère data/sources.yaml
+python -m backend.scripts.enrich_corpus        # complète via MCP (API officielles, pas de scraping)
+python -m backend.scripts.enrich_legifrance    # articles de codes via PISTE (autorité 1)
 
-- Routes: `/` and `/auth` → `AuthPage`
-- **Inscription** → `POST /api/auth/register` (stores user in Mongo `users`)
-- **Connexion** → `POST /api/auth/login`
-- JWT kept in `localStorage` (`ledgermind_access_token`); sent as `Authorization: Bearer …`
-- `/onboarding/` is guarded: unauthenticated users are sent to `/auth`
-- Google OAuth button is disabled (not implemented; no Supabase)
-- Profile + dual-agent context: `GET /api/auth/me`, `GET /api/auth/context`
+# 2. Corpus produit (chatbot de la landing page) — Pinecone
+python -m backend.scripts.index_product_knowledge
+```
 
-### Branch choice
+`index_product_knowledge` lit `DOCUMENTATION_RAG_LEDGERMIND.md`, crée l'index Pinecone si besoin
+(dense, cosinus, 1024 dimensions) et **remplace uniquement** le namespace `product-docs`. À
+relancer après chaque modification du document. État visible sur
+`GET /api/product-assistant/status`.
 
-Route: `/onboarding/`
+> **Après tout changement de `EMBEDDING_MODEL`** : lancer
+> `python -m backend.scripts.reembed_corpus`. Les vecteurs de deux modèles différents ne sont pas
+> comparables — la recherche devient silencieusement inexploitable.
 
-- **A** → `/onboarding/verification` (SIREN/SIRET)
-- **B** → `/onboarding/diagnostic` (no SIREN)
+### Autres scripts utiles
 
-### Branch A — verification → profile
-
-1. Enter SIREN (9) or SIRET (14), or OCR a document  
-2. `POST /api/orchestrator/start` with SIRET  
-3. Possible uploads:
-   - Registry document (Kbis / RNE extract) if required (often EI)
-   - Avis de situation SIRENE (archival proof)
-4. Continue turns → profile questions (`Chatbot` on `/onboarding/profil`)  
-5. Finish → dashboard (shell pages exist; many are still placeholders)
-
-### Branch B — diagnostic conversationnel → feuille de route
-
-Branch B is **conversational**, not a questionnaire: the user describes their activity in their
-own words and the profile builds itself from the conversation. Endpoints live under
-`/api/guidance` (see §7); the orchestrator state machine is untouched and still serves Branch A.
-
-1. `/onboarding/diagnostic` renders `GuidanceChat` — no server call needed to start
-2. Each message → `POST /api/guidance/chat` (session created on the first message)
-3. The backend decides what is still missing; **the roadmap is never produced while a legally
-   required fact is missing**. When the profile is complete, the response carries `roadmap`
-4. CTA **Voir ma feuille de route** → `/onboarding/diagnostic/resultat`, plus a PDF export
-5. Then **J'ai déjà mon SIREN → vérification** hands over to `/onboarding/verification` —
-   the same screen Branch A users reach after answering "yes, I have a SIREN"
-
-Three UI pieces the user drives (`frontend/src/components/lm/`):
-
-| Component | Role |
+| Script | Rôle |
 |---|---|
-| `GuidanceChat.tsx` | chat, opening **suggestions**, backend-driven clickable options |
-| `StatusCard.tsx` | **fiche de statut adaptative** — cards appear as facts are detected (pop-up confirmation), each editable/removable via a pop-up |
-| `ConversationHistory.tsx` | **historique** — reopen, rename, delete past conversations |
-
-Nothing fiscal is hard-coded in the frontend: questions, quick replies, options and the roadmap
-all come from the deterministic backend.
-
-> **Routing note:** `resultat` is a **child route** of `diagnostic`. The parent must render `<Outlet />` for `/resultat`, or the page stays blank.
-
-Other routes (mostly product shell): `/dashboard`, `/documents`, `/education`, `/historique`, `/parametres`, `/simulateur`.
-
-### Registered space — Facture → Rapport → Déclaration → Expert-comptable
-
-Route: `/activite` (premium + `verification_status === "verified"`; guarded with a link to
-`/onboarding/verification` otherwise — Branch A/B and their navigation are untouched). A single
-page, four steps, one flow (`frontend/src/routes/activite.tsx`,
-`frontend/src/lib/facturation-api.ts`):
-
-1. **Facture** — standard model always available; an uploaded template is a second entry point
-   that falls back cleanly to the standard model on any failure (never blocks issuance). Sourced
-   mandatory mentions, sequential numbering, saved as `facture_generee`.
-2. **Rapport** — pick a period; consolidates that period's invoices into deterministic key
-   figures (CA, ventilation prestations/ventes, position vs. thresholds, cotisations estimées)
-   plus a goal-linked, source-cited, non-accusatory appreciation. Saved as `rapport_genere`.
-3. **Déclaration** — consolidates the report into a pre-filled periodic form, one line per box,
-   each line showing its `provenance`. Stays `brouillon` until the user explicitly marks it
-   reviewed; never auto-transmitted. Saved as `declaration_generee`.
-4. **Expert-comptable** — from the declaration's "faire vérifier/signer", or standalone: searches
-   official/open sources only, always links the official Ordre directory, never invents a firm.
-
-Every card in the flow shows its data provenance (manual entry, generated invoice, report,
-import) so the source of each figure stays visible.
+| `backend.scripts.migrate_prototype` | Reprend le prototype (ChromaDB + SQLite) dans MongoDB |
+| `backend.scripts.migrer_jeux_declarations` | Sépare les jeux de déclarations des déclarations préparées |
+| `backend.scripts.backfill_amount_eur` | Recalcule les contre-valeurs en euros manquantes |
+| `backend.scripts.backfill_guidance_agent_context` | Peuple `agent_context.guidance` sur les comptes anciens |
+| `backend.scripts.generer_doc_calculs` | Produit `NOTE-CALCULS-FISCAUX.pdf` **depuis le moteur** |
+| `backend.scripts.generate_rapport_fiscal_guide` | Produit le guide du rapport fiscal |
+| `docs-test/generer.py` | Génère des pièces de test (specimens) pour éprouver `/capture` |
 
 ---
 
-## 6. Backend: orchestrator & agents
+## 6. Les parcours utilisateur, écran par écran
 
-### Orchestrator (`backend/app/agents/orchestrator.py`)
+### Landing publique — `/`
 
-Thin **deterministic state machine**. Every turn:
+Page marketing avec vidéo de présentation et **chatbot produit** (`ProductAssistant.tsx`) :
+un widget RAG public qui répond aux questions sur LedgerMind lui-même et **redirige** toute
+demande de conseil fiscal personnel vers l'Assistant fiscal.
 
-1. Load session from Mongo by `session_id`
-2. Branch on `state.phase`
-3. Call the right agent helper
-4. Save session
-5. Return `OrchestratorTurnResponse` (`ui_action`, `message`, `quick_replies`, `profile`, optional `roadmap` / `diagnostic_profile`)
+### Authentification — `/auth`
 
-#### Branch A phases
+MongoDB + JWT, sans dépendance externe.
+
+- Inscription → `POST /api/auth/register` (utilisateur créé dans la collection `users`)
+- Connexion → `POST /api/auth/login`
+- Le jeton vit dans `localStorage` (`ledgermind_access_token`) et part en `Authorization: Bearer …`
+- Le bouton Google OAuth est désactivé (non implémenté)
+
+### Mise en route — `/onboarding/`
+
+L'utilisateur choisit sa branche.
+
+**Branche A — vérification puis profil**
+
+1. Saisie du SIREN (9 chiffres) ou SIRET (14), ou OCR d'un document
+2. `POST /api/orchestrator/start` avec le SIRET
+3. Dépôts éventuels : document de registre (Kbis / extrait RNE, souvent pour une EI), puis avis
+   de situation SIRENE
+4. Questions de profil (`Chatbot` sur `/onboarding/profil`) — y compris les champs que **aucun
+   registre ne connaît** : foyer fiscal, caisse de retraite BNC, IBAN, date de début d'activité,
+   ACRE. Sans eux, le moteur d'impôt refuse de calculer l'IR plutôt que d'afficher un montant
+   inventé.
+5. Fin de parcours → les outils se déverrouillent
+
+**Branche B — diagnostic conversationnel puis feuille de route**
+
+Ce n'est pas un questionnaire : l'utilisateur décrit son activité avec ses mots, et le profil se
+construit depuis la conversation.
+
+1. `/onboarding/diagnostic` affiche `GuidanceChat` — aucun appel serveur pour démarrer
+2. Chaque message → `POST /api/guidance/chat` (la session naît au premier message)
+3. Le backend décide de ce qui manque encore. **La feuille de route n'est jamais produite tant
+   qu'un fait légalement requis est absent.** Quand le profil est complet, la réponse porte
+   `roadmap`.
+4. « Voir ma feuille de route » → `/onboarding/diagnostic/resultat`, avec export PDF
+5. « J'ai déjà mon SIREN » bascule vers `/onboarding/verification`
+
+Trois pièces d'interface pilotées par l'utilisateur (`frontend/src/components/lm/`) :
+
+| Composant | Rôle |
+|---|---|
+| `GuidanceChat.tsx` | chat, suggestions d'ouverture, options cliquables décidées par le backend |
+| `StatusCard.tsx` | **fiche de statut adaptative** — les cartes apparaissent à mesure que les faits sont détectés, chacune modifiable ou supprimable |
+| `ConversationHistory.tsx` | historique : réouvrir, renommer, supprimer une conversation |
+| `SuggestionChips.tsx` | **profilage rapide** : répondre sans jamais taper |
+
+Rien de fiscal n'est codé dans le frontend : questions, réponses rapides, options et feuille de
+route viennent toutes du backend déterministe.
+
+> **Note de routage :** `resultat` est une route **enfant** de `diagnostic`. Le parent doit rendre
+> `<Outlet />`, sinon la page reste blanche.
+
+**Accès anonyme** — sans jeton, l'identité vient de l'en-tête `X-Anon-Id` (un UUID généré et gardé
+dans le `localStorage`, voir `frontend/src/lib/anon.ts`). Chaque visiteur anonyme a son propre
+profil isolé, purgé après 30 jours d'inactivité ; sans en-tête, une identité jetable est créée
+pour la requête — jamais une identité partagée.
+
+### Assistant fiscal — `/education`
+
+Ouvert à tous, même sans compte. Question fiscale libre, réponse en français simple, **ancrée sur
+des sources citées** (BOFiP, Légifrance, URSSAF). Fonctionne aussi en mode conversation via
+`POST /api/guidance/chat` avec `mode: "pedagogue"`, ce qui conserve l'historique.
+
+### Ma situation — `/dashboard` et `/rapport`
+
+Tableau de bord chiffré : encaissements, position par rapport aux plafonds, prélèvements estimés,
+visualisations (`FiscalVisualisations.tsx`, `charts.tsx`, `FiscalReceipt.tsx`). Le bouton
+« générer un rapport » mène à `/rapport`, page dédiée : un rapport ne se produit pas à la suite
+d'une facture, il se produit quand on veut faire le point.
+
+### Versements — `/capture`
+
+Dépôt d'une pièce (PDF ou image, jusqu'à 20 Mo). L'agent la lit, la classe, la résume et la
+range. Quatre natures reconnues :
+
+| Nature | Ce qui en est fait |
+|---|---|
+| **Facture reçue** | dépense, catégorie, échéance, TVA déductible |
+| **Virement** | encaissement — c'est la base du rapprochement bancaire |
+| **Contrat** | cohérence (prestation exécutée non facturée ?) — **n'entre jamais dans l'assiette** |
+| **Cadeau en nature** | avantage en nature → **revenu imposable**, à sa valeur marchande |
+
+Tout le reste sort en « hors périmètre », sans être enregistré. L'agent **pose une question**
+quand un champ obligatoire manque (`DocumentChatDrawer.tsx`), la pièce d'origine reste
+consultable (`DocumentInspector.tsx`), et toute correction humaine écrase l'extraction
+automatique.
+
+Le parcours cadeau est volontairement en deux temps (`GiftCadeauDrop.tsx`,
+`CadeauDeclaration.tsx`) : `POST /api/capture/cadeau/estimer` propose une valeur **sans rien
+enregistrer**, `POST /api/capture/cadeau` enregistre et exige `valeur_confirmee`. **Estimer
+n'engage rien ; déclarer engage.**
+
+### Facturation — `/activite`
+
+Premium + SIREN vérifié. Cycle de vie complet (`FactureCycleVie.tsx`) :
 
 ```text
-verification
-  → verification_registry_document   (if document required)
-  → verification_document            (SIRENE avis upload)
+brouillon ──emettre──► émise ──reglement──► réglée
+    │                    │
+ supprimable         avoir ──► annulée (archivée, séquence intacte)
+```
+
+- Un **brouillon** ne consomme aucun numéro : une création abandonnée ne laisse pas de trou dans
+  la séquence, ce que la réglementation interdit.
+- L'**émission** attribue le numéro, fige et date le document — c'est ce jalon, et lui seul, qui
+  donne au document son existence fiscale.
+- Une facture émise est **immuable**. La correction conforme est l'**avoir**.
+- Supprimer une facture émise exige `confirmer_suppression_emise=true` et le numéro retiré est
+  consigné (`GET /api/facture/suppressions`) pour rester justifiable lors d'un contrôle.
+- Les mentions obligatoires viennent mot pour mot de `data/facturation.yaml`. Une mention absente
+  lève `MentionManquante` plutôt qu'une facture au texte inventé.
+- Un template uploadé n'est **jamais bloquant** : toute erreur d'analyse retombe sur le modèle
+  standard.
+
+### Déclaration — `/declaration`
+
+Les **cinq obligations** du régime micro, en brouillons prêts à recopier. Déclarer ne prolonge pas
+la facturation : c'est une obligation à échéance fixe, qui vaut même sans facture émise sur la
+période — d'où une page atteinte directement depuis le rail.
+
+Détail complet dans [DECLARATIONS-AGENT.md](DECLARATIONS-AGENT.md).
+
+### Scénarios — `/simulateur`
+
+Comparaison de variantes fiscales « et si… » : CA différent, changement de catégorie, versement
+libératoire ou barème, passage d'un plafond. Le contexte est prérempli depuis le profil et les
+factures réelles ; l'utilisateur peut aussi décrire son scénario en langage naturel
+(`POST /api/simulation/interpreter`, la seule intervention LLM de l'écran — elle **interprète**,
+elle ne calcule pas).
+
+### Historiques — `/historique`
+
+Flux unifié de toutes les pièces (factures émises, factures reçues, virements, contrats, cadeaux),
+filtrable, avec agrégation des anomalies et décompte des pièces sans justificatif.
+
+### Expert-comptable — `/referral`
+
+Recherche de cabinets autour d'une ville (OpenStreetMap / Overpass + géocodage + API entreprises),
+affichés sur une carte Leaflet, avec des **brouillons d'e-mails** de prise de contact
+personnalisés depuis le profil fiscal. Aucun e-mail n'est envoyé automatiquement.
+
+`GET /api/expert-comptable?ville=…` est la voie plus stricte, déclenchée depuis la déclaration
+(« faire vérifier / signer ») : sources officielles et ouvertes uniquement, jamais de cabinet
+inventé, et le lien vers l'annuaire officiel de l'Ordre est toujours présent.
+
+### Centre d'Actions — panneau global
+
+Ouvert depuis `AppShell` sur toutes les pages produit (`CentreActions.tsx`). Deux contenus :
+
+**Agenda fiscal** (`/api/echeancier/*`) — les obligations applicables, leur date ou fenêtre, leur
+statut. Les paramètres de calendrier manquants (périodicité URSSAF, régime de TVA, clients UE)
+sont demandés **une seule fois, en ligne dans l'agenda** — jamais insérés dans la séquence
+d'onboarding. Le statut « régularisée » ne s'obtient que par une confirmation déclarative de
+l'utilisateur : LedgerMind ne déduit jamais qu'un paiement a eu lieu.
+
+**Veille réglementaire** (`/api/veille/*`) — les nouveautés fiscales qui concernent ce profil,
+la plus contraignante d'abord. Aucun SIREN n'est exigé : un utilisateur de la branche B est
+justement celui qui a le plus besoin de savoir qu'une règle change.
+
+### Compte et formule — `/parametres`, `/premium`
+
+Profil, thème clair/sombre, contexte des deux agents. `/premium` présente les deux formules et
+bascule le plan (démo côté client).
+
+---
+
+## 7. Les agents backend, un par un
+
+| Agent | Dossier | Ce qu'il produit | LLM ? |
+|---|---|---|---|
+| **orchestrator** | `agents/orchestrator.py` | Aiguillage des phases, persistance de session | non |
+| **intake** | `agents/intake/` | Identité vérifiée, catégorie fiscale, alertes | Gemini (formulation, compréhension) |
+| **guidance** | `agents/guidance/` | Profil de diagnostic + feuille de route | Mistral (conversation, accompagnement) |
+| **pedagogue** | `agents/pedagogue/` | Réponse fiscale sourcée | Mistral (rédaction sur extraits cités) |
+| **capture** | `agents/capture/` | Pièces lues, classées, dédupliquées | Mistral (OCR, extraction, synthèse) |
+| **facture** | `agents/facture/` | Factures émises conformes + PDF | non |
+| **impots** | `agents/impots/` | **Tous les montants fiscaux** | **jamais** |
+| **rapport_fiscal** | `agents/rapport_fiscal/` | Rapport sur CA encaissé + PDF | non (le calcul vient d'`impots`) |
+| **declarations** | `agents/declarations/` | Les cinq brouillons déclaratifs + PDF | non |
+| **echeancier** | `agents/echeancier/` | Agenda des obligations | non |
+| **veille** | `app/veille/` | Catalogue de nouveautés + notifications | Mistral (qualification, **une seule fois**) |
+| **referral** | `agents/referral/` | Cabinets + e-mails de contact | Mistral (rédaction des e-mails) |
+| **expert_comptable** | `agents/expert_comptable/` | Cabinets en sources officielles | non |
+| **product_rag** | `app/product_rag/` | Réponses sur le produit | Mistral (sur extraits Pinecone) |
+
+### Orchestrateur — `agents/orchestrator.py`
+
+Machine à états **déterministe** et mince. À chaque tour :
+
+1. Charger la session depuis MongoDB par `session_id`
+2. Aiguiller sur `state.phase`
+3. Appeler l'agent compétent
+4. Sauvegarder la session
+5. Renvoyer `OrchestratorTurnResponse` (`ui_action`, `message`, `quick_replies`, `profile`, et
+   éventuellement `roadmap` / `diagnostic_profile`)
+
+```text
+Branche A                                    Branche B
+─────────────────────────────────            ──────────────────────────
+verification                                 diagnostic_questions
+  → verification_registry_document             → diagnostic_roadmap
+  → verification_document                      → done
   → profile_questions
   → done
 ```
 
-Tax classification / compliance tools run as part of intake finalization (schema still lists `tax_classification` / `compliance_check` as phases for compatibility).
+`tax_classification` et `compliance_check` figurent encore dans le schéma pour compatibilité : la
+classification tourne désormais pendant la finalisation de l'intake.
 
-#### Branch B phases
+Valeurs de `ui_action` consommées par le frontend :
 
-```text
-diagnostic_questions
-  → diagnostic_roadmap   (roadmap built; UI shows CTA)
-  → done                 (after user acknowledges / opens result)
-```
+| `ui_action` | Signification |
+|---|---|
+| `ask_question` | Afficher la question + les réponses rapides |
+| `upload_registry_document` | Demander le Kbis / extrait RNE |
+| `upload_sirene_document` | Demander l'avis de situation SIRENE |
+| `show_verification_result` | Résultat de la vérification registre |
+| `show_roadmap` | Diagnostic terminé — afficher le CTA |
+| `show_tax_result` / `show_compliance` / `done` | Intake terminé |
+| `requires_expert` | Orientation humaine / SIE |
 
-### Intake agent — Branch A (`backend/app/agents/intake/`)
+### Intake — branche A — `agents/intake/`
 
-| File / folder | Role |
-|---------------|------|
-| `agent.py` | Verification apply, ask next question, handle answers, finalize |
-| `questions.py` | Field order + LLM phrasing (with fallbacks) |
-| `understand.py` | Map free-text answers → `UserProfile` fields |
-| `tools/verification.py` | SIRENE / RNE lookup (no LLM) |
-| `tools/registry_analysis.py` | Registry document interpretation helpers |
-| `tools/extract_answer.py` | Deterministic field extraction helpers |
-| `tools/classify_tax.py` | BIC / BNC / mixed heuristics |
-| `tools/check_compliance.py` | Alerts / mismatches |
+| Fichier | Rôle |
+|---|---|
+| `agent.py` | Application de la vérification, question suivante, traitement des réponses, finalisation |
+| `questions.py` | Ordre des champs + formulation par LLM (avec repli statique) |
+| `understand.py` | Texte libre → champs de `UserProfile` |
+| `tools/verification.py` | Recherche SIRENE / RNE (**sans LLM**) |
+| `tools/registry_analysis.py` | Interprétation d'un document de registre |
+| `tools/extract_answer.py` | Extraction déterministe de champs |
+| `tools/classify_tax.py` | Heuristiques BIC / BNC / mixte |
+| `tools/check_compliance.py` | Alertes et incohérences |
 
-### Guidance agent — Branch B (`backend/app/agents/guidance/`)
+### Guidance — branche B — `agents/guidance/`
 
-| File / folder | Role |
-|---------------|------|
-| `agent.py` | Ask next Q, handle answer, `finalize_diagnostic` → `build_roadmap` |
-| `questions.py` | **Static** question bank + `next_missing_field` + `to_roadmap_profil` |
-| `understand.py` | Extract into `DiagnosticProfile` (scoped per `target_field`; quick replies; regex; Gemini fallback) |
-| `accompaniment.py` | Short Gemini blurb for the roadmap (rejected if too short / bare label) |
-| `roadmap/` | **Deterministic** legal/UX engine |
-
-Thresholds and rates are **not** in this folder: they live in `data/seuils.yaml` at the repo root,
-each value carrying its official source and verification date. Read them through
-`roadmap/seuils.py` (which resolves the path via `app.core.paths`) — never hardcode a plafond in
-Python or in a prompt.
-
-Roadmap pipeline (conceptual):
+| Fichier | Rôle |
+|---|---|
+| `conversation.py` | Le tour de conversation : quoi demander, quelles chips proposer |
+| `chat.py` | Mémoire, titres, aiguillage guidance / pédagogue |
+| `questions.py` | Banque de questions **statique** + `next_missing_field` + `to_roadmap_profil` |
+| `understand.py` | Extraction dans `DiagnosticProfile` (limitée au `target_field` ; réponses rapides, regex, puis repli Gemini) |
+| `accompaniment.py` | Court texte d'accompagnement de la feuille de route (rejeté s'il est trop pauvre) |
+| `roadmap/` | **Moteur juridique et UX déterministe** |
 
 ```text
 DiagnosticProfile
@@ -363,358 +635,679 @@ DiagnosticProfile
   → dict (bandeau, etapes, phases, …)
 ```
 
-Etape objects use fields like `titre`, `detail`, `lien`, `phase` (see `guidance/roadmap/models.py`).
+Les seuils ne vivent **pas** ici : ils sont dans `data/seuils.yaml`, lus via `roadmap/seuils.py`.
+
+**Profilage rapide (chips + « Autre »)** — `suggestions_champ` est la structure que le frontend
+rend en boutons cliquables plutôt qu'en question ouverte :
+
+- **Champs fermés** (`vend_produits`, `devise`) — suggestions issues de la table déterministe de
+  `conversation.py`, aucun appel LLM, `ouvert: false`
+- **`ventilation`** — simple partage arithmétique du `ca_estime` déjà connu, donc déterministe
+- **Champs ouverts** (`ca_estime`) — défauts déterministes d'abord, puis
+  `POST /suggestions/affiner` peut les remplacer par des libellés affinés en arrière-plan : les
+  chips ne sont **jamais** bloquées par cet appel
+- Cliquer une chip envoie `action: {kind: "reponse_champ", champ, valeurs}`, appliqué
+  **directement** au profil (`store.patch_profil`), en contournant l'extraction sémantique — le
+  texte libre, lui, passe toujours par `extraire_profil`
+
+### Capture — `agents/capture/`
+
+Graphe **LangGraph** avec point de reprise MongoDB, ce qui permet à une analyse interrompue de
+survivre entre deux requêtes HTTP : `/analyze` démarre un thread, `/answer` le reprend.
+
+```text
+ocr → detect_language → (translate_to_fr?) → detect_document_type
+   ├── facture  : extract_fields → (ask_missing_field ⟲) → write_analysis
+   │              → classify_expense → check_duplicate → save_to_db
+   ├── virement : extract_virement → (ask_missing ⟲) → analyze → check_duplicate → save
+   ├── contrat  : extract_contrat  → (ask_missing ⟲) → analyze → check_duplicate → save
+   └── autre    : reject_unsupported  (rien n'est enregistré)
+```
+
+Points remarquables :
+
+- **Human-in-the-loop** par `interrupt` LangGraph : un champ obligatoire manquant suspend le
+  graphe et pose la question.
+- **Déduplication par index unique MongoDB**, avec les champs de la clé recopiés à la racine du
+  document (« miroirs »). Toute correction doit mettre à jour **les deux** — voir
+  `update_document_fields`.
+- **Multilingue et manuscrit** : la langue est détectée, le texte traduit si besoin, et les champs
+  lus avec incertitude sont marqués (`uncertain_fields`).
+- **Devises** : conversion en euros via un cache `fx_rates` (BCE, puis source élargie), la
+  provenance du taux suivant toujours le chiffre.
+- **Cadeaux en nature** : `estimer` (aucune écriture) puis `cadeau` (écriture, `valeur_confirmee`
+  exigée).
+
+### Rapport fiscal — `agents/rapport_fiscal/`
+
+> **L'assiette imposable est le chiffre d'affaires ENCAISSÉ, jamais le facturé.**
+
+Toute l'architecture découle de là : l'agent **rapproche** les factures émises des virements reçus
+au lieu de sommer les factures.
+
+| Stratégie de rapprochement | Fiabilité |
+|---|---|
+| Numéro de facture trouvé dans le motif ou la référence | **certain** |
+| Montant concordant (tolérance 0,02 €) dans une fenêtre de 120 jours, avec **un seul** candidat | **à confirmer** — compté mais isolé, avec alerte |
+
+Le rapport expose **le chemin du calcul** : catégorie fiscale, abattement, base, cotisations, CFP,
+IR, comparaison barème / versement libératoire, contrôle du plafond, prorata de première année,
+position vis-à-vis de la franchise de TVA, ACRE, et les paramètres appliqués avec leur source.
+Le CA facturé y figure comme **indicateur d'écart**, jamais comme second résultat.
+
+Détail complet et limites connues dans
+[RAPPORT-FISCAL-HYPOTHESES.md](RAPPORT-FISCAL-HYPOTHESES.md).
+
+### Déclarations — `agents/declarations/`
+
+Les cinq obligations, chacune avec son déclencheur :
+
+| # | Déclaration | Formulaire | Déclenchée par |
+|---|---|---|---|
+| 1 | Chiffre d'affaires URSSAF | téléservice | **toujours**, même à 0 € |
+| 2 | Revenus annuels | 2042-C-PRO (CERFA 11222) | toujours, une fois par an |
+| 3 | DES | téléservice Prodouane | un encaissement venant d'une entité établie dans l'UE — **même sous franchise de TVA** |
+| 4 | TVA | 3310-CA3 | régime `reel_simplifie` ou `reel_normal` uniquement |
+| 5 | CFE | 1447-C-SD | dès la 2ᵉ année (exonération d'office la première) |
+
+Quatre interdits, tous tenus par des tests :
+
+1. **Ne jamais déduire l'abattement** avant de remplir une case — les cases attendent le CA
+   **brut**, l'administration applique l'abattement ; le déduire ici le compterait deux fois.
+2. **Ne jamais inventer un numéro de case** — les références du CA3 ne sont pas recoupées : ces
+   champs sortent marqués `a_verifier`, sans numéro.
+3. **Ne jamais fusionner les lignes de CA** — trois natures, trois taux.
+4. **Ne jamais taire une déclaration à 0 €** — celle du CA URSSAF reste due.
+
+### Échéancier — `agents/echeancier/`
+
+Trois couches, indépendantes du régime :
+
+- **Rule Engine** (`data/regimes/*.yaml`) — règles d'obligations déclaratives, sourcées. Ajouter
+  un régime = ajouter un fichier YAML, **jamais** toucher au code du moteur. Seul `micro.yaml`
+  (micro-BNC / micro-BIC / mixte) est renseigné aujourd'hui ; réel et société restent un registre
+  vide, prêt à remplir.
+- **Decision Engine** (`moteur.py`) — fonction pure : profil → obligations applicables. Une
+  obligation dont `applicable_si` ne correspond pas au profil n'apparaît jamais (pas de TVA ni de
+  DES inventées pour un profil en franchise et sans clients UE).
+- **Scheduler** (`dates.py`) — résout la prochaine occurrence. Les règles de calendrier stables
+  (URSSAF, CFE) sont calculées ; celles qui sont une fenêtre, un « jour ouvré » ou qui dépendent
+  d'un département inconnu restent une `fenetre_indicative` + lien officiel — **jamais une date
+  exacte fabriquée**.
+
+Les six sources de l'échéancier sont amorcées dans `data/sources.yaml` comme n'importe quelle
+source de corpus, puis maintenues fraîches par `app/veille/scheduler.py`. `verifier_echeancier()`
+recoupe le fait exact dont dépend chaque règle (`verif_motif`, par exemple « 15 décembre » pour la
+CFE) avec la page officielle. Un écart est **signalé** (`echeancier_ecarts` dans
+`GET /api/guidance/veille/last`) — `data/regimes/*.yaml` n'est jamais réécrit automatiquement.
+
+### Veille réglementaire — `app/veille/`
+
+```text
+COLLECTE  →  QUALIFICATION  →  catalogue  →  DISTRIBUTION  →  fil / notifications
+ (MCP)        (LLM, 1 fois)     (MongoDB)    (déterministe)
+```
+
+Le LLM qualifie chaque nouveauté **une seule fois**, en critères structurés. La confrontation au
+profil de chaque utilisateur est ensuite purement déterministe : aucun appel LLM sur le chemin de
+lecture, donc ni latence, ni coût, ni variation d'un chargement à l'autre.
+
+Garanties : aucun chiffre non sourcé publié, pas de renotification (index unique
+`(uid, nouveaute_id)`), obligations avant recommandations, plafond de 20 notifications par
+semaine sans rien faire disparaître du fil, et un profil vide ne reçoit que les mesures
+universelles.
+
+Ce qui **n'est pas** garanti — exhaustivité, déduplication parfaite, exactitude du résumé,
+détection des abrogations — est documenté sans détour dans
+[docs/veille-personnalisee.md](docs/veille-personnalisee.md).
+
+> Ne pas confondre `/api/veille/*` (veille personnalisée) et `/api/guidance/veille/*`
+> (rafraîchissement du corpus RAG derrière le pédagogue). Deux sujets différents, coexistence
+> volontaire.
 
 ---
 
-## 7. API reference
+## 8. Le moteur de calcul fiscal
 
-Base URL: `http://localhost:8000`
+**`backend/app/agents/impots`** — le seul endroit du dépôt où de l'argent est calculé.
 
-### Orchestrator
+| Fichier | Rôle |
+|---|---|
+| `constantes.py` | Lecture seule de `data/seuils.yaml` et `data/impot_revenu.yaml` ; une valeur absente lève `ConstanteManquante` |
+| `moteur.py` | Abattements, base imposable, cotisations, CFP, IR au barème, quotient familial, décote, versement libératoire, plafonds, prorata, ACRE |
+| `tools.py` | Fonctions pures exposables à un agent (arguments simples, résultat JSON) |
+| `schemas.py` | Contrats d'entrée / sortie |
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/orchestrator/start` | Create session; start intake or guidance (**auth required**) |
-| `POST` | `/api/orchestrator/turn` | Next step / answer turn (must own session) |
-| `GET` | `/api/orchestrator/my-sessions` | List current user's sessions |
-| `GET` | `/api/orchestrator/session/{id}` | Current `UserProfile` |
-| `GET` | `/api/orchestrator/session/{id}/detail` | Profile + diagnostic + roadmap (result page) |
-| `GET` | `/api/orchestrator/session/{id}/roadmap` | Roadmap only |
+Trois principes portés par le code :
 
-### Guidance (Branch B — conversational, no SIREN yet)
+1. **Rien n'est inventé.** Sans contexte de foyer, l'IR au barème n'est pas calculé — il est
+   déclaré non calculable.
+2. **Pleine précision jusqu'au bout.** Les arrondis n'interviennent qu'à l'affichage ; arrondir
+   les étapes fait dériver le barème.
+3. **Toute approximation se signale.** L'ACRE appliquée au taux global, la décote « couple » non
+   recoupée : ces réserves remontent dans le résultat.
 
-Auth optional: without a token, identity comes from the `X-Anon-Id` header (a UUID generated and
-kept in the browser's `localStorage`, see `frontend/src/lib/anon.ts`) — never a shared identity.
-Each anonymous visitor gets their own isolated profile, purged after 30 days of inactivity;
-authenticated accounts persist indefinitely.
+**Aucun appel LLM ici, ni maintenant ni plus tard.** Un montant d'impôt doit être reproductible et
+vérifiable ligne à ligne. `rapport_fiscal`, `declarations` et `api/simulation.py` appellent ce
+moteur — ils n'écrivent aucune formule.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/guidance/chat` | One conversation turn — `{session_id?, message, mode?, action?}` |
-| `GET` | `/api/guidance/suggestions` | Opening suggestions, then contextual quick replies + chip structure |
-| `POST` | `/api/guidance/suggestions/affiner` | LLM-refined chip suggestions for one open field (progressive enhancement) |
-| `GET` | `/api/guidance/conversations` | Conversation history (filtered by space) |
-| `GET` | `/api/guidance/chat/{id}` | Full conversation + profile + roadmap + checked steps |
-| `PATCH` | `/api/guidance/chat/{id}/rename` | Rename a conversation |
-| `DELETE` | `/api/guidance/chat/{id}` | Delete a conversation |
-| `GET` | `/api/guidance/profil` | Shared profile + deterministic verdict + what's still missing |
-| `PATCH` | `/api/guidance/profil` | Manual correction from the status card |
-| `DELETE` | `/api/guidance/profil/{field}` | Remove one fact from the status card |
-| `GET`/`PUT` | `/api/guidance/roadmap/state/{id}` | Checkbox state, persisted server-side |
-| `POST` | `/api/guidance/roadmap/pdf` | Roadmap as a downloadable PDF (`fpdf2`, WeasyPrint if available) |
+La note `NOTE-CALCULS-FISCAUX.pdf` est générée **depuis le moteur** : chaque taux y est lu à
+l'exécution, jamais recopié. Une note recopiée dérive de son code au premier changement de loi de
+finances ; celle-ci ne le peut pas.
 
-`POST /chat` returns `{session_id, reponse, profil, roadmap, options, suggestions,
-suggestions_champ, profil_complet}`. `options` is a generic clickable structure decided by the
-backend (e.g. micro vs société in the switching zone) — the frontend renders it without knowing
-the case.
+---
 
-**Fast profiling (chips + "Autre")** — `suggestions_champ` (`{champ, question, ouvert,
-suggestions: [{label, valeurs}]}`) is the structure the frontend renders as clickable chips
-instead of an open-ended question, so answering never requires typing:
-- **Closed fields** (`vend_produits`, `devise`) — suggestions come straight from the deterministic
-  table in `conversation.py` (`reponses_rapides_pour`), no LLM call, `ouvert: false`.
-- **`ventilation`** is a pure arithmetic split of the already-known `ca_estime` (not a fiscal rule,
-  just a 50/50 or all-one-way split) — deterministic too.
-- **Open fields** (`ca_estime`) start with the same deterministic defaults (`ouvert: true`), then
-  `POST /suggestions/affiner` can replace them with LLM-refined, context-aware labels in the
-  background — the chips are never blocked waiting for it (progressive enhancement).
-- Clicking a chip sends `action: {kind: "reponse_champ", champ, valeurs}` — applied **directly**
-  to the profile (`store.patch_profil`), bypassing the semantic extraction pipeline entirely
-  (unlike free text, which always goes through `extraire_profil`). Free text via the "Autre" chip
-  (which simply focuses the existing input) is always available and unchanged.
+## 9. Référence API
 
-### Assistant fiscal (RAG, sourced answers)
+Base : `http://localhost:8000` · documentation interactive sur `/docs` · santé sur `/health`.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/guidance/ask` | One-off fiscal question — answer + cited sources |
-| `GET` | `/api/guidance/corpus` | Corpus status (indexed chunks) |
-| `POST` | `/api/guidance/veille/run` | Run one regulatory-watch cycle |
-| `GET` | `/api/guidance/veille/last` | Last watch report (news + threshold checks) |
+Sauf mention contraire, tous les endpoints exigent un JWT (`Authorization: Bearer …`).
 
-`POST /api/guidance/chat` with `mode: "pedagogue"` routes to the same agent while keeping the
-conversation history. UI: `/education` (`FiscalAssistant.tsx`).
+### Authentification — `/api/auth`
 
-### Chatbot produit de la landing page (RAG Mistral + Pinecone)
+| Méthode | Chemin | Description |
+|---|---|---|
+| `POST` | `/register` | Création du compte dans Mongo + JWT |
+| `POST` | `/login` | Connexion + JWT |
+| `GET` | `/me` | Compte courant + `agent_context` |
+| `GET` | `/context` | Instantanés intake / guidance / capture / referral |
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/product-assistant/chat` | Question produit publique + réponse + références documentaires |
-| `GET` | `/api/product-assistant/status` | Configuration, disponibilité et nombre de vecteurs du namespace |
+### Orchestrateur — `/api/orchestrator`
 
-Le corpus est `DOCUMENTATION_RAG_LEDGERMIND.md`, découpé par question/réponse. Ce chatbot explique
-l'application ; il redirige les demandes de conseil fiscal personnel vers l'Assistant fiscal.
-
-### Auth
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/auth/register` | Create user in Mongo + JWT |
-| `POST` | `/api/auth/login` | Login + JWT |
-| `GET` | `/api/auth/me` | Current user + `agent_context` |
-| `GET` | `/api/auth/context` | Intake + guidance snapshots for next features |
-
-**Start body (examples):**
+| Méthode | Chemin | Description |
+|---|---|---|
+| `POST` | `/start` | Crée la session, démarre l'intake ou la guidance |
+| `POST` | `/turn` | Tour suivant (le compte doit posséder la session) |
+| `GET` | `/my-sessions` | Sessions du compte |
+| `GET` | `/session/{id}` | `UserProfile` courant |
+| `GET` | `/session/{id}/detail` | Profil + diagnostic + feuille de route |
+| `GET` | `/session/{id}/roadmap` | Feuille de route seule |
 
 ```json
+// POST /start — branche A
 { "siret": "12345678900012" }
-```
-
-```json
+// POST /start — branche B
 { "skip_verification": true, "branch": "guidance" }
-```
-
-**Turn body:**
-
-```json
+// POST /turn
 { "session_id": "<uuid>", "user_answer": "Prestation freelance" }
 ```
 
-**Important `ui_action` values:**
+### Vérification — `/api/verification`
 
-| `ui_action` | Meaning (frontend) |
-|-------------|---------------------|
-| `ask_question` | Show question + quick replies |
-| `upload_registry_document` | Ask for Kbis / RNE extract |
-| `upload_sirene_document` | Ask for avis SIRENE |
-| `show_roadmap` | Diagnostic done — show CTA, cache roadmap |
-| `show_tax_result` / `show_compliance` / `done` | Intake finished / wrap-up |
-| `requires_expert` | Human / SIE path |
+| Méthode | Chemin | Description |
+|---|---|---|
+| `POST` | `/siret` | Vérification SIREN / SIRET autonome |
+| `POST` | `/ocr-siret` | OCR du SIRET depuis un fichier |
+| `POST` | `/registry-document` | Dépôt multipart lié à un `session_id` (Kbis / RNE) |
+| `POST` | `/sirene-avis` | Dépôt multipart de l'avis de situation SIRENE |
 
-### Verification
+### Guidance — `/api/guidance` — *auth facultative*
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/verification/siret` | Standalone SIREN/SIRET verify |
-| `POST` | `/api/verification/ocr-siret` | OCR SIRET from uploaded file |
-| `POST` | `/api/verification/registry-document` | Multipart upload tied to `session_id` |
-| `POST` | `/api/verification/sirene-avis` | Multipart SIRENE avis upload |
+Sans jeton, l'identité vient de l'en-tête `X-Anon-Id`.
 
-### Activité (registered space — Facture → Rapport → Déclaration → Expert-comptable)
+| Méthode | Chemin | Description |
+|---|---|---|
+| `POST` | `/chat` | Un tour de conversation — `{session_id?, message, mode?, action?}` |
+| `GET` | `/suggestions` | Suggestions d'ouverture, puis réponses rapides contextuelles + chips |
+| `POST` | `/suggestions/affiner` | Chips affinées par LLM pour un champ ouvert (amélioration progressive) |
+| `GET` | `/conversations` | Historique (filtré par espace) |
+| `GET` | `/chat/{id}` | Conversation complète + profil + feuille de route + cases cochées |
+| `PATCH` | `/chat/{id}/rename` | Renommer |
+| `DELETE` | `/chat/{id}` | Supprimer |
+| `GET` | `/profil` | Profil partagé + verdict déterministe + ce qui manque |
+| `PATCH` | `/profil` | Correction manuelle depuis la fiche de statut |
+| `DELETE` | `/profil/{field}` | Retirer un fait de la fiche |
+| `GET`/`PUT` | `/roadmap/state/{id}` | État des cases, persisté côté serveur |
+| `POST` | `/roadmap/pdf` | Feuille de route en PDF (`fpdf2`) |
+| `POST` | `/ask` | Question fiscale ponctuelle — réponse + sources citées |
+| `GET` | `/corpus` | État du corpus fiscal (nombre de chunks indexés) |
+| `POST` | `/veille/run` | Un cycle de rafraîchissement du **corpus** |
+| `GET` | `/veille/last` | Dernier rapport (actualités + contrôle des seuils + `echeancier_ecarts`) |
 
-Premium + SIREN-verified only (`verification_status === "verified"`). UI: `/activite`
-(`facturation-api.ts`). Every produced document is a **preparation aid** — amounts and regime
-come from the deterministic engine (`analyse_juridique`, `comparateur`, `seuils.yaml`) and cited
-law (RAG); the LLM only drafts the report's narrative appreciation. Nothing is transmitted to the
-administration automatically; the declaration is prepared for a human (the user, then their
-expert-accountant) to review and sign.
+`POST /chat` renvoie `{session_id, reponse, profil, roadmap, options, suggestions,
+suggestions_champ, profil_complet}`. `options` est une structure cliquable générique décidée par
+le backend — le frontend la rend sans connaître le cas.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/facture` | Issue an invoice from profile + service lines (sequential numbering, sourced mandatory mentions) |
-| `POST` | `/api/facture/depuis-template` | Same, from an uploaded template — falls back to the standard model on any analysis failure, never blocks issuance |
-| `GET` | `/api/facture` | List issued invoices (`source="facture_generee"`) |
-| `GET` | `/api/facture/{id}` | Invoice detail |
-| `GET` | `/api/facture/{id}/pdf` | Invoice PDF |
-| `POST` | `/api/rapport` | Consolidate a period (invoices + profile) into key figures + a goal-linked, source-cited appreciation |
-| `GET` | `/api/rapport` | List generated reports (`source="rapport_genere"`) |
-| `GET` | `/api/rapport/{id}` | Report detail |
-| `GET` | `/api/rapport/{id}/pdf` | Report PDF |
-| `POST` | `/api/declaration` | Pre-fill the periodic declaration (box numbers from the deterministic regime + sourced form) from a report/period |
-| `GET` | `/api/declaration` | List prepared declarations (`source="declaration_generee"`) |
-| `GET` | `/api/declaration/{id}` | Declaration detail, each line carries its `provenance` (which invoices/calculation) |
-| `PATCH` | `/api/declaration/{id}/revue` | Mark as reviewed line-by-line by the user (`brouillon` → `revue`) |
-| `GET` | `/api/declaration/{id}/pdf` | Declaration PDF (draft banner + disclaimer) |
-| `GET` | `/api/expert-comptable?ville=...` | Nearby accountants from official/open sources only (no scraping, no invented firm) — always includes the official Ordre directory link |
+### Capture — `/api/capture`
 
-### Centre d'Actions — moteur d'échéances (agenda fiscal)
+| Méthode | Chemin | Description |
+|---|---|---|
+| `POST` | `/analyze` | Dépose une pièce et lance le graphe (multipart) |
+| `POST` | `/answer` | Répond à la question du graphe (reprise du thread), ou interroge un document |
+| `POST` | `/qa` | Question libre sur un document déjà traité |
+| `GET` | `/invoices` · `/virements` · `/contrats` · `/cadeaux` | Listes par nature |
+| `GET` | `/documents/{id}` | Fiche complète (+ `editable_fields`) |
+| `PATCH` | `/documents/{id}` | Correction humaine de champs extraits (409 si cela crée un doublon) |
+| `DELETE` | `/documents/{id}` | Suppression définitive, y compris la trace d'activité |
+| `GET` | `/documents/{id}/file` | Pièce d'origine (types sûrs en `inline`, le reste en téléchargement) |
+| `GET` | `/documents/{id}/messages` | Historique de discussion du document |
+| `POST` | `/cadeau/estimer` | Propose une valeur depuis une photo — **n'enregistre rien** |
+| `POST` | `/cadeau` | Déclare un cadeau — exige `valeur_confirmee` et `valeur_ttc > 0` |
 
-Premium + SIREN-verified. UI: a global slide-over panel (`CentreActions.tsx`, triggered from
-`AppShell` on every product-shell page — not wired into the two conversational interfaces or
-their navigation). Three-layer, regime-agnostic architecture, see `backend/app/agents/echeancier/`:
+### Facturation — `/api/facture` — *Premium + SIREN vérifié*
 
-- **Rule Engine** (`data/regimes/*.yaml`) — declarative, sourced obligation rules per regime.
-  Adding a regime means adding a YAML file, never touching engine code. Only `micro.yaml` (micro-BNC/
-  micro-BIC/mixte) is populated today; réel/société remain an empty, ready-to-fill registry.
-- **Decision Engine** (`moteur.py`) — pure function: profile → applicable obligations. An
-  obligation whose `applicable_si` doesn't match the profile never appears (no invented TVA/DES
-  for a franchise/domestic-only profile).
-- **Scheduler** (`dates.py`) — resolves each obligation's next occurrence. Stable calendar rules
-  (URSSAF, CFE) are computed in code; rules that are themselves a window, a "jour ouvré", or
-  depend on an unknown département (IR annuelle campaign) stay a `fenetre_indicative` + official
-  link — **never a fabricated exact date**.
+| Méthode | Chemin | Description |
+|---|---|---|
+| `POST` | `/brouillon` | Crée un brouillon — **aucun numéro consommé** |
+| `PUT` | `/brouillon/{id}` | Remplace le contenu d'un brouillon (409 si déjà émise) |
+| `DELETE` | `/brouillon/{id}` | Supprime un brouillon |
+| `POST` | `/{id}/emettre` | Attribue le numéro, fige et date — existence fiscale |
+| `POST` | `/{id}/avoir` | Avoir annulant tout ou partie ; l'original passe « annulée », jamais supprimé |
+| `POST` | `/{id}/reglement` | Enregistre un règlement |
+| `POST` | *(racine)* | Émission directe depuis le modèle standard |
+| `POST` | `/depuis-template` | Idem depuis un template uploadé — repli systématique, jamais bloquant |
+| `GET` | *(racine)* · `/{id}` · `/{id}/pdf` | Liste, détail, PDF |
+| `DELETE` | `/{id}` | Supprime ; une facture émise exige `confirmer_suppression_emise=true` |
+| `GET` | `/suppressions` | Numéros retirés de la séquence — de quoi justifier chaque trou |
+| `GET` | `/contexte` | Émetteur, mentions applicables, champs manquants |
+| `GET` | `/alerte-tva` | Position vis-à-vis des seuils de franchise + valeurs à vérifier en direct |
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/echeancier/agenda` | Applicable obligations + due dates/status + which calendar params are still missing |
-| `PATCH` | `/api/echeancier/parametres` | Save calendar params (périodicité URSSAF, régime TVA, clients UE…), asked once inline in the agenda — never inserted into the onboarding question sequence |
-| `POST` | `/api/echeancier/{obligation_id}/marquer-paye` | Declarative "I've paid" confirmation — the **only** path to the green/`regularisee` status; LedgerMind never infers a payment happened |
-| `GET` | `/api/echeancier/historique` | Combined invoices + prepared declarations, most recent first |
+### Rapport fiscal — `/api/rapport-fiscal`
 
-The "Payer"/"Déclarer" button always opens the real official portal (autoentrepreneur.urssaf.fr,
-impots.gouv.fr, PayFiP.gouv.fr, portailpro.gouv.fr, douane.gouv.fr) in a new tab — no payment
-integration, no banking data ever passes through LedgerMind.
+| Méthode | Chemin | Description |
+|---|---|---|
+| `GET` | `/contexte` | Contexte prérempli, origine de chaque champ, champs bloquants |
+| `POST` | *(racine)* | Produit le rapport (assiette = CA encaissé) et l'archive |
+| `GET` | *(racine)* · `/{id}` · `/{id}/pdf` | Liste, détail, PDF |
+| `DELETE` | `/{id}` | Supprime un rapport archivé |
 
-**RAG corpus stays dynamic, via MCP, not a one-off script.** The 6 échéancier sources (URSSAF,
-TVA régime simplifié, IR annuelle, CFE, DES) are seeded once in `data/sources.yaml` like any
-other corpus source, then kept fresh by `app/veille/scheduler.py`:
-- `_collecter()` re-fetches every échéancier `source` URL (from `data/regimes/*.yaml`, no
-  duplicated URL list) via the `docs-officiels` MCP tool on each veille cycle, and re-ingests it
-  — so the pédagogue's answers about these obligations don't go stale between manual reviews.
-- `verifier_echeancier()` (mirrors the pre-existing `verifier_seuils()` for `seuils.yaml`)
-  re-confirms the exact fact each rule depends on (`verif_motif`, e.g. "15 décembre" for CFE)
-  against the live official page. A mismatch is only ever **signalled** (`echeancier_ecarts` in
-  `GET /api/guidance/veille/last`) — `data/regimes/*.yaml` is never auto-overwritten; correcting
-  a rule stays a reviewed, human decision, exactly like a threshold change in `seuils.yaml`.
+### Déclarations — `/api/declarations`
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| `GET` | `/contexte` | Situation déclarative telle que l'onboarding la connaît (préremplissage) |
+| `GET` | `/echeances?annee=` | Calendrier de l'année + CA encaissé par période + prochaine échéance |
+| `POST` | *(racine)* | Produit les cinq brouillons de la période, et les archive |
+| `GET` | *(racine)* · `/{jeu_id}` | Jeux archivés, du plus récent au plus ancien ; détail |
+| `GET` | `/{jeu_id}/dossier.pdf` | Le dossier complet en un seul PDF |
+| `GET` | `/{jeu_id}/{type_declaration}.pdf` | Un document du jeu |
+| `DELETE` | `/{jeu_id}` | Supprime un jeu |
+
+> **Aucun endpoint ne transmet.** Il n'en existe pas, et un test le vérifie.
+
+### Échéancier — `/api/echeancier` — *Premium + SIREN vérifié*
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| `GET` | `/agenda` | Obligations applicables, dates ou fenêtres, statuts, paramètres manquants |
+| `PATCH` | `/parametres` | Enregistre les paramètres de calendrier (demandés en ligne, une seule fois) |
+| `POST` | `/{obligation_id}/marquer-paye` | Confirmation déclarative — **le seul** chemin vers le statut « régularisée » |
+| `GET` | `/historique` | Factures + déclarations préparées, du plus récent au plus ancien |
+
+### Veille — `/api/veille`
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| `GET` | `?contexte=` | Le fil : nouveautés retenues, préférences, état du catalogue, champs de profil connus |
+| `GET` | `/notifications?non_lues=` | Notifications enrichies du contenu de chaque nouveauté |
+| `POST` | `/notifications/{id}/lue` | Marque une notification lue |
+| `POST` | `/notifications/lues` | Marque tout lu (ou seulement les `ids` affichés) |
+| `GET`/`PATCH` | `/preferences` | Veille active, mode `tout` / `obligatoire_seulement` |
+| `POST` | `/run` | Déclenche un cycle à la main (diagnostic) |
+
+### Scénarios — `/api/simulation`
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| `GET` | `/contexte` | Contexte prérempli depuis le profil et les factures réelles + champs manquants |
+| `POST` | `/scenarios` | Calcule et compare les variantes (plafonds, alerte TVA incluses) |
+| `POST` | `/interpreter` | Traduit une description en langage naturel en scénario structuré (**interprète, ne calcule pas**) |
+
+### Expert-comptable — `/api/expert-comptable` et `/api/referral`
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| `GET` | `/api/expert-comptable?ville=` | Cabinets en sources officielles / ouvertes uniquement, avec le lien vers l'annuaire de l'Ordre |
+| `POST` | `/api/referral/generate` | Recherche géolocalisée + brouillons d'e-mails personnalisés |
+| `GET` | `/api/referral/history` | Recherches passées du compte |
+
+### Assistant produit — `/api/product-assistant` — *public*
+
+| Méthode | Chemin | Description |
+|---|---|---|
+| `POST` | `/chat` | Question sur le produit + réponse + références documentaires |
+| `GET` | `/status` | Configuration, disponibilité, nombre de vecteurs du namespace |
+
+### Chantiers antérieurs, conservés
+
+| Préfixe | Ce qu'il fait | À utiliser à la place |
+|---|---|---|
+| `/api/rapport` | Rapport d'activité sur le **CA facturé** | `/api/rapport-fiscal` (CA encaissé) |
+| `/api/declaration` (singulier) | 2042-C-PRO préparée depuis le CA facturé | `/api/declarations` (les cinq obligations, CA encaissé) |
+
+Les deux restent montés et testés ; l'écran `/activite` s'appuie encore sur `/api/facture`.
+Ne pas confondre les deux préfixes de déclaration — un script de migration
+(`migrer_jeux_declarations`) a dû séparer leurs écritures dans une même collection.
 
 ---
 
-## 8. Sessions & data model
+## 10. Données : MongoDB et `data/*.yaml`
 
-### Storage
+### Deux bases
 
-- MongoDB collection `sessions`
-- Document shape: `{ id, state_json, created_at, updated_at }`
-- Code: `backend/app/core/session_store.py`
-- Client never “owns” computed fiscal fields — server loads/saves `OrchestratorState` every turn
+| Base | Rôle | Créée par |
+|---|---|---|
+| `ledgermind` | Toutes les données métier | l'application |
+| `ledgermind_checkpoints` | État interne du graphe LangGraph (capture) | la bibliothèque LangGraph |
 
-**Fiscal corpus (RAG)** — `corpus_chunks` collection: `{chunk_id, texte, embedding, source, url,
-autorite, date_verification, concerne}`. Embeddings come from `gemini-embedding-001` through the
-OpenAI-compatible endpoint already used for chat, so **no vector database and no local embedding
-model are added to the project**; cosine similarity is computed in `backend/app/rag/vectorstore.py`.
-Beyond ~50 000 chunks, switch to an Atlas `vectorSearch` index behind the same `query()` interface.
+La seconde n'est jamais lue par le code du projet. Ses volumes croissent à chaque analyse et
+**ne sont jamais purgés automatiquement** : c'est le premier point à surveiller si la base
+grossit anormalement.
 
-Seed it once: `python -m backend.scripts.seed_corpus` (needs `GEMINI_API_KEY` + `MONGO_URI`).
+Point d'entrée unique : `backend/app/core/mongo.py` (client partagé, créé une fois par processus).
 
-**Guidance conversational memory** (`backend/app/core/conversation_store.py`) — ported from the
-SQLite store of the standalone agent onto the project's MongoDB, same public API:
+### Le piège des identifiants
 
-| Collection | Content |
+| Identifiant | Où | Désigne |
+|---|---|---|
+| `id` | `users.id` | le compte — un UUID |
+| `user_id` | collections de capture | **le même** `users.id` |
+| `uid` | collections guidance et production | **le même** `users.id` encore |
+| `session_id` | `sessions.id` | un parcours d'orchestrateur, pas un compte |
+| `document_id` | capture | une pièce déposée |
+| `thread_id` | base de checkpoints | une exécution du graphe |
+
+`user_id` et `uid` sont **deux noms pour la même clé de compte** : l'agent guidance a été porté
+depuis un prototype qui disait `uid`. Ce n'est pas une distinction sémantique.
+
+### Les collections
+
+| Collection | Contenu |
 |---|---|
-| `guidance_conversations` | `{ id, uid, type, title, created_at, updated_at }` — `type` = `guidance` \| `pedagogue` |
-| `guidance_messages` | `{ conversation_id, role, content, sources, created_at }` |
-| `guidance_profiles` | one document per `uid` — the profile is **shared across spaces**, not per conversation |
-| `guidance_roadmaps` | `{ conversation_id, roadmap, checked }` — checkbox state persisted server-side |
+| `users` | Compte, mot de passe haché (bcrypt), et `agent_context` (`intake`, `guidance`, `capture`, `referral`) |
+| `sessions` | État sérialisé de l'orchestrateur (`state_json`) |
+| `invoices` · `virements` · `contrats` | Pièces **reçues** (capture), une collection par nature, chacune avec sa clé de déduplication |
+| `capture_files.*` | GridFS — les pièces d'origine (jusqu'à 20 Mo) |
+| `chat_sessions` | Discussion par document |
+| `fx_rates` | Cache de taux de change, avec la source du taux |
+| `guidance_conversations` · `_messages` · `_profiles` · `_roadmaps` | Mémoire de l'espace guidance / pédagogue ; le **profil est partagé par compte**, pas par conversation |
+| `factures_emises` · `factures_compteurs` | Factures **émises** + compteur de numérotation atomique |
+| `rapports_generes` · `declarations_generees` | Archives : un rapport ou un jeu est **une photo** de la période |
+| `echeances_statuts` | Confirmations manuelles « marqué comme payé » — jamais déduites |
+| `corpus_chunks` | Corpus fiscal vectorisé (`chunk_id`, `texte`, `embedding`, `source`, `autorite`, `date_verification`, `concerne`) |
+| `veille_nouveautes` · `_notifications` · `_preferences` | Catalogue partagé, qui a vu quoi, réglages |
 
-`uid` is the authenticated user id (falls back to `demo` without auth). Conversations inactive for
-30 days are purged. Profile normalisation stays **in code** (total CA = services + sales; in-kind
-gifts count as service revenue, never as sales) — never delegated to the LLM.
+⚠️ **Ne pas confondre `invoices` et `factures_emises`.** La première porte les factures **reçues**
+(dépenses) ; la seconde les factures **émises** (recettes). Noms proches, sens opposés.
 
-### Core models (`backend/app/schemas/orchestrator.py`)
+**Pas de migrations.** Chaque module crée ses index à la première écriture — une collection
+n'existe donc pas tant que rien n'y a été écrit. Pas de suppression en cascade automatique
+non plus : elle est écrite à la main (`delete_document` efface quatre traces).
 
-- **`UserProfile`** — Branch A identity + docs + activity/revenue + tax/compliance outputs  
-- **`DiagnosticProfile`** — Branch B facts for the roadmap engine  
-- **`OrchestratorState`** — `session_id`, `phase`, `branch`, profiles, `roadmap`, last question metadata  
-- **`OrchestratorTurnResponse`** — what the frontend Chatbot consumes  
+**Recherche vectorielle** — la similarité cosinus est calculée en Python sur les vecteurs chargés
+en mémoire, filtrés côté Mongo par public (`concerne`). Aucune base vectorielle ni modèle local
+n'est ajouté au projet. Au-delà d'environ **50 000 chunks**, basculer sur un index
+`vectorSearch` (MongoDB Atlas) derrière la même interface `query()`.
 
-Frontend mirrors types in `frontend/src/lib/api.ts` and stores:
+Tout le détail — index, miroirs de racine, dénormalisations assumées, commandes d'inspection —
+est dans [docs/ARCHITECTURE-BASE-DE-DONNEES.md](docs/ARCHITECTURE-BASE-DE-DONNEES.md).
 
-- `ledgermind_session_id` (local + session storage)
-- `ledgermind_diagnostic_result` (sessionStorage cache for resultat page)
-- `ledgermind_auth` (sessionStorage — mock auth)
+### Les fichiers `data/*.yaml`
 
----
+Ce sont des **données produit**, revues à la main, versionnées pour que leur relecture soit
+lisible dans les diffs Git. Chaque bloc porte sa `source` (URL officielle), son `annee` et sa
+`date_verif` ; certains portent aussi `verifie: false` ou `verifier_en_direct: true`, ce qui
+oblige le code à **le signaler à l'utilisateur** plutôt qu'à présenter la valeur comme fiable.
 
-## 9. LLM vs deterministic logic
-
-### Uses Gemini (`backend/app/llm/gemini.py`)
-
-- Intake question phrasing  
-- Intake / guidance answer understanding (JSON extraction)  
-- Guidance accompaniment text after roadmap build  
-- Ambiguous OCR document type classification (Kbis vs RNE) when heuristics are unsure  
-
-Always design **fallbacks** (static questions, regex, quick-reply maps). Gemini free-tier quotas will break demos if every turn depends on the LLM.
-
-### Must stay deterministic
-
-- Orchestrator phase transitions  
-- Registry lookups and mismatch rules  
-- Tax classify / compliance tools  
-- Guidance **question order** and “is profile complete?”  
-- **`build_roadmap()`** and all plafond / parcours decisions (`seuils.yaml`)  
-
-**Do not** let the LLM invent thresholds, step lists, or legal conclusions that contradict the roadmap engine.
-
----
-
-## 10. Frontend structure
-
-| Path | Role |
-|------|------|
-| `src/routes/index.tsx`, `auth.tsx` | Auth entry |
-| `src/routes/onboarding.index.tsx` | SIREN oui / non gate |
-| `src/routes/onboarding.verification.tsx` | Branch A verification + uploads |
-| `src/routes/onboarding.profil.tsx` | Branch A profile chatbot |
-| `src/routes/onboarding.diagnostic.tsx` | Branch B chat (+ `<Outlet />` for resultat) |
-| `src/routes/onboarding.diagnostic.resultat.tsx` | Feuille de route UI |
-| `src/components/lm/Chatbot.tsx` | Shared orchestrator chat UI |
-| `src/components/lm/ProductAssistant.tsx` | Widget RAG public avec icône chat sur la landing page |
-| `src/components/AuthPage.tsx` | Static auth |
-| `src/lib/api.ts` | HTTP client + session helpers |
-| `src/lib/product-assistant-api.ts` | Client public de `/api/product-assistant/chat` |
-
-Stack: **TanStack Start / Router**, React 19, Tailwind 4, Vite.
+| Fichier | Contenu | À réviser |
+|---|---|---|
+| `seuils.yaml` | Plafonds micro, abattements, cotisations, franchise TVA, versement libératoire | à chaque loi de finances et revalorisation URSSAF |
+| `impot_revenu.yaml` | Barème IR, quotient familial, décote, CFP, ACRE | à chaque loi de finances |
+| `declarations.yaml` | Cases officielles, TFCC, seuil CFP, CFE, DES | quand une source officielle change |
+| `facturation.yaml` | Mentions obligatoires (**texte affiché mot pour mot**), indemnité de recouvrement, délais, numérotation | idem |
+| `sources.yaml` | Registre des sources du corpus, avec rang d'autorité (1 = loi, 2 = doctrine, 3 = guide) | à l'ajout d'une source |
+| `regimes/micro.yaml` | Règles d'obligations du moteur d'échéances | à l'ajout d'un régime |
 
 ---
 
-## 11. How to add a feature
+## 11. LLM contre déterministe
 
-### A. New diagnostic question (Branch B)
+### Ce que le LLM fait
 
-1. Add field to `DiagnosticProfile` in `schemas/orchestrator.py`  
-2. Mirror type in `frontend/src/lib/api.ts` if the UI needs it  
-3. Extend `guidance/questions.py` (`FIELD_PRIORITY` / fallbacks / completeness)  
-4. Teach `guidance/understand.py` how to extract it (quick reply + regex + scoped LLM)  
-5. If it affects the roadmap, map it in `to_roadmap_profil()` and update `roadmap/` / `seuils.yaml` as needed  
-6. Add/adjust tests in `backend/tests/test_guidance_*.py`
+- Formuler les questions de l'intake, comprendre les réponses en texte libre (extraction JSON)
+- Conduire la conversation de guidance et rédiger le court accompagnement de la feuille de route
+- Rédiger une réponse fiscale **sur des extraits cités** (pédagogue) ou produit (Pinecone)
+- Lire une pièce déposée : OCR, langue, extraction de champs, synthèse, catégorie de dépense
+- Qualifier une nouveauté de veille en critères structurés — **une seule fois**, au moment de la
+  collecte
+- Rédiger l'appréciation narrative d'un rapport et les e-mails de prise de contact
+- Interpréter un scénario décrit en langage naturel
 
-### B. New intake profile field (Branch A)
+### Ce qui doit rester déterministe
 
-1. Add field on `UserProfile`  
-2. Register in intake `FIELD_PRIORITY` / questions fallbacks  
-3. Extraction in `intake/understand.py` or `tools/extract_answer.py`  
-4. If it affects tax/compliance, update `classify_tax.py` / `check_compliance.py`  
-5. Update frontend Chatbot consumers only if you display the field
+- **Tous les montants** (`agents/impots`)
+- Les transitions de phase de l'orchestrateur
+- Les recherches en registre et les règles d'incohérence
+- Les outils de classification fiscale et de conformité
+- L'**ordre des questions** de guidance et le « le profil est-il complet ? »
+- `build_roadmap()` et toute décision de plafond ou de parcours
+- La distribution de la veille aux utilisateurs
+- L'applicabilité d'une obligation et le calcul de son échéance
 
-### C. New API endpoint
+### Toujours prévoir un repli
 
-1. Add Pydantic request/response in `schemas/`  
-2. Implement in `api/` router  
-3. Keep business logic in `agents/` or `services/` (not in the router)  
-4. Document in this README’s API table
+Questions statiques, regex, tables de réponses rapides, valeurs par défaut déterministes. Un
+quota épuisé ne doit pas casser une démonstration : la feuille de route doit se construire même
+si le texte d'accompagnement échoue.
 
-### D. New UI screen
-
-1. Add `frontend/src/routes/<name>.tsx` (file-based routing)  
-2. Call `src/lib/api.ts` — avoid duplicating fiscal logic in the browser  
-3. If nested under an existing route (like `diagnostic/resultat`), ensure the parent renders `<Outlet />`
-
-### E. Changing legal thresholds
-
-Edit `data/seuils.yaml` at the repo root (and tests). Prefer YAML over hardcoding in Python or prompts.
+**Le LLM n'invente jamais** un seuil, une liste d'étapes, un numéro de case, ou une conclusion
+juridique qui contredirait le moteur.
 
 ---
 
-## 12. Tests
+## 12. Frontend
 
-From **repo root** with venv active:
+**Pile :** TanStack Start / Router · React 19 · Tailwind 4 · Vite · shadcn/ui (Radix) ·
+Recharts · Leaflet · TanStack Query · Sonner.
+
+### Routes — `src/routes/` (routage par fichiers)
+
+| Fichier | Écran |
+|---|---|
+| `index.tsx` | Landing publique + chatbot produit |
+| `auth.tsx` | Inscription / connexion |
+| `premium.tsx` | Comparaison des formules |
+| `onboarding.index.tsx` | Portail « ai-je un SIREN ? » |
+| `onboarding.verification.tsx` | Branche A : vérification + dépôts |
+| `onboarding.profil.tsx` | Branche A : chatbot de profil |
+| `onboarding.diagnostic.tsx` | Branche B : chat (+ `<Outlet />` pour le résultat) |
+| `onboarding.diagnostic.resultat.tsx` | Feuille de route |
+| `education.tsx` | Assistant fiscal (public) |
+| `dashboard.tsx` | Ma situation |
+| `rapport.tsx` | Génération du rapport fiscal |
+| `capture.tsx` | Versements (dépôt de pièces) |
+| `activite.tsx` | Facturation |
+| `declaration.tsx` | Déclarations |
+| `simulateur.tsx` | Scénarios |
+| `historique.tsx` | Flux unifié des pièces |
+| `referral.tsx` | Expert-comptable |
+| `parametres.tsx` | Compte et préférences |
+
+### Composants notables — `src/components/lm/`
+
+| Composant | Rôle |
+|---|---|
+| `AppShell.tsx` | Rail de navigation, thème, encart de formule, Centre d'Actions |
+| `AccessGate.tsx` · `PremiumLock.tsx` | Verrouillage d'un écran selon `lockReason()` |
+| `GuidanceChat.tsx` · `StatusCard.tsx` · `ConversationHistory.tsx` · `SuggestionChips.tsx` | Branche B |
+| `Chatbot.tsx` | Chat partagé de l'orchestrateur (branche A) |
+| `FiscalAssistant.tsx` · `Sources.tsx` · `Markdown.tsx` | Assistant fiscal et rendu des sources |
+| `FactureCycleVie.tsx` | Cycle de vie complet d'une facture |
+| `DocumentInspector.tsx` · `DocumentChatDrawer.tsx` | Fiche et discussion d'une pièce capturée |
+| `GiftCadeauDrop.tsx` · `CadeauDeclaration.tsx` | Parcours cadeau en deux temps |
+| `RapportFiscal.tsx` · `Declarations.tsx` | Panneaux métier du rapport et des déclarations |
+| `ScenarioSaisie.tsx` · `ScenariosAnalyse.tsx` · `ScenariosCharts.tsx` · `ScenarioRecommandations.tsx` | Écran Scénarios |
+| `Transactions*.tsx` | Flux unifié, filtres, résumés, anomalies |
+| `CentreActions.tsx` | Agenda fiscal + veille, en panneau latéral |
+| `CabinetsMap*.tsx` | Carte des cabinets (Leaflet, chargée à la demande) |
+| `FiscalVisualisations.tsx` · `charts.tsx` · `FiscalReceipt.tsx` | Visualisations du tableau de bord |
+
+### Clients et logique d'affichage — `src/lib/`
+
+| Fichier | Rôle |
+|---|---|
+| `api.ts` | Client HTTP principal, types miroirs, helpers de session |
+| `auth.ts` · `anon.ts` | Jeton, compte en cache, identité anonyme |
+| `entitlements.ts` | **Droits d'accès, en un seul endroit** — les écrans consomment `lockReason()` |
+| `plan.ts` | Formule Free / Premium (démo côté client, par compte) |
+| `guidance-api.ts` · `facturation-api.ts` · `declarations-api.ts` · `rapport-fiscal-api.ts` · `echeancier-api.ts` · `veille-api.ts` · `product-assistant-api.ts` | Un client par domaine |
+| `finance.ts` · `transactions.ts` · `scenarios*.ts` · `recommandations.ts` | Agrégations d'**affichage** uniquement — aucune règle fiscale |
+| `theme.ts` · `voice.ts` · `error-capture.ts` · `reprise.ts` | Thème, dictée, remontée d'erreur, reprise de parcours |
+
+> `useEntitlements()` partage **un seul** appel `/api/auth/me` via TanStack Query. Sans cette
+> déduplication, une session de test avait produit 286 appels sur 448 requêtes — 64 % du trafic.
+
+### Stockage navigateur
+
+| Clé | Contenu |
+|---|---|
+| `ledgermind_access_token` · `ledgermind_user` | Jeton JWT et compte en cache |
+| `ledgermind_session_id` | Session d'orchestrateur courante |
+| `ledgermind_diagnostic_result` | Cache de la page de résultat (sessionStorage) |
+| `ledgermind_scenarios_brouillon` | Brouillon de scénarios |
+| `lm.anon_id` | Identité anonyme (en-tête `X-Anon-Id`) |
+| `lm.plan.<uid>` | Formule du compte (démo) |
+| `lm.theme` | Thème clair / sombre |
+
+---
+
+## 13. Tests
+
+Depuis la **racine du dépôt**, venv actif :
 
 ```bash
-pytest backend/tests -q
+pytest backend/tests -q                        # 741 tests
+pytest backend/tests/test_impots_moteur.py -q   # un domaine
+pytest backend/tests -q -k declarations         # par mot-clé
 ```
 
-| File | What it covers |
-|------|----------------|
-| `backend/tests/test_guidance_branch_b.py` | Guidance agent + orchestrator branch B |
-| `backend/tests/test_guidance_roadmap.py` | Deterministic roadmap paths |
-| `backend/tests/test_tax_compliance.py` | Tax / OCR classify helpers |
+`pytest.ini` fixe `pythonpath = backend` et `asyncio_mode = auto`. MongoDB est substitué par
+`mongomock` ; les appels LLM sont remplacés par des doublures (`app/agents/capture/tests/fakes.py`
+et les fixtures locales). **Aucun test n'a besoin d'une clé d'API valide** — mais `config.py`
+exige `GEMINI_API_KEY` dans `backend/.env` pour s'initialiser.
 
-When changing understand/roadmap behavior, add a focused unit test — Gemini may be unavailable or rate-limited in CI/local.
+Les domaines les plus couverts :
+
+| Fichiers | Ce qu'ils protègent |
+|---|---|
+| `test_declarations.py` (55) | Les quatre interdits de l'agent déclaratif ; l'exemple chiffré de la spécification est reproduit **au centime** |
+| `test_facture_cycle_vie.py` (47) | Brouillon → émise → avoir → réglée, séquence de numérotation, suppressions tracées |
+| `test_impots_moteur.py` (35) | Abattements, barème, décote, versement libératoire, plafonds, prorata, ACRE |
+| `test_rapport_fiscal_*.py` (134 au total) | Rapprochement, cas limites, conformité au moteur, sources, PDF |
+| `test_guidance_*.py` (71) | Conversation, feuille de route, schéma d'API, synchronisation du contexte |
+| `test_capture_*.py` (83) | Documents, contrats, corrections, manuscrit, devises, hors périmètre |
+| `test_cadeau.py` + `test_cadeaux_revenus.py` (39) | Cadeaux en nature : valeur confirmée, entrée dans l'assiette, cadeau non valorisé signalé |
+| `test_veille_*.py` (49) | Personnalisation, notifications non renotifiées, écarts d'échéancier |
+| `test_simulation.py` (28) | Scénarios : rien d'incalculable n'est présenté comme un zéro |
+
+Quand vous changez un comportement d'extraction ou de feuille de route, **ajoutez un test
+ciblé** : le LLM peut être indisponible ou limité en quota, en local comme en CI.
 
 ---
 
-## 13. Integrations & external services
+## 14. Ajouter une fonctionnalité
 
-| Service | Used for | Code |
-|---------|----------|------|
-| [recherche-entreprises](https://recherche-entreprises.api.gouv.fr/) (api.gouv.fr) | Company identity / SIRENE aggregate | `services/recherche.py`, `insee_sirene.py`, `inpi_rne.py` |
-| Gemini | NL understanding / phrasing | `llm/gemini.py` |
-| MongoDB | Session persistence | `core/session_store.py` |
-| PyMuPDF + RapidOCR (+ Tesseract fallback) | PDF/image OCR | `services/ocr_*.py` |
+### A. Une nouvelle question de diagnostic (branche B)
 
-Official sites referenced in UX copy (not always API-called): avis de situation SIRENE (INSEE), greffe / RCS, Guichet unique INPI.
+1. Ajouter le champ à `DiagnosticProfile` dans `schemas/orchestrator.py`
+2. Refléter le type dans `frontend/src/lib/api.ts` si l'interface en a besoin
+3. Étendre `guidance/questions.py` (priorité des champs, replis, complétude)
+4. Apprendre l'extraction à `guidance/understand.py` (réponse rapide + regex + LLM limité au champ)
+5. Si cela change la feuille de route : mapper dans `to_roadmap_profil()`, puis ajuster `roadmap/`
+   et `data/seuils.yaml`
+6. Ajouter ou ajuster les tests dans `backend/tests/test_guidance_*.py`
+
+### B. Un nouveau champ de profil intake (branche A)
+
+1. Ajouter le champ sur `UserProfile`
+2. L'enregistrer dans la priorité et les replis de `intake/questions.py`
+3. Écrire l'extraction dans `intake/understand.py` ou `tools/extract_answer.py`
+4. Si cela touche la fiscalité ou la conformité : `classify_tax.py` / `check_compliance.py`
+5. Mettre à jour le frontend seulement si le champ est affiché
+
+### C. Un nouveau calcul fiscal
+
+**Toujours dans `agents/impots`**, jamais ailleurs.
+
+1. La valeur réglementaire va dans `data/*.yaml`, avec `source` et `date_verif`
+2. La lecture passe par `impots/constantes.py` (qui lève si la valeur manque)
+3. La formule va dans `impots/moteur.py`, en pleine précision
+4. Si un agent doit l'appeler, exposer une fonction pure dans `impots/tools.py`
+5. Test dans `test_impots_moteur.py`, plus un test de non-régression côté agent appelant
+
+### D. Un nouvel endpoint
+
+1. Requête / réponse Pydantic dans `schemas/` (ou local au routeur si strictement interne)
+2. Le routeur dans `api/` — **aucune logique métier**
+3. La logique dans `agents/` ou `services/`
+4. Documenter dans le tableau d'API de ce README
+
+### E. Un nouvel écran
+
+1. `frontend/src/routes/<nom>.tsx` (routage par fichiers)
+2. Envelopper dans `<AccessGate feature="…">` et déclarer la `Feature` dans
+   `lib/entitlements.ts` — ne pas recombiner les règles d'accès dans l'écran
+3. Passer par un client de `src/lib/` ; **ne jamais dupliquer une règle fiscale dans le
+   navigateur**
+4. Route enfant ? Le parent doit rendre `<Outlet />`
+
+### F. Un nouveau régime pour l'agenda fiscal
+
+Ajouter `data/regimes/<regime>.yaml` avec ses obligations sourcées. Le moteur ne connaît aucun
+régime en dur : **aucun code à modifier**.
+
+### G. Changer un seuil légal
+
+Éditer `data/*.yaml` (et les tests qui s'y adossent). Jamais dans du Python, jamais dans un
+prompt. Si la valeur n'a pas été recoupée avec la source officielle, la marquer
+`verifie: false` — le code s'en sert pour avertir l'utilisateur.
+
+---
+
+## 15. Conventions et pièges
+
+1. **L'orchestrateur est la source de vérité** pour les transitions de phase — ne pas inventer de
+   machine à états parallèle dans le frontend.
+2. **Un champ par réponse en guidance** : `understand.py` limite la mise à jour au `target_field`,
+   pour que le LLM ne remplisse pas tout le profil à partir d'une seule phrase.
+3. **La feuille de route est déterministe** : le texte d'accompagnement peut échouer (quota), la
+   feuille de route doit se construire quand même.
+4. **Les routes enfants ont besoin de `<Outlet />`** — en particulier
+   `onboarding.diagnostic` → `…/resultat`.
+5. **CORS** : `FRONTEND_ORIGIN` doit correspondre à l'origine du navigateur. `localhost` et
+   `127.0.0.1` sont deux origines différentes (`main.py` les reflète, mais mieux vaut le savoir).
+6. **Ne jamais committer de secrets** : `.env` reste local, seul `.env.example` est partagé.
+7. **Une correction de pièce doit mettre à jour les miroirs de racine**, sinon l'index de
+   déduplication travaille sur des valeurs périmées et un vrai doublon passe.
+8. **Une suppression doit nettoyer `agent_context`** : sans cela, une pièce effacée continue
+   d'apparaître dans le fil d'activité.
+9. **`invoices` ≠ `factures_emises`** — reçues contre émises. C'est l'erreur la plus facile à
+   commettre.
+10. **`/api/declaration` ≠ `/api/declarations`** — CA facturé contre CA encaissé, un document
+    contre cinq.
+11. **Petites PR** : agent, API et interface dans des commits distincts. Voir
+    [CONTRIBUTING.md](CONTRIBUTING.md) et [.github/CODEOWNERS](.github/CODEOWNERS) — la relecture
+    du propriétaire d'un dossier est demandée automatiquement.
+
+---
+
+## 16. Intégrations externes
+
+| Service | Sert à | Code |
+|---|---|---|
+| [recherche-entreprises](https://recherche-entreprises.api.gouv.fr/) (api.gouv.fr) | Identité d'entreprise / agrégat SIRENE | `services/recherche.py`, `insee_sirene.py`, `inpi_rne.py` |
+| **Mistral** | LLM + embeddings (guidance, pédagogue, veille, capture, produit) | `llm/mistral.py`, `agents/capture/app/mistral_client.py` |
+| **Gemini** | LLM de l'intake + OCR de document de registre | `llm/gemini.py` |
+| **MongoDB** | Toute la persistance + checkpoints LangGraph | `core/mongo.py` |
+| **Pinecone** | Corpus du chatbot produit | `product_rag/pinecone_store.py` |
+| **MCP** — Légifrance/PISTE, BOFiP, INSEE, docs officiels, sources web | Alimentation et contrôle du corpus, veille | `mcp/client.py`, `mcp_servers/` |
+| PyMuPDF + RapidOCR (+ Tesseract en repli) | OCR de PDF et d'images | `services/ocr_*.py` |
+| OpenStreetMap / Overpass + géocodage | Cabinets d'expertise comptable | `agents/referral/tools/` |
+| BCE (+ source élargie) | Taux de change, mis en cache | `agents/capture/app/fx.py` |
+| `fpdf2` / `pypdf` | PDF produits et assemblage du dossier déclaratif | `*/pdf.py` |
+
+Sites officiels cités dans les textes d'interface, sans appel API : avis de situation SIRENE
+(INSEE), greffe / RCS, Guichet unique INPI, annuaire de l'Ordre des experts-comptables.
 
 ---
 
@@ -753,47 +1346,54 @@ what is inside them, and signs a real image to read its manifest back.
 
 ## 14. Conventions & pitfalls
 
-1. **Orchestrator is the source of truth** for phase transitions — don’t invent parallel session machines in the frontend.  
-2. **One field per answer on guidance** — `understand.py` scopes updates to `target_field` so the LLM cannot fill the whole profile from one sentence.  
-3. **Roadmap is deterministic** — accompaniment text can fail (quota); the feuille de route must still build.  
-4. **Child routes need `<Outlet />`** — especially `onboarding.diagnostic` → `…/resultat`.  
-5. **CORS** — `FRONTEND_ORIGIN` must match the browser origin (`http://localhost:3000` vs `http://127.0.0.1:3000` are different).  
-6. **Don’t commit secrets** — `.env` stays local; only `.env.example` is shared.  
-7. **Prefer small PRs** — agent logic, API, and UI in focused commits help teammates review.  
-8. **Auth is Mongo + JWT** — register/login required for orchestrator start; agent context lives on the user document (`agent_context.intake` / `agent_context.guidance`).
+| Document | À lire quand |
+|---|---|
+| [DECLARATIONS-AGENT.md](DECLARATIONS-AGENT.md) | Vous touchez aux déclarations — les quatre interdits, les sources de l'assiette, la TVA du CA3, la détection des revenus UE, les valeurs à vérifier |
+| [RAPPORT-FISCAL-HYPOTHESES.md](RAPPORT-FISCAL-HYPOTHESES.md) | Vous touchez au rapport fiscal — hypothèses du rapprochement, avantages en nature, ce que l'agent refuse de faire |
+| [docs/ARCHITECTURE-BASE-DE-DONNEES.md](docs/ARCHITECTURE-BASE-DE-DONNEES.md) | Vous ajoutez une collection ou déboguez un index / un doublon |
+| [docs/FACTURATION-VALEURS-REGLEMENTAIRES.md](docs/FACTURATION-VALEURS-REGLEMENTAIRES.md) | Vous révisez `data/facturation.yaml` après une loi de finances |
+| [docs/veille-personnalisee.md](docs/veille-personnalisee.md) | Vous travaillez sur la veille — ce qui est garanti, ce qui ne l'est pas, points ouverts |
+| [docs/AGENT2-INSIGHTS.md](docs/AGENT2-INSIGHTS.md) | Conception de l'agent d'insights post-immatriculation |
+| `NOTE-CALCULS-FISCAUX.pdf` | Vous voulez la note de calcul, générée depuis le moteur |
+| `docs/Guide_LedgerMind_Rapport_Fiscal.pdf` | Guide utilisateur du rapport fiscal |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Avant votre première PR |
 
 ---
 
-## Quick start (cheat sheet)
+## 18. Aide-mémoire
 
 ```bash
-# Terminal 1 — Mongo must be running
+# Terminal 1 — MongoDB doit tourner
 cd backend
-# (venv activated, .env configured)
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000       # venv actif, .env renseigné
 
 # Terminal 2
 cd frontend
-npm run dev
-# → http://localhost:3000
+npm run dev                                      # → http://localhost:3000
 ```
 
 ```bash
-# Tests
+# Tests (depuis la racine)
 pytest backend/tests -q
+
+# Amorcer les corpus (une fois)
+python -m backend.scripts.seed_corpus
+python -m backend.scripts.index_product_knowledge
+
+# Inspecter la base
+mongosh ledgermind --eval "db.getCollectionNames()"
+python backend/app/agents/capture/check_db.py
 ```
 
----
-
-## Team contacts / ownership (fill in)
-
-| Area | Owner |
-|------|--------|
-| Branch A intake / verification | _TBD_ |
-| Branch B guidance / roadmap | _TBD_ |
-| Frontend onboarding UX | _TBD_ |
-| Infra (Mongo, deploy) | _TBD_ |
+| Sanity check | Où |
+|---|---|
+| Backend en vie | `GET /health` |
+| Endpoints disponibles | `/docs` |
+| Corpus fiscal indexé | `GET /api/guidance/corpus` |
+| Corpus produit indexé | `GET /api/product-assistant/status` |
+| Dernier cycle de veille | `GET /api/guidance/veille/last` |
 
 ---
 
-*Last aligned with the intake + guidance orchestrator architecture (agents under `backend/app/agents/{intake,guidance}`, HTTP under `backend/app/api/`).*
+*Aligné sur l'état du dépôt en août 2026 : 16 routeurs HTTP, 14 agents, 741 tests, deux
+fournisseurs LLM et deux corpus RAG.*

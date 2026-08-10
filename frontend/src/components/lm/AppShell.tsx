@@ -21,7 +21,7 @@ import { useEntitlements, type Feature, type LockReason } from "@/lib/entitlemen
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { CentreActionsButton } from "@/components/lm/CentreActions";
-import { Wordmark } from "@/components/lm/Logo";
+import { AnimatedWordmark } from "@/components/lm/Logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -243,7 +243,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Le wordmark ramène à l'accueil du site, comme partout ailleurs sur le web. Le
               raccourci vers l'espace de travail, lui, est l'entrée de navigation correspondante. */}
           <Link to="/" className="px-2" aria-label="LedgerMind, accueil">
-            <Wordmark />
+            <AnimatedWordmark />
           </Link>
 
           <nav className="mt-8 space-y-1" aria-label="Navigation principale">
@@ -266,7 +266,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Header mobile */}
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-3 backdrop-blur lg:hidden">
             <Link to="/" aria-label="LedgerMind, accueil">
-              <Wordmark />
+              <AnimatedWordmark />
             </Link>
             <div className="flex items-center gap-2">
               <Badge variant={state === "premium_complet" ? "accent" : "outline"}>
