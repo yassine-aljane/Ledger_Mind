@@ -25,7 +25,12 @@ from app.agents.facture.pdf import (
     _setup_font,
 )
 
+from app.core import ai_act
+
 from .schemas import RapportFiscal
+
+# Analyse, commentaires et mise en page produits intégralement par la machine.
+_NIVEAU_IA = "genere"
 
 # Rouge sobre pour les alertes critiques — le seul ajout à la palette produit.
 ALERTE_INK = (150, 42, 42)
@@ -473,6 +478,9 @@ def rapport_to_pdf(rapport: RapportFiscal) -> bytes:
         titre_section("Provenance des taux et barèmes")
         paragraphe(_texte_provenance(rapport.provenance))
 
+    # Transparence IA (art. 50) : mention dans la page + métadonnées dans le fichier.
+    ai_act.filigrane_pdf(pdf, texte, niveau=_NIVEAU_IA, police=font)
+    ai_act.marquer_pdf(pdf, niveau=_NIVEAU_IA)
     return bytes(pdf.output())
 
 

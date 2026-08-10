@@ -26,6 +26,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AiLabel } from "@/components/lm/AiLabel";
 import { cn } from "@/lib/utils";
 import {
   contextePrerempli,
@@ -384,6 +385,11 @@ export function RapportFiscalPanel({
             >
               <ArrowLeft className="size-4" /> Tous les rapports établis
             </button>
+
+            {/* Étiquette en tête du rapport, avant tout chiffre. Le PDF exporté par le
+                bouton ci-dessous porte le même marquage, mais écrit DANS le fichier :
+                celui-ci disparaîtrait au téléchargement. */}
+            <AiLabel detail />
 
             {/* Assiette */}
             <Carte className="space-y-4">

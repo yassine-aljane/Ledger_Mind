@@ -94,14 +94,13 @@ curl -s -X POST http://localhost:8000/answer \
 curl -s http://localhost:8000/invoices/u1
 ```
 
-## Démo & tests (aucun service externe)
+## Tests (aucun service externe)
 
-Les deux utilisent un **client Mistral simulé** + **mongomock** + checkpointer
+Ils utilisent un **client Mistral simulé** + **mongomock** + checkpointer
 en mémoire : ni clé API ni MongoDB ne sont nécessaires.
 
 ```bash
-python -m examples.run_demo     # imprime les 4 scénarios de bout en bout
-pytest -q                       # suite de tests
+pytest -q backend/tests          # depuis la racine du dépôt
 ```
 
 La suite couvre : chemin nominal + sauvegarde, **interruption champ manquant en
@@ -136,9 +135,9 @@ app/
   mistral_client.py # wrappers OCR + chat, sélection de modèle, retries
   prompts.py        # tous les prompts, en français, centralisés
   config.py         # chargement .env + constantes
-tests/              # fakes.py (doublures) + test_flow.py
-examples/           # run_demo.py
 ```
+
+Les tests de cet agent vivent dans `backend/tests/test_capture_*.py`.
 
 ## Notes de conception
 

@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     veille_enabled: bool = True
     veille_cron_hour: int = 6
 
+    # Transparence IA — article 50 du règlement (UE) 2024/1689.
+    # Chaîne de signature C2PA des contenus générés (marquage lisible par machine).
+    # Facultative : sans elle, la mention visible, les métadonnées de document et les
+    # en-têtes HTTP restent posés ; seule la preuve de provenance signée manque.
+    # Génération : python backend/scripts/generer_cles_signature.py
+    c2pa_signer_key: str = ""
+    c2pa_signer_chain: str = ""
+    c2pa_signer_alg: str = "es256"
+
     # Auth (JWT) — change AUTH_SECRET in production (min 32 chars)
     auth_secret: str = "ledgermind-dev-secret-change-me-32b"
     auth_token_days: int = 14

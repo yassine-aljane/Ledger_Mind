@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Loader2, Send, ShieldCheck } from "lucide-react";
+import { AiChatNotice } from "@/components/lm/AiLabel";
 import { ConversationHistory } from "@/components/lm/ConversationHistory";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -396,6 +397,10 @@ export function GuidanceChat() {
       />
 
       <div className="min-w-0 flex flex-col h-[75vh] min-h-[520px]">
+        {/* Divulgation art. 50(1), hors du cadre défilant : à l'intérieur, elle remonterait
+            hors de vue dès les premiers échanges. */}
+        <AiChatNotice className="mb-3 shrink-0" />
+
         {/* Cadre de conversation à hauteur fixe : les anciens messages défilent ici, dans leur
             propre cadre, pendant que la saisie reste toujours visible en bas de l'écran — plutôt
             que de faire défiler toute la page à mesure que la discussion s'allonge. */}

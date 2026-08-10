@@ -6,6 +6,7 @@
 
 import { Library, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AiChatNotice } from "@/components/lm/AiLabel";
 import { ConversationHistory } from "@/components/lm/ConversationHistory";
 import { FiscalVisualisations } from "@/components/lm/FiscalVisualisations";
 import { Markdown } from "@/components/lm/Markdown";
@@ -216,6 +217,9 @@ export function FiscalAssistant() {
             </p>
           )}
         </div>
+
+        {/* Divulgation art. 50(1) — hors du cadre défilant, pour rester visible. */}
+        <AiChatNotice className="mx-4 mt-3 sm:mx-5" />
 
         <div className="chat-scroll relative flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-5">
           {empty && (

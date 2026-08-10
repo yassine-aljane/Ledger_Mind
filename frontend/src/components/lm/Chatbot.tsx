@@ -13,6 +13,8 @@ import {
   Volume2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { AiChatNotice } from "@/components/lm/AiLabel";
+import { DIVULGATION_CHAT_COURTE } from "@/lib/ai-act";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -94,6 +96,8 @@ export function Chatbot({
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognitionRef = useRef<RecognitionHandle | null>(null);
   const lastSpokenRef = useRef<string | null>(null);
+  /** La divulgation audible n'est énoncée qu'une fois par session de conversation. */
+  const divulgationVocaleFaiteRef = useRef(false);
   // Détecté après montage seulement (jamais pendant le rendu serveur) : évite un décalage
   // d'hydratation entre le HTML serveur (pas de `window`) et le premier rendu client.
   const [canVoiceMode, setCanVoiceMode] = useState(false);
@@ -157,17 +161,31 @@ export function Chatbot({
     lastSpokenRef.current = text;
     setSpeaking(true);
     setRevealedLength(0);
-    speak(
-      text,
-      () => {
-        setSpeaking(false);
-        setRevealedLength(null);
-        if (modeRef.current === "vocal") startListening();
-      },
-      (charIndex) => {
-        if (modeRef.current === "vocal") setRevealedLength(charIndex);
-      },
-    );
+
+    const lireQuestion = () =>
+      speak(
+        text,
+        () => {
+          setSpeaking(false);
+          setRevealedLength(null);
+          if (modeRef.current === "vocal") startListening();
+        },
+        (charIndex) => {
+          if (modeRef.current === "vocal") setRevealedLength(charIndex);
+        },
+      );
+
+    // Divulgation audible avant la toute première phrase du mode vocal (art. 50(1)).
+    // L'étiquette à l'écran ne suffit pas ici : en usage vocal l'utilisateur peut ne pas
+    // regarder l'écran, et c'est précisément la situation où l'on peut croire parler à
+    // quelqu'un. Énoncée dans une utterance distincte, pour ne pas décaler les `charIndex`
+    // sur lesquels s'aligne la révélation progressive du texte.
+    if (!divulgationVocaleFaiteRef.current) {
+      divulgationVocaleFaiteRef.current = true;
+      speak(DIVULGATION_CHAT_COURTE, lireQuestion);
+      return;
+    }
+    lireQuestion();
   };
 
   useEffect(() => {
@@ -457,6 +475,11 @@ export function Chatbot({
           </div>
         )}
       </div>
+
+      {/* Divulgation art. 50(1) : au premier point de contact, avant le premier échange,
+          et maintenue ensuite — le mode vocal en particulier ne laisse rien d'autre pour
+          signaler qu'aucun humain n'est au bout du fil. */}
+      <AiChatNotice />
 
       {intro && turns.length === 0 && (
         <p className="text-pretty text-base text-muted-foreground">{intro}</p>

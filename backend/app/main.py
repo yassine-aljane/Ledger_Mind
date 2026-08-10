@@ -5,7 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.core import ai_act
 from app.api import (
+    ai_act as ai_act_api,
     auth,
     capture,
     declaration,
@@ -97,6 +99,7 @@ app.add_middleware(
     allow_credentials=True,
 )
 
+app.include_router(ai_act_api.router)
 app.include_router(auth.router)
 app.include_router(referral.router)
 app.include_router(capture.router)

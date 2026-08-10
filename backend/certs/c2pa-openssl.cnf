@@ -1,0 +1,47 @@
+# Profil de certificat pour la signature C2PA des contenus générés par LedgerMind.
+#
+# Contraintes imposées par la spécification C2PA (§ « X.509 Certificates ») et reprises
+# telles quelles par le validateur c2patool / c2pa-python :
+#
+#   * clé EC P-256 → algorithme de signature ES256 ;
+#   * feuille : basicConstraints CA:FALSE, keyUsage digitalSignature (critique),
+#     extendedKeyUsage emailProtection (1.3.6.1.5.5.7.3.4) — SANS l'EKU anyExtendedKeyUsage,
+#     que C2PA refuse explicitement sur une feuille ;
+#   * autorité : basicConstraints CA:TRUE critique, keyUsage keyCertSign + cRLSign.
+#
+# Un certificat auto-signé produit ici est VALIDE techniquement (la signature C2PA se vérifie,
+# le manifeste est lisible) mais n'est ancré dans aucune liste de confiance publique : les
+# plateformes afficheront « signature valide, émetteur inconnu ». Voir certs/README.md pour
+# le passage à un certificat émis par une AC reconnue.
+
+[ req ]
+default_md          = sha256
+prompt              = no
+distinguished_name  = dn_ca
+x509_extensions     = ext_ca
+
+# ---------------------------------------------------------------- Autorité interne
+[ dn_ca ]
+C                   = FR
+O                   = LedgerMind
+OU                  = LedgerMind Content Provenance
+CN                  = LedgerMind Content Authority
+
+[ ext_ca ]
+basicConstraints    = critical, CA:TRUE, pathlen:0
+keyUsage            = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+
+# ---------------------------------------------------------------- Feuille de signature
+[ dn_leaf ]
+C                   = FR
+O                   = LedgerMind
+OU                  = LedgerMind Content Provenance
+CN                  = LedgerMind AI Content Signer
+
+[ ext_leaf ]
+basicConstraints        = critical, CA:FALSE
+keyUsage                = critical, digitalSignature
+extendedKeyUsage        = critical, emailProtection
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always

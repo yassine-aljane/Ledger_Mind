@@ -34,6 +34,13 @@ lxml>=5.0.0
 mcp>=1.2.0
 apscheduler>=3.11.0
 
+# Transparence IA — article 50 du règlement (UE) 2024/1689.
+# Signature C2PA des contenus générés (marquage lisible par machine, art. 50(2)).
+# Facultative au sens strict : sans elle, la mention visible, les métadonnées de document
+# et les en-têtes HTTP restent posés — seule la preuve cryptographique de provenance manque,
+# et `app.core.ai_act.signer()` renvoie alors l'actif inchangé après l'avoir journalisé.
+c2pa-python>=0.7.0
+
 # Outillage
 pytest>=8.0.0
 pytest-asyncio>=0.24.0
