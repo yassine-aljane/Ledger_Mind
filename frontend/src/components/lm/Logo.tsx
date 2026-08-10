@@ -47,3 +47,53 @@ export function Wordmark({
     </span>
   );
 }
+
+/** Signature animée des en-têtes. Le cadre conserve sa largeur pour éviter tout décalage de la navigation. */
+export function AnimatedWordmark({
+  className,
+  onInk = false,
+  markClassName,
+}: {
+  className?: string;
+  onInk?: boolean;
+  markClassName?: string;
+}) {
+  return (
+    <span
+      role="img"
+      aria-label="LedgerMind"
+      className={cn(
+        "lm-animated-wordmark inline-flex w-[8.4rem]",
+        onInk && "lm-animated-wordmark--on-ink",
+        className,
+      )}
+    >
+      <span aria-hidden className="lm-auth-logo-intro">
+        <span className="lm-auth-logo-word font-display text-lg font-semibold tracking-tight">
+          {"LedgerMind".split("").map((letter, index) => (
+            <span
+              key={`${letter}-${index}`}
+              className={cn(
+                "lm-auth-logo-letter",
+                index === 0 && "lm-auth-logo-letter--l",
+                index > 0 && index < 9 && "lm-auth-logo-letter--middle",
+                index === 9 && "lm-auth-logo-letter--d",
+                index >= 6 && index < 9 && "text-accent",
+              )}
+            >
+              {index === 9 ? (
+                <>
+                  <span className="lm-auth-logo-d-lower text-accent">d</span>
+                  <span className="lm-auth-logo-d-upper">D</span>
+                </>
+              ) : (
+                letter
+              )}
+            </span>
+          ))}
+        </span>
+        <Mark className={cn("lm-auth-logo-final size-9", markClassName)} />
+      </span>
+    </span>
+  );
+}

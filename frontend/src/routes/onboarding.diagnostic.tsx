@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-r
 import { useState } from "react";
 import { AccessGate } from "@/components/lm/AccessGate";
 import { LogoutBubble } from "@/components/lm/AppShell";
-import { Wordmark } from "@/components/lm/Logo";
+import { AnimatedWordmark } from "@/components/lm/Logo";
 import { Button } from "@/components/ui/button";
 import { FiscalAssistant } from "@/components/lm/FiscalAssistant";
 import { GuidanceChat } from "@/components/lm/GuidanceChat";
@@ -69,7 +69,7 @@ function DiagnosticChat() {
     <div className="min-h-screen px-6 py-16 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-4">
         <Link to="/" aria-label="LedgerMind, accueil">
-          <Wordmark />
+          <AnimatedWordmark />
         </Link>
         <div className="flex items-center gap-2">
           <Link
