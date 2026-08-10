@@ -1,18 +1,27 @@
 /**
  * Déclaration d'un cadeau / avantage en nature reçu d'une marque (« gifting »).
  *
- * La photo passe au modèle de vision, qui extrait objet, marque et valeur.
- * L'utilisateur RELIT et confirme — il ne remplit pas à la main sauf correction.
+ * Human-in-the-loop assumé de bout en bout : la photo passe au modèle de vision, qui
+ * PROPOSE un objet et une valeur ; l'utilisateur relit, corrige, puis déclare. Rien
+ * n'est enregistré tant qu'il n'a pas validé, et le serveur refuse une déclaration
+ * qui ne porte pas sa confirmation.
+ *
+ * D'où deux partis pris d'interface :
+ *  - la suggestion s'affiche dans un encart distinct du formulaire, jamais comme un
+ *    champ déjà « bon » : le lecteur doit voir d'un coup d'œil ce qui vient de la
+ *    machine et ce qu'il a saisi lui-même ;
+ *  - le niveau de confiance est écrit en toutes lettres, pas seulement porté par une
+ *    couleur, et une confiance basse ne pré-remplit pas le montant.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
+  Camera,
   Check,
   CheckCircle2,
   Gift,
   Info,
   Loader2,
-  Pencil,
   TriangleAlert,
   X,
   XCircle,
@@ -24,6 +33,7 @@ import { cn } from "@/lib/utils";
 import {
   declarerCadeau,
   estimerCadeau,
+  formatMoney,
   type CaptureEstimationCadeau,
 } from "@/lib/api";
 
@@ -37,6 +47,18 @@ const CONFIANCE_LABEL: Record<string, string> = {
   faible: "confiance faible",
 };
 
+/**
+ * Montant pré-rempli dans le champ, quelle que soit la confiance.
+ *
+ * Le champ reste entièrement modifiable et l'encart d'avertissement demeure au-dessus :
+ * partir d'un chiffre à corriger fait gagner du temps sur la quasi-totalité des cas, là
+ * où un champ vide oblige à retaper une valeur que le modèle vient d'afficher.
+ *
+ * À défaut de valeur unique, on prend le MILIEU de la fourchette : c'est le seul point
+ * qu'on puisse en tirer sans privilégier arbitrairement le bas ou le haut. Le libellé
+ * sous le champ dit d'où vient le chiffre, pour qu'un milieu de fourchette large ne
+ * passe jamais pour un prix constaté.
+ */
 function valeurPreRemplie(est: CaptureEstimationCadeau): string {
   if (est.valeur_estimee != null) return String(Math.round(est.valeur_estimee));
   if (est.fourchette_min != null && est.fourchette_max != null) {
@@ -144,7 +166,6 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
   const [dateReception, setDateReception] = useState(todayIso());
   const [valeur, setValeur] = useState("");
   const [contrepartie, setContrepartie] = useState("");
-  const [corriger, setCorriger] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,7 +182,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
     setDateReception(todayIso());
     setValeur("");
     setContrepartie("");
-    setCorriger(false);
+    if (photoRef.current) photoRef.current.value = "";
   }
 
   async function handlePhoto(fichier: File | null) {
@@ -266,10 +287,15 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
           </p>
         </div>
 
-        <GiftCadeauDrop
-          onFiles={onGiftFiles}
-          variant="panel"
-          disabled={estimating || saving}
+      {/* Photo : point de départ facultatif. Sans elle, le formulaire reste saisissable. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          ref={photoRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
         />
 
         {(apercu || photo) && (
@@ -297,6 +323,7 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
             )}
           </div>
         )}
+      </div>
 
         {extraitPret && estimation && (
           <form onSubmit={handleSubmit} className="space-y-5 border-t border-border p-5">
@@ -319,18 +346,6 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
               </div>
               <p className="text-[0.9375rem] leading-relaxed text-foreground">{estimation.message}</p>
 
-              <div className="rounded-lg bg-card/70 px-3">
-                <LigneExtrait
-                  label="Description"
-                  valeur={description.trim() || "—"}
-                />
-                <LigneExtrait label="Marque" valeur={marque.trim() || "—"} />
-                <LigneExtrait
-                  label="Valeur TTC"
-                  valeur={valeurValide ? `${valeurNombre.toFixed(0)} €` : "—"}
-                />
-                <LigneExtrait label="Date" valeur={dateReception || "—"} />
-              </div>
 
               {estimation.fourchette_min != null && estimation.fourchette_max != null && (
                 <p className="num text-[0.8125rem] text-muted-foreground">

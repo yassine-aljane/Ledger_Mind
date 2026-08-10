@@ -691,6 +691,9 @@ def generer_declarations(
     # il doit être DIT. Sans cela, l'utilisateur croit l'outil cassé au lieu de comprendre que
     # son chiffre d'affaires se trouve sur une autre période.
     if ca_encaisse <= 0:
+        annuel = rappro.rapprocher(
+            factures, virements, date(debut.year, 1, 1), date(debut.year, 12, 31),
+        )
         if annuel.ca_encaisse > 0:
             periodes = sorted({
                 (e.date_valeur or "")[:7] for e in annuel.encaissements if e.date_valeur

@@ -399,7 +399,6 @@ function CapturePage() {
   }
 
   const unified = unifyDocs(invoices, virements, contrats, cadeaux);
-  const openDoc = unified.find((d) => d.document_id === openId);
   const analysing = queue.find((it) => it.status === "analyse");
   const done = queue.filter((it) => TERMINAL.includes(it.status)).length;
   const busy = queue.some((it) => !TERMINAL.includes(it.status));
