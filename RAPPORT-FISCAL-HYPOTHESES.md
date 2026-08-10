@@ -24,10 +24,34 @@ antérieures. Aucun des deux n'est une anomalie en soi, et aucun ne sert au calc
 | Source | Rôle | Entre dans l'assiette ? |
 |---|---|---|
 | Virements reçus, rapprochés | **l'assiette** | **oui**, une fois convertis en HT |
+| **Cadeaux reçus** (avantages en nature) | **l'assiette**, sans flux bancaire | **oui**, à leur valeur marchande retenue |
 | Factures émises | rapprochement + indicateur « facturé » | non |
 | Contrats capturés | revenu engagé, charge de travail | **jamais** — un contrat engage, il n'encaisse pas |
 | Dépenses capturées | mesure de marge réelle | **jamais** — l'abattement forfaitaire remplace la déduction des frais réels |
 | Profil d'onboarding | préremplit le contexte de calcul | non (c'est un paramètre, pas une recette) |
+
+### Les avantages en nature
+
+Un cadeau reçu **en contrepartie d'un service** n'est pas fiscalement un cadeau : c'est un
+partenariat rémunéré en produits, donc un **revenu en nature**, déclarable à sa valeur
+marchande. Il entre au livre des recettes comme un encaissement — alors qu'aucun euro n'a
+transité par le compte bancaire.
+
+Quatre règles, toutes tenues :
+
+- **Il ne passe PAS par le rapprochement bancaire** : il n'y a aucun virement à rapprocher.
+  L'y chercher le ferait disparaître de l'assiette.
+- **Il relève de la prestation, jamais de la vente.** Le créateur n'a rien vendu : il a reçu un
+  objet en paiement d'un service.
+- **Seule la valeur RETENUE compte** (`valeur_ttc`, saisie ou confirmée). Une estimation issue
+  d'une photo reste une suggestion — la déclarer d'office ferait porter à l'utilisateur une
+  erreur qui n'est pas la sienne.
+- **Un cadeau sans valeur retenue n'est jamais tu.** Il n'est pas compté, ce qui **minore** le
+  CA : une alerte **critique** le signale et invite à le valoriser.
+
+Le rapport distingue explicitement `ca_encaisse_bancaire` et `ca_avantages_en_nature` : la
+seconde part n'apparaît sur aucun relevé, et les confondre rendrait le rapprochement bancaire
+incompréhensible.
 
 Deux pièges volontairement évités :
 

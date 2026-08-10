@@ -155,6 +155,13 @@ export type JeuDeclarations = {
   /** Contrats en cours — contexte de cohérence, jamais une case de formulaire. */
   contrats_actifs: { document_id: string; type: string | null; titre: string | null;
                      contrepartie: string | null; montant_eur: number | null }[];
+  /** Avantages en nature compris dans les cases, absents de tout relevé bancaire. */
+  cadeaux_recus: { document_id: string; description: string | null; marque: string | null;
+                   date: string | null; valeur_eur: number; contrepartie: string | null }[];
+  total_cadeaux_eur: number;
+  cadeaux_a_valoriser: { document_id: string; description: string | null;
+                         marque: string | null; date: string | null;
+                         valeur_estimee: number | null }[];
   /** Écart avec un rapport fiscal portant exactement la même période. */
   recoupement_rapport: {
     rapport_id: string; genere_le: string; ca_du_rapport: number;

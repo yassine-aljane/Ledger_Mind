@@ -652,3 +652,207 @@ def test_une_periode_pleine_n_ajoute_aucune_explication_inutile():
 
     explication = " ".join(_generer().hypotheses)
     assert "Aucun encaissement" not in explication
+
+
+# ============================================================================
+# Formulaires officiels reproduits (`templates.py`)
+# ============================================================================
+#
+# Ce que ces tests protègent n'est pas la mise en page — elle bougera — mais les deux
+# promesses que la mise en page porte : le tableau de l'attestation URSSAF distingue les
+# mois clos des mois à venir, et aucun numéro attribué par l'administration n'est inventé.
+
+
+def _texte_pdf(donnees: bytes) -> str:
+    """Texte extrait du PDF. Sert à vérifier ce que le document DIT, pas à quoi il ressemble."""
+    import io
+
+    from pypdf import PdfReader
+
+    return "\n".join(page.extract_text() for page in PdfReader(io.BytesIO(donnees)).pages)
+
+
+def test_le_tableau_mensuel_distingue_un_mois_a_zero_d_un_mois_a_venir():
+    """« 0,00 € » et « - » ne disent pas la même chose.
+
+    Un mois clos sans recette se déclare bien à 0 €. Un mois non échu ne se déclare pas
+    encore : l'attestation officielle y porte « - ». Les confondre ferait croire à une
+    absence de recettes là où il n'y a qu'une absence de données.
+    """
+    from datetime import date as _date
+
+    from app.agents.rapport_fiscal.schemas import LigneEncaissement
+
+    encaissements = [
+        LigneEncaissement(
+            virement_document_id="v1", montant=1200.0, montant_ht=1200.0,
+            date_valeur="2026-03-12", methode="numero_facture", certain=True,
+            categorie="prestation",
+        )
+    ]
+    lignes = G._ventilation_mensuelle(
+        encaissements, 2026, ContexteDeclaratif(categorie_par_defaut="BNC"),
+        _date(2026, 8, 6),
+    )
+
+    assert len(lignes) == 12
+    mars, juin, aout = lignes[2], lignes[5], lignes[7]
+
+    assert mars.prestations_bnc == 1200.0
+    assert juin.prestations_bnc == 0.0, "juin est clos et sans recette : c'est un vrai zéro"
+    assert juin.periode_en_cours is False
+    assert aout.prestations_bnc is None, "le mois courant n'est pas échu"
+    assert aout.periode_en_cours is True
+
+
+def test_le_tableau_mensuel_ne_melange_pas_les_natures():
+    """Vente et prestation ont des taux distincts : l'attestation les sépare, nous aussi."""
+    from datetime import date as _date
+
+    from app.agents.rapport_fiscal.schemas import LigneEncaissement
+
+    commun = {"methode": "numero_facture", "certain": True, "date_valeur": "2026-02-10"}
+    encaissements = [
+        LigneEncaissement(virement_document_id="v1", montant=800.0, montant_ht=800.0,
+                          categorie="vente", **commun),
+        LigneEncaissement(virement_document_id="v2", montant=300.0, montant_ht=300.0,
+                          categorie="prestation", **commun),
+    ]
+    fevrier = G._ventilation_mensuelle(
+        encaissements, 2026, ContexteDeclaratif(categorie_par_defaut="BNC"),
+        _date(2026, 12, 31),
+    )[1]
+
+    assert fevrier.ventes == 800.0
+    assert fevrier.prestations_bnc == 300.0
+
+
+def test_le_tableau_mensuel_ignore_les_encaissements_d_une_autre_annee():
+    from datetime import date as _date
+
+    from app.agents.rapport_fiscal.schemas import LigneEncaissement
+
+    encaissements = [
+        LigneEncaissement(virement_document_id="v1", montant=500.0, montant_ht=500.0,
+                          date_valeur="2025-04-01", methode="numero_facture", certain=True,
+                          categorie="prestation"),
+    ]
+    # Vu depuis 2027, les douze mois de 2026 sont clos : chacun doit valoir 0 €, aucun ne
+    # doit hériter du montant de l'année précédente.
+    lignes = G._ventilation_mensuelle(
+        encaissements, 2026, ContexteDeclaratif(), _date(2027, 1, 5),
+    )
+
+    assert all(ligne.prestations_bnc == 0.0 for ligne in lignes)
+
+
+def test_le_jeu_porte_les_douze_mois_de_l_annee():
+    _facture("FA-2026-000001", 2400.0, emission="2026-08-01")
+    _virement("v1", 2400.0, "FA-2026-000001", date_iso="2026-08-04")
+
+    jeu = _generer()
+    assert [m.mois for m in jeu.ca_mensuel] == list(range(1, 13))
+    assert jeu.ca_mensuel[0].libelle == "Janvier"
+
+
+@pytest.mark.parametrize(
+    "type_declaration", ["ca_urssaf", "revenus_2042", "cfe", "des", "tva_ca3"],
+)
+def test_chaque_declaration_tient_sur_son_seul_formulaire(type_declaration):
+    """Une déclaration = une page = le formulaire officiel.
+
+    Pas de mise en page ajoutée par-dessus : elle obligerait l'expert-comptable à retrouver
+    chaque rubrique au lieu de la lire à sa place habituelle. Et pas de débordement sur une
+    deuxième page, qui passerait inaperçu à la relecture.
+    """
+    import io
+
+    from pypdf import PdfReader
+
+    _facture("FA-2026-000001", 2400.0)
+    _virement("v1", 2400.0, "FA-2026-000001")
+
+    jeu = _generer(ContexteDeclaratif(date_creation="2020-01-01", assujetti_tva=True))
+    brouillon = _brouillon(jeu, type_declaration)
+    donnees = brouillon_to_pdf(brouillon, jeu, {"denomination": "ACME", "siren": "123456789"})
+
+    assert donnees[:4] == b"%PDF"
+    assert len(PdfReader(io.BytesIO(donnees)).pages) == 1
+
+
+def test_le_dossier_complet_donne_une_page_par_declaration():
+    """Cinq obligations, cinq pages — le dossier remis au cabinet se feuillette."""
+    import io
+
+    from pypdf import PdfReader
+
+    _facture("FA-2026-000001", 2400.0)
+    _virement("v1", 2400.0, "FA-2026-000001")
+
+    jeu = _generer(ContexteDeclaratif(date_creation="2020-01-01"))
+    applicables = [b for b in jeu.brouillons if b.applicable]
+    dossier = PdfReader(io.BytesIO(jeu_to_pdf(jeu, {"denomination": "ACME"})))
+
+    assert len(dossier.pages) == len(applicables)
+
+
+def test_l_attestation_urssaf_reprend_les_quatre_colonnes_officielles():
+    _facture("FA-2026-000001", 2400.0)
+    _virement("v1", 2400.0, "FA-2026-000001")
+
+    jeu = _generer()
+    texte = _texte_pdf(brouillon_to_pdf(_brouillon(jeu, "ca_urssaf"), jeu, {}))
+
+    assert "ATTESTATION DE" in texte
+    for colonne in ("Prestations BNC", "Ventes", "Prestations BIC", "LMTC"):
+        assert colonne in texte
+
+
+def test_aucun_numero_delivre_par_l_administration_n_est_invente():
+    """Code de sécurité, n° de sécurité sociale, n° TI : l'Urssaf seule les attribue.
+
+    Un numéro plausible mais faux serait pire qu'une case vide, parce qu'on ne le relirait
+    pas. Le document doit donc porter une zone à compléter — et le dire.
+    """
+    _facture("FA-2026-000001", 2400.0)
+    _virement("v1", 2400.0, "FA-2026-000001")
+
+    jeu = _generer()
+    texte = _texte_pdf(brouillon_to_pdf(_brouillon(jeu, "ca_urssaf"), jeu, {}))
+
+    assert "à compléter" in texte
+    assert "CODE DE SÉCURITÉ" in texte
+    assert "ne porte donc aucun code" in texte
+
+
+def test_toute_reproduction_dit_qu_elle_n_a_pas_ete_transmise():
+    """La ressemblance avec l'imprimé officiel ne doit jamais faire croire à un dépôt."""
+    _facture("FA-2026-000001", 2400.0)
+    _virement("v1", 2400.0, "FA-2026-000001")
+
+    jeu = _generer(ContexteDeclaratif(date_creation="2020-01-01"))
+    for type_declaration in ("ca_urssaf", "revenus_2042", "cfe"):
+        texte = _texte_pdf(brouillon_to_pdf(_brouillon(jeu, type_declaration), jeu, {}))
+        assert "N'A PAS été transmis" in texte, type_declaration
+
+
+def test_la_reproduction_du_2042_porte_le_ca_brut_dans_sa_case():
+    _facture("FA-2026-000001", 2400.0)
+    _virement("v1", 2400.0, "FA-2026-000001")
+
+    jeu = _generer(ContexteDeclaratif(categorie_par_defaut="BNC"))
+    texte = _texte_pdf(brouillon_to_pdf(_brouillon(jeu, "revenus_2042"), jeu, {}))
+
+    assert "5HQ" in texte
+    assert "2400,00" in texte, "le montant reporté est le CA brut, jamais l'abattement"
+
+
+def test_une_declaration_non_applicable_n_ouvre_pas_sur_un_formulaire_vide():
+    """La CFE de première année est exonérée : reproduire l'imprimé n'apprendrait rien."""
+    jeu = _generer(ContexteDeclaratif(date_creation="2026-01-15"))
+    cfe = _brouillon(jeu, "cfe")
+
+    assert cfe.applicable is False
+    texte = _texte_pdf(brouillon_to_pdf(cfe, jeu, {}))
+    assert "COTISATION FONCIÈRE DES ENTREPRISES 2" not in texte
+    assert "Première année d'activité" in texte

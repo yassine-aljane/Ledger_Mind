@@ -21,6 +21,39 @@ INK = (26, 26, 31)
 MUTED = (107, 107, 117)
 BORDER = (232, 227, 217)
 
+_THEMES = {
+    "minimal": {
+        "primary": (42, 42, 46),
+        "primary_bg": (246, 246, 247),
+        "accent_ink": (42, 42, 46),
+        "accent_bg": (238, 238, 240),
+    },
+    "grid": {
+        "primary": (47, 95, 224),
+        "primary_bg": (239, 244, 255),
+        "accent_ink": (35, 71, 168),
+        "accent_bg": (224, 233, 255),
+    },
+    "azure": {
+        "primary": (0, 111, 185),
+        "primary_bg": (235, 247, 255),
+        "accent_ink": (0, 91, 153),
+        "accent_bg": (218, 240, 255),
+    },
+    "mint": {
+        "primary": (57, 176, 172),
+        "primary_bg": (235, 249, 247),
+        "accent_ink": (29, 114, 110),
+        "accent_bg": (205, 243, 224),
+    },
+    "lilac": {
+        "primary": (126, 65, 161),
+        "primary_bg": (248, 239, 252),
+        "accent_ink": (100, 42, 135),
+        "accent_bg": (237, 211, 247),
+    },
+}
+
 _DISCLAIMER = (
     "Document d'aide à la préparation, généré automatiquement. Vérifiez les mentions applicables "
     "à votre situation avant envoi ; en cas de doute, faites relire par votre expert-comptable."
@@ -71,6 +104,11 @@ def facture_to_pdf(facture: Facture) -> bytes:
     pdf.add_page()
     pdf.set_margins(16, 14, 16)
     font, unicode_ok = _setup_font(pdf)
+    theme = _THEMES.get(facture.template_id, _THEMES["minimal"])
+    primary = theme["primary"]
+    primary_bg = theme["primary_bg"]
+    accent_ink = theme["accent_ink"]
+    accent_bg = theme["accent_bg"]
 
     def texte(s: str) -> str:
         """Rend le texte tel quel avec une police Unicode ; transpose sinon.
@@ -89,14 +127,48 @@ def facture_to_pdf(facture: Facture) -> bytes:
         return _eur(n, unicode_ok)
 
     # --- En-tête : émetteur + numéro/date ---
-    pdf.set_fill_color(*NAVY)
-    pdf.rect(0, 0, 210, 32, style="F")
-    pdf.set_xy(16, 10)
-    pdf.set_text_color(253, 251, 246)
+    # Les cinq modèles gardent le même contenu fiscal, mais reprennent les codes visuels
+    # des références choisies : minimal, quadrillé, bleu, formes menthe ou bandeau lilas.
+    header_on_dark = facture.template_id in {"grid", "azure", "lilac"}
+    if header_on_dark:
+        pdf.set_fill_color(*primary)
+        pdf.rect(0, 0, 210, 32, style="F")
+    else:
+        pdf.set_fill_color(255, 255, 255)
+        pdf.rect(0, 0, 210, 32, style="F")
+
+    if facture.template_id == "grid":
+        pdf.set_draw_color(*primary_bg)
+        pdf.set_line_width(0.15)
+        for x in range(0, 211, 10):
+            pdf.line(x, 0, x, 32)
+        for y in range(0, 33, 8):
+            pdf.line(0, y, 210, y)
+    elif facture.template_id == "mint":
+        pdf.set_fill_color(*accent_bg)
+        pdf.ellipse(151, -17, 42, 42, style="F")
+        pdf.set_fill_color(*primary)
+        pdf.ellipse(177, -25, 48, 48, style="F")
+    elif facture.template_id == "minimal":
+        pdf.set_draw_color(*primary)
+        pdf.set_line_width(0.55)
+        pdf.line(16, 31, 194, 31)
+
+    # Logo vectoriel natif : il reste net à l'impression et ne dépend pas des aperçus.
+    pdf.set_fill_color(*(CREME if header_on_dark else primary))
+    pdf.rect(16, 7, 10, 10, style="F")
+    pdf.set_xy(18.4, 8)
+    pdf.set_text_color(*(primary if header_on_dark else CREME))
+    pdf.set_font(font, "B", 10)
+    pdf.cell(5, 7, texte("L"))
+    pdf.set_xy(29, 7.5)
+    header_text = CREME if header_on_dark else INK
+    pdf.set_text_color(*header_text)
+    pdf.set_font(font, "B", 12)
+    pdf.cell(60, 8, texte("LedgerMind"))
+    pdf.set_xy(118, 7)
     pdf.set_font(font, "B", 18)
-    pdf.cell(0, 8, texte("FACTURE"), ln=1)
-    pdf.set_x(16)
-    pdf.set_font(font, "", 11)
+    pdf.cell(76, 8, texte("FACTURE"), align="R")
     # Un brouillon n'a ni numéro ni date d'émission : il se rend quand même, en le disant.
     if facture.numero and facture.date_emission:
         entete = (f"N° {facture.numero}  —  émise le "
@@ -105,7 +177,10 @@ def facture_to_pdf(facture: Facture) -> bytes:
         entete = "BROUILLON — sans valeur légale, non numéroté"
     if facture.facture_origine_numero:
         entete += f"  —  annule la facture {facture.facture_origine_numero}"
-    pdf.cell(0, 6, texte(entete), ln=1)
+    pdf.set_xy(70, 19)
+    pdf.set_font(font, "", 9)
+    pdf.set_text_color(*header_text)
+    pdf.cell(124, 6, texte(entete), align="R")
 
     pdf.set_text_color(*INK)
     pdf.set_xy(16, 40)
@@ -179,7 +254,7 @@ def facture_to_pdf(facture: Facture) -> bytes:
     # Somme = 166mm, sous les 178mm utiles — marge de sécurité contre les arrondis fpdf2.
     largeurs = (58, 14, 26, 18, 18, 32)
     entetes = ("Désignation", "Qté", "PU HT", "Remise", "TVA", "Total HT")
-    pdf.set_fill_color(*NAVY)
+    pdf.set_fill_color(*primary)
     pdf.set_text_color(253, 251, 246)
     pdf.set_font(font, "B", 9)
     for w, h in zip(largeurs, entetes):
@@ -195,7 +270,7 @@ def facture_to_pdf(facture: Facture) -> bytes:
         ht = round(ligne.quantite * ligne.prix_unitaire_ht * (1 - remise / 100), 2)
         fill = (i % 2 == 1)
         if fill:
-            pdf.set_fill_color(*NAVY_BG)
+            pdf.set_fill_color(*primary_bg)
         y_row = pdf.get_y()
         pdf.multi_cell(largeurs[0], 6, texte(ligne.designation), fill=fill)
         y_after = pdf.get_y()
@@ -231,8 +306,8 @@ def facture_to_pdf(facture: Facture) -> bytes:
         pdf.cell(sum(largeurs[1:5]), 6, texte(libelle))
         pdf.cell(largeurs[5], 6, texte(f"- {eur(facture.acompte.montant_ttc)}"), ln=1)
 
-    pdf.set_fill_color(*BUTTER_BG)
-    pdf.set_text_color(*BUTTER_INK)
+    pdf.set_fill_color(*accent_bg)
+    pdf.set_text_color(*accent_ink)
     pdf.set_font(font, "B", 11)
     pdf.set_x(16 + largeurs[0])
     intitule = "Net à payer" if facture.acompte else "Total TTC à payer"

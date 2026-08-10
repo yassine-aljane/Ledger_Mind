@@ -102,6 +102,68 @@ def depenses_capturees(uid: str, debut: date, fin: date) -> List[DepenseCapturee
     return lignes
 
 
+def cadeaux_recus(uid: str, debut: date, fin: date) -> List[Dict[str, Any]]:
+    """Cadeaux et avantages en nature reçus sur la période — du CHIFFRE D'AFFAIRES.
+
+    Fiscalement, ce n'est pas un cadeau : un partenariat rémunéré en produits est un revenu
+    en nature, déclarable à sa valeur marchande. Il entre au livre des recettes comme un
+    encaissement, alors même qu'aucun euro n'a transité par le compte bancaire.
+
+    Seule la valeur RETENUE (`valeur_ttc`, saisie ou confirmée par l'utilisateur) compte.
+    Une estimation issue d'une photo reste une suggestion : la déclarer d'office ferait
+    porter à l'utilisateur une erreur qui n'est pas la sienne.
+    """
+    lignes: List[Dict[str, Any]] = []
+    for doc in get_db()["cadeaux"].find({"user_id": uid}, {"_id": 0}):
+        c = doc.get("cadeau") or {}
+        d = _date(c.get("date_reception"))
+        if d is None or not (debut <= d <= fin):
+            continue
+        # `valeur_eur` d'abord : un cadeau valorisé en devise doit être comparable.
+        valeur = c.get("valeur_eur") if c.get("valeur_eur") is not None else c.get("valeur_ttc")
+        if valeur is None or float(valeur) <= 0:
+            continue
+        lignes.append({
+            "document_id": doc.get("document_id", ""),
+            "description": c.get("description") or c.get("objet_identifie"),
+            "marque": c.get("marque"),
+            "date": c.get("date_reception"),
+            "valeur_eur": round(float(valeur), 2),
+            "contrepartie": c.get("contrepartie"),
+            "valeur_corrigee": c.get("valeur_corrigee"),
+            "source_estimation": c.get("source_estimation"),
+        })
+    return sorted(lignes, key=lambda l: l["date"] or "")
+
+
+def cadeaux_sans_valeur(uid: str, debut: date, fin: date) -> List[Dict[str, Any]]:
+    """Cadeaux déclarés sans valeur retenue — ils ne peuvent PAS entrer dans le CA.
+
+    Les taire les ferait disparaître du chiffre d'affaires sans que rien ne le signale, ce
+    qui minorerait la déclaration. On les recense pour que l'utilisateur les valorise.
+    """
+    manquants: List[Dict[str, Any]] = []
+    for doc in get_db()["cadeaux"].find({"user_id": uid}, {"_id": 0}):
+        c = doc.get("cadeau") or {}
+        d = _date(c.get("date_reception"))
+        if d is None or not (debut <= d <= fin):
+            continue
+        valeur = c.get("valeur_eur") if c.get("valeur_eur") is not None else c.get("valeur_ttc")
+        if valeur is None or float(valeur) <= 0:
+            manquants.append({
+                "document_id": doc.get("document_id", ""),
+                "description": c.get("description") or c.get("objet_identifie"),
+                "marque": c.get("marque"),
+                "date": c.get("date_reception"),
+                "valeur_estimee": c.get("valeur_estimee"),
+            })
+    return manquants
+
+
+def total_cadeaux(lignes: Iterable[Dict[str, Any]]) -> float:
+    return round(sum(float(l.get("valeur_eur") or 0) for l in lignes), 2)
+
+
 def total_eur(lignes: Iterable[Any]) -> float:
     return round(sum(float(getattr(l, "montant_eur", 0) or 0) for l in lignes), 2)
 

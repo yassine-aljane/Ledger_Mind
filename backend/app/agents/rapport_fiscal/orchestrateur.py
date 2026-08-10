@@ -26,6 +26,7 @@ from . import sources
 from . import tva as tva_flag
 from .schemas import (
     Alerte,
+    CadeauRecu,
     ContexteFiscalRapport,
     DemandeRapport,
     RapportFiscal,
@@ -339,6 +340,29 @@ def _alertes_pieces(pieces: SourcesRapport) -> List[Alerte]:
             ),
         ))
 
+    if pieces.cadeaux:
+        alertes.append(Alerte(
+            niveau="vigilance",
+            titre=f"{_eur(pieces.total_cadeaux_eur)} d'avantages en nature comptés dans le CA",
+            message=(
+                f"{len(pieces.cadeaux)} cadeau(x) reçu(s) en contrepartie d'un service. "
+                "Fiscalement ce ne sont pas des cadeaux : un partenariat rémunéré en produits "
+                "est un revenu en nature, déclarable à sa valeur marchande. Ces montants "
+                "n'apparaissent sur AUCUN relevé bancaire — vérifiez chaque valeur retenue."
+            ),
+        ))
+
+    if pieces.cadeaux_a_valoriser:
+        alertes.append(Alerte(
+            niveau="critique",
+            titre=f"{len(pieces.cadeaux_a_valoriser)} cadeau(x) sans valeur retenue",
+            message=(
+                "Ces avantages en nature ne sont PAS comptés faute de valeur marchande, ce qui "
+                "minore votre chiffre d'affaires déclaré. Renseignez leur valeur dans vos "
+                "justificatifs avant de déclarer."
+            ),
+        ))
+
     if pieces.depenses:
         alertes.append(Alerte(
             niveau="info",
@@ -401,12 +425,22 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
 
     ca_encaisse_numeraire = resultat_rappro.ca_encaisse
     ca_retenu = round(ca_encaisse_numeraire + recettes_nature, 2)
-    base = (
-        "CA ENCAISSÉ, en numéraire ET en nature : les virements reçus, rapprochés d'une "
-        "facture et datés de la période, PLUS les avantages en nature déclarés sur la même "
-        "période (un produit reçu en contrepartie d'une prestation est une recette). Une "
-        "facture non payée ne compte pas — elle comptera lors de son encaissement."
-    )
+    # La base de calcul décrit CE QUI a été compté, pas ce qui aurait pu l'être : annoncer
+    # des avantages en nature quand il n'y en a aucun ferait chercher un montant absent.
+    if recettes_nature > 0:
+        base = (
+            "CA ENCAISSÉ, en numéraire ET en nature : les virements reçus, rapprochés d'une "
+            "facture et datés de la période, PLUS les avantages en nature déclarés sur la "
+            "même période (un produit reçu en contrepartie d'une prestation est une "
+            "recette). Une facture non payée ne compte pas — elle comptera lors de son "
+            "encaissement."
+        )
+    else:
+        base = (
+            "CA ENCAISSÉ : les virements reçus, rapprochés d'une facture et datés de la "
+            "période. Une facture non payée ne compte pas — elle comptera lors de son "
+            "encaissement."
+        )
 
     # -- Pièces de contexte : elles éclairent, elles n'entrent pas dans l'assiette --------
     contrats = sources.contrats_en_cours(uid, debut, fin)
@@ -415,18 +449,39 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
     # commerciaux mélangerait deux natures de revenu qui ne se déclarent pas au même endroit.
     salariat = sources.contrats_de_salariat(contrats)
     commerciaux = [c for c in contrats if c not in salariat]
+
+    # Le détail affiché des avantages en nature est celui que `cadeaux_fiscaux` a retenu, et
+    # rien d'autre : une seule lecture des cadeaux, donc un seul total. Recompter la
+    # collection par un autre chemin ferait afficher un montant qui contredirait l'assiette.
+    cadeaux_comptes = [
+        CadeauRecu(
+            document_id=c.document_id,
+            description=c.description,
+            marque=c.marque,
+            date=c.date_reception,
+            valeur_eur=c.valeur_eur or 0.0,
+            contrepartie=c.contrepartie,
+        )
+        for c in collecte_cadeaux.retenus
+    ]
+    # Déclarés mais sans valeur retenue : comptés nulle part, jamais tus pour autant.
+    a_valoriser = sources.cadeaux_sans_valeur(uid, debut, fin)
+
     pieces = SourcesRapport(
         factures_emises=len(factures),
         virements_analyses=len(tous_virements),
         contrats_en_cours=len(contrats),
         depenses_capturees=len(depenses),
+        cadeaux_recus=collecte_cadeaux.nb_retenus,
         profil_onboarding=profil is not None,
         contrats=contrats,
         depenses=depenses,
+        cadeaux=cadeaux_comptes,
+        cadeaux_a_valoriser=a_valoriser,
         total_depenses_eur=sources.total_eur(depenses),
+        total_cadeaux_eur=recettes_nature,
         revenu_contractuel_engage_eur=sources.total_eur(commerciaux),
         cadeaux_declares=collecte_cadeaux.nb_retenus,
-        cadeaux=collecte_cadeaux.retenus,
         recettes_en_nature_eur=recettes_nature,
         cadeaux_ecartes=collecte_cadeaux.non_convertis + collecte_cadeaux.sans_date,
     )
@@ -508,6 +563,8 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
         date_fin=demande.date_fin,
         genere_le=datetime.now(timezone.utc).isoformat(),
         ca_retenu=ca_retenu,
+        ca_encaisse_bancaire=ca_encaisse_numeraire,
+        ca_avantages_en_nature=recettes_nature,
         base_de_calcul=base,
         ca_encaisse_numeraire=ca_encaisse_numeraire,
         recettes_en_nature=recettes_nature,
