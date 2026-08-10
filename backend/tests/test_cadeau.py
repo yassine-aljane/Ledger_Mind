@@ -20,6 +20,7 @@ from datetime import date
 import mongomock
 import pytest
 
+from app.agents import cadeaux_fiscaux
 from app.agents.capture.app.cadeau import _nombre, estimer_cadeau
 from app.agents.capture.app.mistral_client import MistralError
 from app.agents.facture import store as facture_store
@@ -36,7 +37,8 @@ def mongo(monkeypatch):
     monkeypatch.setattr(facture_store, "get_db", lambda: db)
     monkeypatch.setattr(rapport_store, "get_db", lambda: db)
     monkeypatch.setattr(conversation_store, "get_db", lambda: db)
-    yield
+    monkeypatch.setattr(cadeaux_fiscaux, "get_db", lambda: db)
+    yield db
 
 
 class FauxClient:
@@ -262,8 +264,17 @@ def test_qa_selectionne_le_bloc_par_type_et_non_par_or():
 
 # ---------------------------------------------------------------------- Consolidation
 
-def _cadeau(valeur_eur: float, recu: str) -> dict:
-    return {
+def _declarer_cadeau(db, valeur_eur: float, recu: str | None, indice: int = 0) -> None:
+    """Écrit un cadeau tel que l'API le persiste — pas un double de la lecture.
+
+    Ces tests passaient auparavant par un stub de `cadeaux_periode`, ce qui laissait la
+    conversion en euros et le rattachement à la période hors de leur portée. On écrit
+    maintenant en base, et c'est le vrai chemin de lecture qui est exercé.
+    """
+    db["cadeaux"].insert_one({
+        "user_id": UID,
+        "document_id": f"doc-cadeau-{indice}",
+        "document_type": "cadeau",
         "cadeau": {
             "description": "Bracelet",
             "marque": "Youhave",
@@ -271,22 +282,13 @@ def _cadeau(valeur_eur: float, recu: str) -> dict:
             "valeur_ttc": valeur_eur,
             "devise": "EUR",
             "valeur_eur": valeur_eur,
-        }
-    }
+        },
+    })
 
 
-def _brancher_cadeaux(monkeypatch, docs: list[dict]):
-    monkeypatch.setattr(
-        consolidation, "cadeaux_periode",
-        lambda uid, debut, fin: [
-            d["cadeau"] for d in docs
-            if debut.isoformat() <= d["cadeau"]["date_reception"] <= fin.isoformat()
-        ],
-    )
-
-
-def test_cadeaux_declares_alimentent_les_avantages_en_nature(monkeypatch):
-    _brancher_cadeaux(monkeypatch, [_cadeau(800, "2026-03-02"), _cadeau(150, "2026-03-20")])
+def test_cadeaux_declares_alimentent_les_avantages_en_nature(mongo):
+    _declarer_cadeau(mongo, 800, "2026-03-02", 1)
+    _declarer_cadeau(mongo, 150, "2026-03-20", 2)
 
     brut = consolidation.consolider(UID, date(2026, 1, 1), date(2026, 12, 31))
 
@@ -295,8 +297,8 @@ def test_cadeaux_declares_alimentent_les_avantages_en_nature(monkeypatch):
     assert brut["source_avantages"] == "cadeaux déclarés"
 
 
-def test_cadeau_hors_periode_est_ignore(monkeypatch):
-    _brancher_cadeaux(monkeypatch, [_cadeau(800, "2025-11-02")])
+def test_cadeau_hors_periode_est_ignore(mongo):
+    _declarer_cadeau(mongo, 800, "2025-11-02")
 
     brut = consolidation.consolider(UID, date(2026, 1, 1), date(2026, 12, 31))
 
@@ -304,13 +306,13 @@ def test_cadeau_hors_periode_est_ignore(monkeypatch):
     assert not brut["avantages_nature"]
 
 
-def test_avantages_en_nature_entrent_dans_la_base_des_seuils(monkeypatch):
+def test_avantages_en_nature_entrent_dans_la_base_des_seuils(mongo):
     """Un cadeau est une recette : il compte face au plafond, comme un encaissement.
 
     L'omettre sous-estimerait la position de l'utilisateur — le genre d'erreur qui ne
     se voit qu'au moment où le plafond est franchi sans prévenir.
     """
-    _brancher_cadeaux(monkeypatch, [_cadeau(1000, "2026-03-02")])
+    _declarer_cadeau(mongo, 1000, "2026-03-02")
 
     brut = consolidation.consolider(UID, date(2026, 1, 1), date(2026, 12, 31))
     assert brut["recettes_totales"] == brut["total_ht"] + 1000
@@ -321,9 +323,8 @@ def test_avantages_en_nature_entrent_dans_la_base_des_seuils(monkeypatch):
     assert analyse["cotisations_estimees"] > sans_cadeau["cotisations_estimees"]
 
 
-def test_repli_sur_le_profil_quand_aucun_cadeau_declare(monkeypatch):
+def test_repli_sur_le_profil_quand_aucun_cadeau_declare(mongo):
     """Les dossiers antérieurs à la déclaration pièce par pièce gardent leur valeur."""
-    _brancher_cadeaux(monkeypatch, [])
     conversation_store.patch_profil(UID, {"remuneration_nature": 150})
 
     brut = consolidation.consolider(UID, date(2026, 1, 1), date(2026, 12, 31))
@@ -332,12 +333,22 @@ def test_repli_sur_le_profil_quand_aucun_cadeau_declare(monkeypatch):
     assert brut["source_avantages"] == "profil déclaré"
 
 
-def test_cadeaux_declares_priment_sur_lestimation_du_profil(monkeypatch):
+def test_cadeaux_declares_priment_sur_lestimation_du_profil(mongo):
     """Des pièces datées et confirmées valent mieux qu'une estimation globale."""
-    _brancher_cadeaux(monkeypatch, [_cadeau(800, "2026-03-02")])
+    _declarer_cadeau(mongo, 800, "2026-03-02")
     conversation_store.patch_profil(UID, {"remuneration_nature": 150})
 
     brut = consolidation.consolider(UID, date(2026, 1, 1), date(2026, 12, 31))
 
     assert brut["avantages_nature"] == 800
     assert brut["source_avantages"] == "cadeaux déclarés"
+
+
+def test_un_cadeau_sans_date_est_signale_au_lieu_d_etre_perdu(mongo):
+    """Sans date il n'entre dans aucun exercice — mais l'utilisateur doit l'apprendre."""
+    _declarer_cadeau(mongo, 800, None)
+
+    brut = consolidation.consolider(UID, date(2026, 1, 1), date(2026, 12, 31))
+
+    assert brut["nb_cadeaux"] == 0
+    assert [e["motif"] for e in brut["cadeaux_ecartes"]] == ["date de réception manquante"]

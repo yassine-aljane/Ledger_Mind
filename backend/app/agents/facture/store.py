@@ -115,14 +115,40 @@ def enregistrer(facture: Facture) -> None:
     )
 
 
+def _normaliser(document: dict | None) -> dict | None:
+    """Complète les champs de règlement absents des documents antérieurs à leur ajout.
+
+    Les routes de lecture renvoient le document Mongo TEL QUEL, sans le repasser par le
+    modèle `Facture` — un document écrit avant l'apparition de `net_a_payer` et de
+    `montant_regle` sort donc sans ces clés, alors que le contrat d'API les annonce
+    obligatoires. Côté client, `f.net_a_payer.toFixed(2)` casse alors tout l'écran de
+    facturation, et pas seulement la ligne fautive.
+
+    Les valeurs de repli ne sont pas des inventions : sans acompte enregistré, le net à
+    payer EST le total TTC, et une facture sans règlement constaté a bien 0 € réglé.
+    """
+    if document is None:
+        return None
+    if document.get("net_a_payer") is None:
+        acompte = document.get("acompte") or {}
+        document["net_a_payer"] = round(
+            float(document.get("total_ttc") or 0.0)
+            - float(acompte.get("montant_ttc") or 0.0),
+            2,
+        )
+    if document.get("montant_regle") is None:
+        document["montant_regle"] = 0.0
+    return document
+
+
 def obtenir(uid: str, facture_id: str) -> dict | None:
     _ensure_schema()
-    return _factures().find_one({"uid": uid, "id": facture_id}, {"_id": 0})
+    return _normaliser(_factures().find_one({"uid": uid, "id": facture_id}, {"_id": 0}))
 
 
 def obtenir_par_numero(uid: str, numero: str) -> dict | None:
     _ensure_schema()
-    return _factures().find_one({"uid": uid, "numero": numero}, {"_id": 0})
+    return _normaliser(_factures().find_one({"uid": uid, "numero": numero}, {"_id": 0}))
 
 
 def supprimer_brouillon(uid: str, facture_id: str) -> bool:
@@ -217,7 +243,10 @@ def lister(
         if jusqua:
             borne["$lte"] = jusqua
         requete["date_emission"] = borne
-    return list(_factures().find(requete, {"_id": 0}).sort("numero", ASCENDING))
+    return [
+        _normaliser(d)
+        for d in _factures().find(requete, {"_id": 0}).sort("numero", ASCENDING)
+    ]
 
 
 # Statuts portant une existence fiscale : ce que l'agent de rapprochement doit compter.
