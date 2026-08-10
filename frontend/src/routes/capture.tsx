@@ -399,6 +399,9 @@ function CapturePage() {
   }
 
   const unified = unifyDocs(invoices, virements, contrats, cadeaux);
+  // Le document ouvert se relit depuis la liste : garder une copie à part se désynchroniserait
+  // du rechargement qui suit une analyse ou une suppression.
+  const openDoc = openId ? unified.find((d) => d.document_id === openId) : undefined;
   const analysing = queue.find((it) => it.status === "analyse");
   const done = queue.filter((it) => TERMINAL.includes(it.status)).length;
   const busy = queue.some((it) => !TERMINAL.includes(it.status));

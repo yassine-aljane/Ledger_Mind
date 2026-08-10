@@ -22,6 +22,7 @@ from typing import Any, Dict, List
 import mongomock
 import pytest
 
+from app.agents import cadeaux_fiscaux
 from app.agents.declarations import generateur as D
 from app.agents.declarations import sources as pieces_decl
 from app.agents.declarations.schemas import ContexteDeclaratif, DemandeDeclarations
@@ -38,7 +39,9 @@ def base(monkeypatch):
     client = mongomock.MongoClient()
     db = client["testdb"]
     _FACTURES.clear()
-    for module in (O, sources, pieces_decl):
+    # `cadeaux_fiscaux` lit les cadeaux pour son propre compte : sans ce lien, il tomberait
+    # sur la vraie base et lirait « aucun avantage en nature » au lieu d'échouer.
+    for module in (O, sources, pieces_decl, cadeaux_fiscaux):
         monkeypatch.setattr(module, "get_db", lambda: db)
     monkeypatch.setattr(O, "_factures_avec_existence_fiscale", lambda uid: _FACTURES)
     monkeypatch.setattr(D.facture_store, "lister_emises", lambda uid: _FACTURES)
