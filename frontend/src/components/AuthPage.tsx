@@ -1,5 +1,12 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  Calculator,
+  Globe2,
+  KeyRound,
+  Loader2,
+  ShieldCheck,
+} from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   fetchMe,
@@ -11,9 +18,8 @@ import {
 } from "@/lib/auth";
 import { accessState, isParcoursDone, landingPathFor } from "@/lib/entitlements";
 import { consumePremiumPending, getPlan } from "@/lib/plan";
-import { Wordmark } from "@/components/lm/Logo";
+import { AnimatedWordmark, Mark } from "@/components/lm/Logo";
 import { cn } from "@/lib/utils";
-import authVisual from "@/assets/auth-visual.png";
 
 type Mode = "login" | "signup";
 
@@ -22,6 +28,7 @@ export function AuthPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formFocused, setFormFocused] = useState(false);
 
   useEffect(() => {
     if (!isAuthed()) return;
@@ -86,54 +93,142 @@ export function AuthPage() {
   const isLogin = mode === "login";
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="relative flex h-64 shrink-0 flex-col justify-between overflow-hidden px-8 py-8 md:h-auto md:min-h-screen md:w-[48%] md:px-12 md:py-12">
-        <img
-          src={authVisual}
-          alt="Créatrice indépendante travaillant sur ses documents entre deux ordinateurs"
-          className="absolute inset-0 size-full object-cover object-center"
+    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(430px,0.85fr)]">
+      <aside
+        className="relative min-h-[320px] overflow-hidden text-ink-foreground lg:min-h-screen"
+        style={{
+          background:
+            "radial-gradient(circle at 22% 16%, color-mix(in oklab, var(--accent) 18%, transparent), transparent 32%), linear-gradient(145deg, color-mix(in oklab, var(--primary) 84%, white), color-mix(in oklab, var(--ink) 82%, var(--teal-light)))",
+        }}
+      >
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-15"
+          style={{
+            backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
+            backgroundSize: "25px 25px",
+          }}
         />
         <div
           aria-hidden
-          className="absolute inset-0 bg-linear-to-b from-black/50 via-black/5 to-black/45"
+          className="lm-auth-glow absolute -left-24 -top-24 size-72 rounded-full bg-accent/25 blur-3xl"
         />
+        <div
+          aria-hidden
+          className="lm-auth-glow lm-auth-glow--late absolute -bottom-32 -right-20 size-80 rounded-full bg-teal/25 blur-3xl"
+        />
+        <div className="relative z-10 flex min-h-[320px] flex-col px-6 py-6 sm:px-10 sm:py-8 lg:min-h-screen lg:px-14 lg:py-10 xl:px-20">
+          <Link
+            to="/"
+            className="lm-auth-logo-link w-fit rounded-full border border-white/12 bg-white/6 px-3 py-2 backdrop-blur-sm transition-colors hover:bg-white/10"
+            aria-label="LedgerMind, accueil"
+          >
+            <AnimatedWordmark onInk className="w-auto" />
+          </Link>
 
-        <Link to="/" className="relative w-fit shrink-0" aria-label="LedgerMind, accueil">
-          <Wordmark onInk />
-        </Link>
+          <div className="my-auto flex flex-col items-center py-8 text-center">
+            <div
+              className={cn(
+                "lm-auth-orbit-stage relative size-44 sm:size-56 lg:size-64",
+                formFocused && "lm-auth-orbit-stage--active",
+              )}
+              role="img"
+              aria-label="Globe LedgerMind avec une clé et une calculatrice en orbite"
+            >
+              <div aria-hidden className="lm-auth-orbit-track lm-auth-orbit-track--key">
+                <span className="lm-auth-orbit-ring" />
+                <span className="lm-auth-orbit-node">
+                  <span className="lm-auth-orbit-icon">
+                    <KeyRound className="size-5 text-accent" />
+                  </span>
+                </span>
+              </div>
 
-        <p className="rule-label relative text-white/65">© 2026 LedgerMind</p>
-      </aside>
+              <div aria-hidden className="lm-auth-orbit-track lm-auth-orbit-track--calculator">
+                <span className="lm-auth-orbit-ring" />
+                <span className="lm-auth-orbit-node">
+                  <span className="lm-auth-orbit-icon">
+                    <Calculator className="size-5 text-white/90" />
+                  </span>
+                </span>
+              </div>
 
-      <main className="flex flex-1 items-center justify-center px-6 py-10 md:py-16">
-        <section className="animate-rise w-full max-w-md">
-          <div className="mb-8 flex items-center justify-between">
-            <p className="rule-label text-accent-ink">
-              {isLogin ? "Connexion" : "Nouveau compte"}
+              <div
+                className={cn(
+                  "relative z-10 grid size-full place-items-center overflow-hidden rounded-full border border-white/25 bg-white/10 shadow-[inset_-24px_-24px_50px_rgba(0,0,0,0.22),0_25px_70px_rgba(0,0,0,0.30)] backdrop-blur-xl transition-all duration-500",
+                  formFocused &&
+                    "scale-105 border-accent/70 bg-white/15 shadow-[0_0_48px_color-mix(in_oklab,var(--accent)_30%,transparent)]",
+                )}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_34%_26%,color-mix(in_oklab,var(--accent)_28%,transparent),transparent_48%)]" />
+                <Globe2
+                  className="lm-auth-globe-lines absolute size-[88%] text-accent/30"
+                  strokeWidth={0.85}
+                />
+                <div className="relative z-10 grid size-28 place-items-center rounded-[2.25rem] border border-white/20 bg-ink/75 shadow-[0_16px_40px_rgba(0,0,0,0.30)] backdrop-blur-md sm:size-36 lg:size-40">
+                  <Mark className="size-[5.5rem] sm:size-28 lg:size-32" />
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.24em] text-accent">
+              LedgerMind
             </p>
-            <span className="rule-label text-muted-foreground">
-              {isLogin ? "01 / 02" : "02 / 02"}
-            </span>
+            <h1 className="mt-2 max-w-lg font-display text-3xl font-semibold leading-tight text-white sm:text-4xl xl:text-5xl">
+              Create more,
+              <span className="block font-normal italic text-accent">Stress less.</span>
+            </h1>
           </div>
 
-          <h2 className="text-balance text-3xl md:text-4xl">
-            {isLogin ? (
-              <>
-                Ravi de vous <span className="font-normal italic">revoir.</span>
-              </>
-            ) : (
-              <>
-                Rejoignez <span className="font-normal italic">LedgerMind.</span>
-              </>
-            )}
-          </h2>
-          <p className="mt-3 text-pretty text-sm text-muted-foreground">
-            {isLogin
-              ? "Saisissez vos identifiants pour accéder à votre espace."
-              : "Créez votre compte pour commencer à automatiser vos obligations."}
+          <p className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+            © 2026 LedgerMind
           </p>
+        </div>
+      </aside>
 
-          <div className="relative mt-8 grid grid-cols-2 rounded-full border border-border bg-card p-1 text-xs font-medium">
+      <main
+        className="relative flex min-h-screen items-stretch overflow-hidden px-5 py-10 sm:px-8 lg:px-10 lg:py-14"
+        style={{
+          background:
+            "linear-gradient(145deg, color-mix(in oklab, var(--card) 82%, white), color-mix(in oklab, var(--parchment) 88%, var(--accent)))",
+        }}
+      >
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage: "radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0)",
+            backgroundSize: "28px 28px",
+          }}
+        />
+        <div
+          aria-hidden
+          className="absolute -right-24 top-1/4 size-72 rounded-full bg-accent/10 blur-3xl"
+        />
+
+        <section className="animate-rise relative z-10 flex w-full flex-col justify-center px-1 sm:px-6 lg:px-[8%] xl:px-[12%]">
+          <div
+            aria-hidden
+            className="absolute bottom-[12%] left-0 top-[12%] hidden w-px bg-gradient-to-b from-transparent via-accent/55 to-transparent lg:block"
+          />
+          <div key={mode} className="animate-rise flex items-start gap-4">
+            <Mark className="mt-0.5 size-11 shrink-0" />
+            <div>
+              <p className="rule-label text-accent-ink">
+                {isLogin ? "Connexion" : "Inscription"}
+              </p>
+              <h2 className="mt-2 text-balance text-3xl md:text-4xl">
+                {isLogin ? "Bon retour." : "Créez votre espace."}
+              </h2>
+              <p className="mt-2 text-pretty text-sm leading-relaxed text-muted-foreground">
+                {isLogin
+                  ? "Connectez-vous et continuez là où vous vous êtes arrêté."
+                  : "Quelques secondes suffisent pour commencer avec LedgerMind."}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative mt-8 grid grid-cols-2 rounded-full border border-border bg-secondary/60 p-1 text-xs font-medium">
             <div
               className={cn(
                 "absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-primary transition-transform duration-300 ease-out",
@@ -168,7 +263,14 @@ export function AuthPage() {
             </button>
           </div>
 
-          <form onSubmit={(e) => void handleSubmit(e)} className="mt-8 space-y-5">
+          <form
+            onSubmit={(e) => void handleSubmit(e)}
+            onFocusCapture={() => setFormFocused(true)}
+            onBlurCapture={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFormFocused(false);
+            }}
+            className="mt-8 space-y-5"
+          >
             {!isLogin && (
               <Field
                 label="Nom complet"
@@ -210,7 +312,7 @@ export function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-medium text-primary-foreground shadow-soft transition-all duration-200 hover:bg-primary/90 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
+              className="group mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 text-sm font-semibold text-accent-foreground shadow-soft transition-all duration-200 hover:brightness-[1.04] hover:shadow-lift active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
             >
               {loading ? (
                 <>
@@ -219,30 +321,19 @@ export function AuthPage() {
                 </>
               ) : (
                 <>
-                  {isLogin ? "Se connecter" : "Créer mon compte"}
-                  <ArrowRight className="size-3.5" />
+                  {isLogin ? "Accéder à mon espace" : "Créer mon espace"}
+                  <ArrowRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-1" />
                 </>
               )}
             </button>
+
+            <p className="flex items-center justify-center gap-1.5 pt-1 text-[11px] text-muted-foreground">
+              <ShieldCheck className="size-3.5 text-success-ink" />
+              Connexion protégée
+            </p>
           </form>
 
-          <div className="my-8 flex items-center gap-4">
-            <div className="dotted-divider flex-1" />
-            <span className="rule-label text-muted-foreground">ou</span>
-            <div className="dotted-divider flex-1" />
-          </div>
-
-          <button
-            type="button"
-            disabled
-            title="Bientôt disponible"
-            className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-border bg-card py-2.5 text-sm font-medium opacity-50"
-          >
-            <GoogleIcon />
-            Continuer avec Google (bientôt)
-          </button>
-
-          <p className="mt-10 text-center text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
             En continuant, vous acceptez nos{" "}
             <a href="#" className="underline underline-offset-2 transition-colors hover:text-foreground">
               Conditions
@@ -278,19 +369,8 @@ function Field({
       <input
         {...rest}
         name={name}
-        className="w-full border-b border-border bg-transparent py-2.5 text-sm text-foreground transition-colors duration-200 placeholder:text-muted-foreground/60 focus:border-ink focus:outline-none"
+        className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition-all duration-200 placeholder:text-muted-foreground/55 focus:border-primary/55 focus:outline-none focus:ring-4 focus:ring-primary/8"
       />
     </label>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden>
-      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.1 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.9 6.1C12.4 13.4 17.7 9.5 24 9.5z" />
-      <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.4z" />
-      <path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.7 0 20.2 0 24s1 7.3 2.6 10.7l7.9-6.1z" />
-      <path fill="#34A853" d="M24 48c6.1 0 11.2-2 15-5.5l-7.6-5.9c-2.1 1.4-4.8 2.3-7.4 2.3-6.3 0-11.6-3.9-13.5-9.4l-7.9 6.1C6.5 42.6 14.6 48 24 48z" />
-    </svg>
   );
 }

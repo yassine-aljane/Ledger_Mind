@@ -586,6 +586,10 @@
   animation: lm-marquee 38s linear infinite;
 }
 
+.lm-sources-marquee:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
 @keyframes lm-caret {
   0%,
   45% {
@@ -599,6 +603,192 @@
 
 @utility animate-caret {
   animation: lm-caret 1s step-end infinite;
+}
+
+/* Landing — progression de la démarche sécurité ISO/IEC 27001:2022. */
+@keyframes lm-iso-fill {
+  from {
+    clip-path: inset(80% 0 0 0);
+  }
+  to {
+    clip-path: inset(74% 0 0 0);
+  }
+}
+
+@keyframes lm-iso-water-rise {
+  from {
+    top: 80%;
+    opacity: 0.65;
+  }
+  to {
+    top: 74%;
+    opacity: 1;
+  }
+}
+
+@keyframes lm-iso-water-drop {
+  0% {
+    top: 5%;
+    opacity: 0;
+    transform: translateX(-50%) scale(0.55);
+  }
+  12% {
+    opacity: 0.95;
+  }
+  82% {
+    top: 69%;
+    opacity: 0.95;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    top: 73%;
+    opacity: 0;
+    transform: translateX(-50%) scaleX(2.4) scaleY(0.25);
+  }
+}
+
+@keyframes lm-iso-water-ripple {
+  0%,
+  76% {
+    opacity: 0;
+    transform: translateX(-50%) scaleX(0.12) scaleY(0.32);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scaleX(1.95) scaleY(1.2);
+  }
+}
+
+@keyframes lm-iso-water-wave {
+  0%,
+  100% {
+    transform: translateY(0) scaleX(0.94);
+  }
+  50% {
+    transform: translateY(2px) scaleX(1);
+  }
+}
+
+.lm-iso-validation {
+  justify-self: center;
+  width: min(100%, 20rem);
+  border: 1px solid color-mix(in oklab, white 12%, transparent);
+  border-radius: 2rem;
+  background: color-mix(in oklab, white 6%, transparent);
+  padding: 1.5rem;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.24);
+  backdrop-filter: blur(14px);
+}
+
+.lm-iso-seal-stack {
+  position: relative;
+  width: min(100%, 16rem);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  filter: drop-shadow(0 18px 24px rgb(0 0 0 / 0.22));
+}
+
+.lm-iso-seal-color {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(100% 0 0 0);
+}
+
+.lm-iso-validation--active .lm-iso-seal-color {
+  animation: lm-iso-fill 8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.lm-iso-water-drops {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.lm-iso-validation--active .lm-iso-water-drops {
+  opacity: 1;
+}
+
+.lm-iso-water-drop {
+  position: absolute;
+  left: 50%;
+  top: 5%;
+  width: 12px;
+  height: 21px;
+  border-radius: 55% 55% 62% 62% / 42% 42% 75% 75%;
+  background: linear-gradient(180deg, #bae6fd 0%, #38bdf8 45%, #2563eb 100%);
+  box-shadow:
+    inset 1px 1px 2px rgb(255 255 255 / 0.7),
+    0 0 8px rgb(56 189 248 / 0.55);
+  opacity: 0;
+}
+
+.lm-iso-validation--active .lm-iso-water-drop {
+  animation: lm-iso-water-drop 2.6s cubic-bezier(0.3, 0, 0.7, 1) infinite;
+}
+
+.lm-iso-water-ripple {
+  position: absolute;
+  left: 50%;
+  top: 72.5%;
+  z-index: 2;
+  width: 5.5rem;
+  height: 1rem;
+  border: 3px solid #7dd3fc;
+  border-radius: 50%;
+  box-shadow:
+    0 0 8px rgb(56 189 248 / 0.95),
+    inset 0 0 7px rgb(186 230 253 / 0.65);
+  opacity: 0;
+}
+
+.lm-iso-validation--active .lm-iso-water-ripple {
+  animation: lm-iso-water-ripple 2.6s ease-out infinite;
+}
+
+.lm-iso-water-ripple--late {
+  top: 73.2%;
+  width: 4.2rem;
+  height: 0.7rem;
+  border-width: 2px;
+}
+
+.lm-iso-validation--active .lm-iso-water-ripple--late {
+  animation-delay: 0.14s;
+}
+
+.lm-iso-water-surface {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 100%;
+  height: 8px;
+  border-top: 3px solid #38bdf8;
+  border-radius: 50%;
+  background: transparent;
+  filter: drop-shadow(0 1px 3px rgb(56 189 248 / 0.55));
+  opacity: 0;
+}
+
+.lm-iso-validation--active .lm-iso-water-surface {
+  animation:
+    lm-iso-water-rise 8s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    lm-iso-water-wave 1.4s linear infinite;
+}
+
+.lm-iso-water-surface::after {
+  position: absolute;
+  left: 29%;
+  top: -6px;
+  width: 42%;
+  height: 7px;
+  border-top: 2px solid rgb(186 230 253 / 0.9);
+  border-radius: 50%;
+  content: "";
 }
 
 /* Chatbot produit — le pixel-chat ouvre la voie pendant que l'accroche se compose. */
@@ -3037,6 +3227,394 @@
   background-color: var(--color-teal-light);
 }
 
+/* Authentification — mouvement lent et décoratif, sans distraire de la saisie. */
+@keyframes lm-auth-glow {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes lm-auth-logo-word-cycle {
+  0% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translate(-50%, calc(-50% - 0.8rem)) scale(0.9);
+  }
+  10%,
+  35% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  58% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate(-50%, -50%) scale(1.35);
+  }
+  66%,
+  100% {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+}
+
+@keyframes lm-auth-logo-middle-exit {
+  0%,
+  34% {
+    max-width: 1.4rem;
+    opacity: 1;
+    transform: translateY(0);
+  }
+  52%,
+  100% {
+    max-width: 0;
+    opacity: 0;
+    transform: translateY(0.55rem);
+  }
+}
+
+@keyframes lm-auth-logo-l-isolate {
+  0%,
+  34% {
+    color: var(--lm-logo-word);
+    text-shadow: none;
+  }
+  52%,
+  100% {
+    color: var(--accent);
+    text-shadow: 0 0 10px color-mix(in oklab, var(--accent) 42%, transparent);
+  }
+}
+
+@keyframes lm-auth-logo-d-lower {
+  0%,
+  36% {
+    opacity: 1;
+  }
+  48%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lm-auth-logo-d-upper {
+  0%,
+  36% {
+    opacity: 0;
+    transform: translateY(-0.25rem) scale(0.75);
+  }
+  48%,
+  62% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  68%,
+  100% {
+    opacity: 0;
+    transform: translateY(0) scale(0.8);
+  }
+}
+
+@keyframes lm-auth-logo-reveal {
+  0%,
+  62% {
+    opacity: 0;
+    filter: drop-shadow(0 0 0 transparent);
+    transform: translate(-50%, -50%) rotate(-12deg) scale(0.55);
+  }
+  70% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px color-mix(in oklab, var(--accent) 62%, transparent));
+    transform: translate(-50%, -50%) rotate(0deg) scale(1.18);
+  }
+  78%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px color-mix(in oklab, var(--accent) 28%, transparent));
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes lm-auth-logo-shell {
+  0%,
+  38% {
+    width: 8.4rem;
+  }
+  58% {
+    width: 3.1rem;
+  }
+  68%,
+  100% {
+    width: 2.25rem;
+  }
+}
+
+.lm-auth-logo-intro {
+  position: relative;
+  display: block;
+  width: 8.4rem;
+  height: 2.25rem;
+  overflow: hidden;
+  animation: lm-auth-logo-shell 4.8s cubic-bezier(0.76, 0, 0.24, 1) infinite;
+}
+
+.lm-animated-wordmark {
+  --lm-logo-word: var(--foreground);
+}
+
+.lm-animated-wordmark--on-ink {
+  --lm-logo-word: var(--ink-foreground);
+}
+
+.lm-auth-logo-word {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  width: max-content;
+  color: var(--lm-logo-word);
+  animation: lm-auth-logo-word-cycle 4.8s cubic-bezier(0.76, 0, 0.24, 1) infinite;
+}
+
+.lm-auth-logo-letter {
+  display: inline-block;
+}
+
+.lm-auth-logo-letter--middle {
+  max-width: 1.4rem;
+  overflow: hidden;
+  animation: lm-auth-logo-middle-exit 4.8s cubic-bezier(0.76, 0, 0.24, 1) infinite;
+}
+
+.lm-auth-logo-letter--l {
+  animation: lm-auth-logo-l-isolate 4.8s ease-in-out infinite;
+}
+
+.lm-auth-logo-letter--d {
+  position: relative;
+  color: var(--lm-logo-word);
+}
+
+.lm-auth-logo-d-lower {
+  display: inline-block;
+  animation: lm-auth-logo-d-lower 4.8s ease-in-out infinite;
+}
+
+.lm-auth-logo-d-upper {
+  position: absolute;
+  left: 0;
+  bottom: -0.03em;
+  opacity: 0;
+  animation: lm-auth-logo-d-upper 4.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.lm-auth-logo-final {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  opacity: 0;
+  animation: lm-auth-logo-reveal 4.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes lm-auth-orbit-node {
+  0% {
+    transform: translate(-50%, -50%) translate(0, var(--orbit-y-negative));
+  }
+  12.5% {
+    transform: translate(-50%, -50%) translate(var(--orbit-diagonal-x), var(--orbit-diagonal-y-negative));
+  }
+  25% {
+    transform: translate(-50%, -50%) translate(var(--orbit-x), 0);
+  }
+  37.5% {
+    transform: translate(-50%, -50%) translate(var(--orbit-diagonal-x), var(--orbit-diagonal-y));
+  }
+  50% {
+    transform: translate(-50%, -50%) translate(0, var(--orbit-y));
+  }
+  62.5% {
+    transform: translate(-50%, -50%) translate(var(--orbit-diagonal-x-negative), var(--orbit-diagonal-y));
+  }
+  75% {
+    transform: translate(-50%, -50%) translate(var(--orbit-x-negative), 0);
+  }
+  87.5% {
+    transform: translate(-50%, -50%) translate(var(--orbit-diagonal-x-negative), var(--orbit-diagonal-y-negative));
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(0, var(--orbit-y-negative));
+  }
+}
+
+@keyframes lm-auth-globe-lines {
+  from {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.035);
+  }
+  to {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+.lm-auth-glow {
+  animation: lm-auth-glow 9s ease-in-out infinite;
+}
+
+.lm-auth-glow--late {
+  animation-delay: -4.5s;
+}
+
+.lm-auth-orbit-stage {
+  --orbit-x: 9.5rem;
+  --orbit-x-negative: -9.5rem;
+  --orbit-y: 5rem;
+  --orbit-y-negative: -5rem;
+  --orbit-diagonal-x: 6.72rem;
+  --orbit-diagonal-x-negative: -6.72rem;
+  --orbit-diagonal-y: 3.54rem;
+  --orbit-diagonal-y-negative: -3.54rem;
+}
+
+.lm-auth-orbit-track {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  width: 19rem;
+  height: 10rem;
+  pointer-events: none;
+  transition: filter 500ms ease;
+}
+
+.lm-auth-orbit-track--key {
+  transform: translate(-50%, -50%) rotate(-25deg);
+}
+
+.lm-auth-orbit-track--calculator {
+  transform: translate(-50%, -50%) rotate(25deg) scale(0.94);
+}
+
+.lm-auth-orbit-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid color-mix(in oklab, var(--accent) 78%, white);
+  border-radius: 50%;
+  opacity: 0.72;
+  box-shadow:
+    0 0 22px color-mix(in oklab, var(--accent) 20%, transparent),
+    inset 0 0 16px color-mix(in oklab, white 8%, transparent);
+  transition:
+    opacity 500ms ease,
+    box-shadow 500ms ease;
+}
+
+.lm-auth-orbit-track--calculator .lm-auth-orbit-ring {
+  border-color: color-mix(in oklab, var(--teal-light) 64%, white);
+  opacity: 0.58;
+}
+
+.lm-auth-orbit-node {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 30;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  border-radius: 9999px;
+  background: var(--ink);
+  box-shadow: 0 0 22px color-mix(in oklab, var(--accent) 55%, transparent);
+  animation: lm-auth-orbit-node 8.5s linear infinite;
+}
+
+.lm-auth-orbit-track--calculator .lm-auth-orbit-node {
+  border-color: color-mix(in oklab, white 28%, transparent);
+  box-shadow: 0 0 20px color-mix(in oklab, var(--teal-light) 34%, transparent);
+  animation-duration: 10.5s;
+  animation-direction: reverse;
+}
+
+.lm-auth-orbit-icon {
+  display: grid;
+  place-items: center;
+}
+
+.lm-auth-orbit-track--key .lm-auth-orbit-icon {
+  transform: rotate(25deg);
+}
+
+.lm-auth-orbit-track--calculator .lm-auth-orbit-icon {
+  transform: rotate(-25deg) scale(1.064);
+}
+
+.lm-auth-orbit-stage--active .lm-auth-orbit-track {
+  filter: brightness(1.2);
+}
+
+.lm-auth-orbit-stage--active .lm-auth-orbit-ring {
+  opacity: 1;
+  box-shadow: 0 0 38px color-mix(in oklab, var(--accent) 36%, transparent);
+}
+
+.lm-auth-orbit-stage--active .lm-auth-orbit-node {
+  animation-duration: 4.2s;
+}
+
+.lm-auth-orbit-stage--active .lm-auth-orbit-track--calculator .lm-auth-orbit-node {
+  animation-duration: 5.2s;
+}
+
+.lm-auth-globe-lines {
+  animation: lm-auth-globe-lines 28s linear infinite;
+}
+
+@media (min-width: 640px) {
+  .lm-auth-orbit-stage {
+    --orbit-x: 12rem;
+    --orbit-x-negative: -12rem;
+    --orbit-y: 6.25rem;
+    --orbit-y-negative: -6.25rem;
+    --orbit-diagonal-x: 8.49rem;
+    --orbit-diagonal-x-negative: -8.49rem;
+    --orbit-diagonal-y: 4.42rem;
+    --orbit-diagonal-y-negative: -4.42rem;
+  }
+
+  .lm-auth-orbit-track {
+    width: 24rem;
+    height: 12.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lm-auth-orbit-stage {
+    --orbit-x: 13.5rem;
+    --orbit-x-negative: -13.5rem;
+    --orbit-y: 7rem;
+    --orbit-y-negative: -7rem;
+    --orbit-diagonal-x: 9.55rem;
+    --orbit-diagonal-x-negative: -9.55rem;
+    --orbit-diagonal-y: 4.95rem;
+    --orbit-diagonal-y-negative: -4.95rem;
+  }
+
+  .lm-auth-orbit-track {
+    width: 27rem;
+    height: 14rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -3044,6 +3622,20 @@
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+
+  .lm-auth-logo-intro {
+    width: 2.25rem;
+  }
+
+  .lm-auth-logo-word,
+  .lm-auth-logo-morph {
+    display: none;
+  }
+
+  .lm-auth-logo-final {
+    opacity: 1;
+    transform: translate(-50%, -50%);
   }
 }
 

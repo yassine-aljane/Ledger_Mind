@@ -596,6 +596,31 @@ function Landing() {
         </div>
       </section>
 
+      {/* ---------- Démarche sécurité ---------- */}
+      <section className="relative overflow-hidden border-t border-border bg-ink text-ink-foreground">
+        <div
+          aria-hidden
+          className="absolute -right-24 top-1/2 size-80 -translate-y-1/2 rounded-full bg-info/20 blur-3xl"
+        />
+        <div className="relative mx-auto grid max-w-5xl items-center gap-10 px-5 py-14 sm:py-16 lg:grid-cols-[1fr_0.72fr] lg:py-20">
+          <div className="max-w-xl">
+            <SectionLabel className="text-ink-foreground/55">Démarche sécurité</SectionLabel>
+            <h2 className="mt-4 text-balance font-display text-3xl leading-tight sm:text-4xl">
+              Notre sécurité{" "}
+              <span className="italic text-accent">prend forme.</span>
+            </h2>
+            <p className="mt-4 text-base text-ink-foreground/62 sm:text-lg">
+              Validation ISO/IEC 27001:2022 en cours.
+            </p>
+            <p className="mt-3 text-xs text-ink-foreground/38">
+              Certification non encore obtenue.
+            </p>
+          </div>
+
+          <IsoValidationBadge />
+        </div>
+      </section>
+
       {/* ---------- Sources officielles (celles que l'app cite vraiment) ---------- */}
       <section className="overflow-hidden border-y border-border">
         <div className="mx-auto max-w-6xl px-5 py-14 sm:py-16">
@@ -605,7 +630,7 @@ function Landing() {
             <span className="italic text-accent-ink">des textes officiels.</span>
           </h2>
         </div>
-        <div className="border-t border-border bg-secondary/50 py-7" aria-hidden>
+        <div className="lm-sources-marquee border-t border-border bg-secondary/50 py-7" aria-hidden>
           <div className="animate-marquee flex w-max items-center gap-14 whitespace-nowrap sm:gap-20">
             {Array.from({ length: 2 }).flatMap((_, loop) =>
               OFFICIAL_SOURCES.map((src, i) => (
@@ -628,5 +653,84 @@ function Landing() {
       </section>
 
     </MarketingLayout>
+  );
+}
+
+function QualitySeal({ colored }: { colored: boolean }) {
+  const primary = colored ? "#2563eb" : "#9ca3af";
+  const secondary = colored ? "#0891b2" : "#b7bcc3";
+  const success = colored ? "#16a36a" : "#a8adb4";
+  const ink = colored ? "#123a63" : "#858b94";
+
+  return (
+    <svg viewBox="0 0 260 260" aria-hidden className="size-full">
+      <circle cx="130" cy="130" r="111" fill="white" fillOpacity="0.92" stroke={primary} strokeWidth="8" />
+      <circle cx="130" cy="130" r="92" fill="none" stroke={secondary} strokeWidth="2" strokeDasharray="4 7" />
+      <path d="M62 70c18-22 41-34 68-34s50 12 68 34" fill="none" stroke={primary} strokeWidth="3" strokeLinecap="round" />
+      <path d="M62 190c18 22 41 34 68 34s50-12 68-34" fill="none" stroke={primary} strokeWidth="3" strokeLinecap="round" />
+      <text x="130" y="82" textAnchor="middle" fill={ink} fontSize="12" fontWeight="700" letterSpacing="3">
+        SÉCURITÉ
+      </text>
+      <text x="130" y="129" textAnchor="middle" fill={primary} fontSize="46" fontWeight="800" letterSpacing="-2">
+        ISO
+      </text>
+      <text x="130" y="158" textAnchor="middle" fill={ink} fontSize="22" fontWeight="750" letterSpacing="0.5">
+        27001
+      </text>
+      <rect x="96" y="174" width="68" height="24" rx="12" fill={secondary} />
+      <text x="130" y="191" textAnchor="middle" fill="white" fontSize="12" fontWeight="800" letterSpacing="1.5">
+        2022
+      </text>
+      <circle cx="202" cy="180" r="25" fill={success} stroke="white" strokeWidth="5" />
+      <path d="m190 180 8 8 15-17" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IsoValidationBadge() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setActive(true);
+        observer.disconnect();
+      },
+      { threshold: 0.35 },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={cn("lm-iso-validation", active && "lm-iso-validation--active")}>
+      <div
+        className="lm-iso-seal-stack"
+        role="img"
+        aria-label="Référentiel ISO/IEC 27001:2022, validation de sécurité en cours"
+      >
+        <QualitySeal colored={false} />
+        <div className="lm-iso-seal-color">
+          <QualitySeal colored />
+        </div>
+        <span className="lm-iso-water-drops" aria-hidden>
+          <span className="lm-iso-water-drop" />
+        </span>
+        <span className="lm-iso-water-ripple" aria-hidden />
+        <span className="lm-iso-water-ripple lm-iso-water-ripple--late" aria-hidden />
+        <span className="lm-iso-water-surface" aria-hidden />
+      </div>
+      <p className="mt-4 flex items-center justify-center gap-2 font-mono text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-info-ink">
+        <span className="relative flex size-2">
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-info-ink/50" />
+          <span className="relative inline-flex size-2 rounded-full bg-info-ink" />
+        </span>
+        Validation en cours
+      </p>
+    </div>
   );
 }

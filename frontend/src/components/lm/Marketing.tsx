@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getStoredUser, isAuthed, postAuthPath, type AuthUser } from "@/lib/auth";
 import { usePlan } from "@/lib/plan";
-import { Wordmark } from "@/components/lm/Logo";
+import { AnimatedWordmark, Wordmark } from "@/components/lm/Logo";
 import { ThemeToggle } from "@/components/lm/AppShell";
 import { Button } from "@/components/ui/button";
 
@@ -32,7 +32,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4">
         <Link to="/" aria-label="LedgerMind, accueil">
-          <Wordmark />
+          <AnimatedWordmark />
         </Link>
 
         <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">

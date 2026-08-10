@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AccessGate } from "@/components/lm/AccessGate";
 import { LogoutBubble } from "@/components/lm/AppShell";
-import { Wordmark } from "@/components/lm/Logo";
+import { AnimatedWordmark } from "@/components/lm/Logo";
 import { repriseEnCours, routeDeReprise } from "@/lib/reprise";
 
 export const Route = createFileRoute("/onboarding/")({
@@ -77,7 +77,7 @@ function Gate() {
     <div className="min-h-screen flex flex-col">
       <header className="px-6 h-16 flex items-center justify-between max-w-7xl mx-auto w-full">
         <Link to="/" aria-label="LedgerMind, accueil">
-          <Wordmark />
+          <AnimatedWordmark />
         </Link>
         <LogoutBubble />
       </header>
