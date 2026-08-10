@@ -362,9 +362,6 @@ mongosh ledgermind --eval "db.invoices.getIndexes()"
 
 # Un document complet
 mongosh ledgermind --eval "db.invoices.findOne()"
-
-# Diagnostic fourni par le projet (capture)
-python backend/app/agents/capture/check_db.py
 ```
 
 ---

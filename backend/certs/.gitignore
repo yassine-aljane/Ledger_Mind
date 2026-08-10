@@ -1,0 +1,15 @@
+# Les clés privées ne sortent jamais de la machine qui les a générées.
+*.key
+*.pem
+*.csr
+*.srl
+*.p12
+*.pfx
+
+# Les certificats sont publics par nature, mais ils sont régénérés par le script sur
+# chaque poste : les versionner ferait diverger le dépôt à chaque exécution.
+*.crt
+
+# Une seule exception : la racine. C'est l'ancre de confiance qu'un tiers doit détenir
+# pour vérifier une signature C2PA émise par LedgerMind — elle n'a de valeur que publiée.
+!c2pa-ca.crt

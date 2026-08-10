@@ -10,6 +10,13 @@ from __future__ import annotations
 import os
 
 from app.agents.facture.schemas import Facture
+from app.core import ai_act
+
+# « Modifié » et non « généré » : la facture part chez un client, et ses montants, son objet
+# et ses parties viennent de l'utilisateur. Seules la composition et les mentions légales
+# sont produites par la machine. La marquer « entièrement générée par IA » serait à la fois
+# inexact au sens du jeu d'icônes européen et dommageable dans une relation commerciale.
+_NIVEAU_IA = "modifie"
 
 # Palette produit — identique à guidance/roadmap/pdf.py (marine, butter, prune, crème).
 NAVY = (27, 58, 95)
@@ -360,4 +367,7 @@ def facture_to_pdf(facture: Facture) -> bytes:
     pdf.set_text_color(*MUTED)
     pdf.multi_cell(0, 4, texte(_DISCLAIMER))
 
+    # Transparence IA (art. 50) : mention dans la page + métadonnées dans le fichier.
+    ai_act.filigrane_pdf(pdf, texte, niveau=_NIVEAU_IA)
+    ai_act.marquer_pdf(pdf, niveau=_NIVEAU_IA)
     return bytes(pdf.output())

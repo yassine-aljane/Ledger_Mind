@@ -2,7 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.core import ai_act
 from app.api import (
+    ai_act as ai_act_api,
     auth,
     capture,
     declaration,
@@ -39,6 +41,23 @@ def _cors_origins() -> list[str]:
     return sorted(origins)
 
 
+@app.middleware("http")
+async def marquage_ia(request, call_next):
+    """Pose les en-têtes de transparence IA sur toute réponse de l'API.
+
+    Tout ce que ce backend renvoie est produit par des systèmes d'IA. Un client qui
+    consomme l'API sans passer par notre interface — intégration tierce, robot d'indexation,
+    agrégateur — n'a que ces en-têtes pour savoir que la charge utile est synthétique : le
+    marquage visible, lui, vit dans le frontend et ne l'atteint jamais.
+
+    `/health` en est exclu : ce n'est pas du contenu, et un moniteur n'a rien à en déduire.
+    """
+    reponse = await call_next(request)
+    if request.url.path != "/health":
+        reponse.headers.update(ai_act.entetes_http())
+    return reponse
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
@@ -47,8 +66,12 @@ app.add_middleware(
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_methods=["*"],
     allow_headers=["*"],
+    # Sans cette liste, le navigateur masque les en-têtes de transparence au JavaScript de
+    # la page : `allow_headers` couvre la requête, pas la lecture de la réponse.
+    expose_headers=list(ai_act.entetes_http().keys()),
 )
 
+app.include_router(ai_act_api.router)
 app.include_router(auth.router)
 app.include_router(referral.router)
 app.include_router(capture.router)

@@ -89,6 +89,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "LedgerMind aide les freelances et créateurs à comprendre, calculer et provisionner leurs impôts, sans jargon.",
       },
       { name: "author", content: "LedgerMind" },
+      // --- Marquage lisible par machine — art. 50(2) du règlement (UE) 2024/1689 ---
+      // Ce que les moteurs, robots et plateformes lisent sur les pages du site. Il double
+      // le marquage visible sans le remplacer : les deux obligations sont distinctes, et
+      // ces balises ne suivent PAS un contenu téléchargé — c'est le backend qui marque les
+      // fichiers exportés.
+      { name: "ai-generated", content: "true" },
+      { name: "ai-content-declaration", content: "AI-generated" },
+      { name: "ai-provider", content: "LedgerMind" },
+      { name: "generator", content: "LedgerMind Assistant (IA générative)" },
+      {
+        name: "digital-source-type",
+        content: "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+      },
       { property: "og:title", content: "LedgerMind — l'assistant fiscal qui parle humain" },
       {
         property: "og:description",
@@ -122,6 +135,30 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
         {/* Applique le thème mémorisé avant la première peinture (pas de flash clair en sombre). */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        {/*
+          Provenance structurée (schema.org). Les balises <meta> ci-dessus disent « c'est
+          généré » ; ce bloc dit par qui, avec quoi, et sous quel régime — c'est ce que
+          consomment les vérificateurs de provenance et les moteurs qui savent le lire.
+        */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "LedgerMind",
+              creditText: "Contenu généré par intelligence artificielle — LedgerMind",
+              publisher: { "@type": "Organization", name: "LedgerMind" },
+              isAccessibleForFree: true,
+              usageInfo: "https://artificialintelligenceact.eu/article/50/",
+              // Vocabulaire IPTC : la même valeur que celle écrite dans les métadonnées
+              // des documents exportés, pour qu'un vérificateur retrouve la page et le
+              // fichier sous la même déclaration.
+              digitalSourceType:
+                "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+            }),
+          }}
+        />
       </head>
       <body>
         {children}

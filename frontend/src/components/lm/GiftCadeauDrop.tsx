@@ -8,6 +8,7 @@
 
 import { ImagePlus } from "lucide-react";
 import { useId, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { AiMediaBadge } from "@/components/lm/AiLabel";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -34,15 +35,20 @@ const SPARKS = [
 
 function GiftCat({ reveal }: { reveal: boolean }) {
   return (
-    <div className={cn("lm-gift-cat", reveal ? "lm-gift-cat--out" : "lm-gift-cat--in")} aria-hidden>
+    // Le conteneur n'est plus `aria-hidden` : l'animation reste décorative (l'image porte
+    // un alt vide), mais l'étiquette IA doit rester annonçable. Masquer tout le sous-arbre
+    // la retirerait aussi aux lecteurs d'écran.
+    <div className={cn("lm-gift-cat relative", reveal ? "lm-gift-cat--out" : "lm-gift-cat--in")}>
       <img
         src="/gifts/sitting-cat.original.gif"
         alt=""
+        aria-hidden
         className="lm-gift-cat__gif"
         width={896}
         height={896}
         draggable={false}
       />
+      <AiMediaBadge className="absolute bottom-1 right-1 z-10 scale-90 origin-bottom-right" />
     </div>
   );
 }

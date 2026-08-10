@@ -6,6 +6,11 @@ Rien n'est composé ici : l'objet `RapportActivite` est déjà entièrement calc
 from __future__ import annotations
 
 from app.agents.rapport.schemas import RapportActivite
+from app.core import ai_act
+
+# Le rapport est entièrement composé par la machine : chiffres consolidés, commentaires,
+# mise en page. Aucun élément n'est rédigé par une personne.
+_NIVEAU_IA = "genere"
 
 NAVY = (27, 58, 95)
 NAVY_BG = (237, 242, 248)
@@ -115,4 +120,8 @@ def rapport_to_pdf(rapport: RapportActivite) -> bytes:
     pdf.set_text_color(*MUTED)
     pdf.multi_cell(0, 4, texte(_DISCLAIMER))
 
+    # Transparence IA (art. 50) : la mention est imprimée dans la page et les métadonnées
+    # sont écrites dans le fichier, pour qu'elles survivent au téléchargement.
+    ai_act.filigrane_pdf(pdf, texte, niveau=_NIVEAU_IA)
+    ai_act.marquer_pdf(pdf, niveau=_NIVEAU_IA)
     return bytes(pdf.output())

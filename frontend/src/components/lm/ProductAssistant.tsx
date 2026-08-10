@@ -1,5 +1,7 @@
 import { Loader2, MessageCircleQuestion, Send, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { AiChatNotice } from "@/components/lm/AiLabel";
+import { MENTION_VISUEL } from "@/lib/ai-act";
 import { Markdown } from "@/components/lm/Markdown";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +40,11 @@ function PixelCat({ className }: { className?: string }) {
       alt=""
       aria-hidden
       draggable={false}
+      // La mascotte est un visuel généré. Elle ne mesure que 44 à 82 px : y incruster un
+      // badge le réduirait à l'état d'ornement illisible, ce que le guide d'accessibilité
+      // écarte explicitement. La divulgation passe donc par les surfaces qui la portent —
+      // `AiChatNotice` dans le panneau, la mention du lanceur — et par cette infobulle.
+      title={MENTION_VISUEL}
       className={cn("select-none object-contain [image-rendering:pixelated]", className)}
     />
   );
@@ -173,6 +180,11 @@ export function ProductAssistant() {
             </div>
           </header>
 
+          {/* Divulgation art. 50(1). Compacte : la bulle est étroite, mais elle reste au
+              premier plan et hors du fil défilant — pas reléguée dans un message d'accueil
+              qui remonterait hors de vue. */}
+          <AiChatNotice compact className="mx-3 mt-3 shrink-0" />
+
           <div className="chat-scroll flex-1 space-y-4 overflow-y-auto bg-secondary/25 px-4 py-5" aria-live="polite">
             {messages.map((message) => (
               <div
@@ -284,7 +296,9 @@ export function ProductAssistant() {
           type="button"
           onClick={() => setOpen(true)}
           aria-expanded="false"
-          aria-label="Ouvrir le chatbot LedgerMind"
+          // Le lanceur est le premier point de contact avec l'agent : sa nature doit être
+          // annoncée ici, pas seulement une fois le panneau ouvert (art. 50(1)).
+          aria-label="Ouvrir l'assistant IA LedgerMind — vous échangerez avec une intelligence artificielle"
           className="lm-product-launcher group relative overflow-hidden border-4 border-background bg-card text-ink shadow-2xl hover:-translate-y-1 hover:border-accent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/35"
         >
           <span className="lm-product-launcher__icon" aria-hidden>
@@ -292,7 +306,10 @@ export function ProductAssistant() {
           </span>
           <span className="lm-product-launcher__copy" aria-hidden>
             <strong>Une question&nbsp;?</strong>
-            <small>Découvrez LedgerMind</small>
+            {/* « Assistant IA » remplace « Découvrez LedgerMind » : c'est la seule ligne de
+                texte visible avant l'ouverture du panneau, et la nature du service y a plus
+                sa place qu'une invitation. */}
+            <small>Assistant IA</small>
           </span>
           <span className="lm-product-launcher__cat-track" aria-hidden>
             <PixelCat className="lm-product-launcher__cat w-[82px]" />
