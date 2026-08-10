@@ -42,8 +42,6 @@ export type AuthUser = {
 };
 
 export type AuthResponse = {
-  access_token: string;
-  token_type: "bearer";
   user: AuthUser;
 };
 
@@ -56,9 +54,15 @@ function storage(): Storage | null {
   }
 }
 
-export function getAccessToken(): string | null {
-  return storage()?.getItem(TOKEN_KEY) ?? null;
-}
+/**
+ * Options communes à tout appel authentifié.
+ *
+ * `credentials: "include"` est indispensable : le jeton de session vit dans un cookie `httpOnly`,
+ * que le navigateur n'attache PAS spontanément à un appel inter-origine — or le front et le back
+ * n'écoutent pas sur le même port, donc tous les appels le sont. Sans cette option, chaque route
+ * protégée répondrait 401.
+ */
+export const AVEC_SESSION = { credentials: "include" } as const satisfies RequestInit;
 
 export function getStoredUser(): AuthUser | null {
   const raw = storage()?.getItem(USER_KEY);
@@ -164,15 +168,24 @@ export function postAuthPath(
   return "/onboarding";
 }
 
+/**
+ * Indice d'affichage, pas un contrôle d'accès.
+ *
+ * Le jeton étant désormais `httpOnly`, JavaScript ne peut plus constater la présence d'une
+ * session : on se fie à l'identité mémorisée à la connexion. C'est suffisant pour décider quoi
+ * afficher, et ça ne donne accès à rien — chaque route protégée revérifie le cookie côté serveur,
+ * qui reste seul juge. Un utilisateur qui forgerait cette clé ne verrait que des 401.
+ */
 export function isAuthed(): boolean {
-  return Boolean(getAccessToken());
+  return Boolean(getStoredUser());
 }
 
 export function storeAuth(res: AuthResponse): void {
   const s = storage();
   if (!s) return;
 
-  s.setItem(TOKEN_KEY, res.access_token);
+  // Le jeton n'est pas stocké : il est arrivé en cookie `httpOnly`, hors de portée de tout script
+  // de la page. Seule l'identité affichable est conservée ici.
   s.setItem(USER_KEY, JSON.stringify(res.user));
   // Le plan (démo) est stocké par compte (voir lib/plan.ts) : il suffit de signaler le
   // changement de compte pour que l'interface réaffiche la formule du nouvel utilisateur —
@@ -190,6 +203,9 @@ export function storeAuth(res: AuthResponse): void {
 export function clearAuth(): void {
   const s = storage();
   if (!s) return;
+  // TOKEN_KEY : reliquat des sessions d'avant le passage au cookie. Rien ne l'écrit plus, mais un
+  // navigateur ouvert avant la bascule en garde un — et un jeton oublié dans le stockage local est
+  // exactement ce dont on cherche à se débarrasser.
   s.removeItem(TOKEN_KEY);
   s.removeItem(USER_KEY);
   // L'identifiant de session appartient au compte qu'on quitte. Le laisser derrière soi le
@@ -212,12 +228,15 @@ export function clearAuth(): void {
   }
 }
 
+/**
+ * En-têtes d'un appel authentifié.
+ *
+ * Ne porte plus le jeton : celui-ci voyage dans le cookie de session, que le navigateur attache
+ * lui-même dès lors que l'appel est fait avec {@link AVEC_SESSION}. La fonction reste le point de
+ * passage commun de tous les appels protégés — c'est là qu'on ajouterait un en-tête transversal.
+ */
 export function authHeaders(extra?: HeadersInit): HeadersInit {
-  const token = getAccessToken();
-  return {
-    ...(extra ?? {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  return { ...(extra ?? {}) };
 }
 
 function detailMessage(err: unknown, fallback: string): string {
@@ -239,6 +258,7 @@ export async function registerAccount(input: {
   name: string;
 }): Promise<AuthResponse> {
   const response = await fetch(`${API_BASE}/api/auth/register`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -257,6 +277,7 @@ export async function loginAccount(input: {
   password: string;
 }): Promise<AuthResponse> {
   const response = await fetch(`${API_BASE}/api/auth/login`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -272,6 +293,7 @@ export async function loginAccount(input: {
 
 export async function fetchMe(): Promise<AuthUser> {
   const response = await fetch(`${API_BASE}/api/auth/me`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (response.status === 401) {
@@ -290,6 +312,7 @@ export async function fetchMe(): Promise<AuthUser> {
 
 export async function fetchAgentContext(): Promise<UserAgentContext> {
   const response = await fetch(`${API_BASE}/api/auth/context`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (response.status === 401) {
@@ -303,6 +326,38 @@ export async function fetchAgentContext(): Promise<UserAgentContext> {
   return body as UserAgentContext;
 }
 
+/**
+ * Demande au serveur de retirer le cookie de session. Retourne `true` s'il l'a confirmé.
+ *
+ * Le cookie est `httpOnly` : ni JavaScript ni l'utilisateur ne peuvent l'effacer depuis le
+ * navigateur — seul le serveur qui l'a posé peut le retirer. Cet appel n'est donc pas une
+ * formalité : sans lui, la session reste valide côté serveur alors que l'interface affiche un
+ * visiteur déconnecté.
+ *
+ * Exposé séparément de {@link logout} pour les écrans qui doivent *savoir* si la révocation a
+ * abouti avant d'annoncer quoi que ce soit à l'utilisateur (voir `/mes-donnees`).
+ */
+export async function revoquerSession(): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE}/api/auth/logout`, {
+      ...AVEC_SESSION,
+      method: "POST",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Déconnexion.
+ *
+ * L'état local est nettoyé sans attendre la réponse : un utilisateur qui clique « se déconnecter »
+ * doit voir l'effet immédiatement, même si le réseau est lent ou absent. Et si l'appel échoue, la
+ * session expirera d'elle-même — mieux vaut une déconnexion visible tout de suite qu'un écran
+ * bloqué sur un appel qui ne revient pas.
+ */
 export function logout(): void {
   clearAuth();
+  void revoquerSession();
 }

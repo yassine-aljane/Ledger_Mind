@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -63,6 +63,11 @@ class LoginRequest(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    access_token: str
-    token_type: Literal["bearer"] = "bearer"
+    """Réponse d'inscription et de connexion.
+
+    Le jeton n'y figure volontairement pas : il part dans un cookie `httpOnly` (voir
+    `app/api/auth.py`). Le renvoyer ici le rendrait lisible par JavaScript, donc exposé à un
+    script injecté — précisément ce que le cookie empêche.
+    """
+
     user: UserPublic

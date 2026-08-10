@@ -13,10 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActiviteRouteImport } from './routes/activite'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CaptureRouteImport } from './routes/capture'
+import { Route as ConfidentialiteRouteImport } from './routes/confidentialite'
+import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DeclarationRouteImport } from './routes/declaration'
 import { Route as EducationRouteImport } from './routes/education'
 import { Route as HistoriqueRouteImport } from './routes/historique'
+import { Route as MesDonneesRouteImport } from './routes/mes-donnees'
 import { Route as ParametresRouteImport } from './routes/parametres'
 import { Route as PremiumRouteImport } from './routes/premium'
 import { Route as RapportRouteImport } from './routes/rapport'
@@ -48,6 +51,16 @@ const CaptureRoute = CaptureRouteImport.update({
   path: '/capture',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
+  id: '/confidentialite',
+  path: '/confidentialite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CookiesRoute = CookiesRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -66,6 +79,11 @@ const EducationRoute = EducationRouteImport.update({
 const HistoriqueRoute = HistoriqueRouteImport.update({
   id: '/historique',
   path: '/historique',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MesDonneesRoute = MesDonneesRouteImport.update({
+  id: '/mes-donnees',
+  path: '/mes-donnees',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ParametresRoute = ParametresRouteImport.update({
@@ -125,10 +143,13 @@ export interface FileRoutesByFullPath {
   '/activite': typeof ActiviteRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
+  '/confidentialite': typeof ConfidentialiteRoute
+  '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
   '/declaration': typeof DeclarationRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
+  '/mes-donnees': typeof MesDonneesRoute
   '/parametres': typeof ParametresRoute
   '/premium': typeof PremiumRoute
   '/rapport': typeof RapportRoute
@@ -145,10 +166,13 @@ export interface FileRoutesByTo {
   '/activite': typeof ActiviteRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
+  '/confidentialite': typeof ConfidentialiteRoute
+  '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
   '/declaration': typeof DeclarationRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
+  '/mes-donnees': typeof MesDonneesRoute
   '/parametres': typeof ParametresRoute
   '/premium': typeof PremiumRoute
   '/rapport': typeof RapportRoute
@@ -166,10 +190,13 @@ export interface FileRoutesById {
   '/activite': typeof ActiviteRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
+  '/confidentialite': typeof ConfidentialiteRoute
+  '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
   '/declaration': typeof DeclarationRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
+  '/mes-donnees': typeof MesDonneesRoute
   '/parametres': typeof ParametresRoute
   '/premium': typeof PremiumRoute
   '/rapport': typeof RapportRoute
@@ -188,10 +215,13 @@ export interface FileRouteTypes {
     | '/activite'
     | '/auth'
     | '/capture'
+    | '/confidentialite'
+    | '/cookies'
     | '/dashboard'
     | '/declaration'
     | '/education'
     | '/historique'
+    | '/mes-donnees'
     | '/parametres'
     | '/premium'
     | '/rapport'
@@ -208,10 +238,13 @@ export interface FileRouteTypes {
     | '/activite'
     | '/auth'
     | '/capture'
+    | '/confidentialite'
+    | '/cookies'
     | '/dashboard'
     | '/declaration'
     | '/education'
     | '/historique'
+    | '/mes-donnees'
     | '/parametres'
     | '/premium'
     | '/rapport'
@@ -228,10 +261,13 @@ export interface FileRouteTypes {
     | '/activite'
     | '/auth'
     | '/capture'
+    | '/confidentialite'
+    | '/cookies'
     | '/dashboard'
     | '/declaration'
     | '/education'
     | '/historique'
+    | '/mes-donnees'
     | '/parametres'
     | '/premium'
     | '/rapport'
@@ -249,10 +285,13 @@ export interface RootRouteChildren {
   ActiviteRoute: typeof ActiviteRoute
   AuthRoute: typeof AuthRoute
   CaptureRoute: typeof CaptureRoute
+  ConfidentialiteRoute: typeof ConfidentialiteRoute
+  CookiesRoute: typeof CookiesRoute
   DashboardRoute: typeof DashboardRoute
   DeclarationRoute: typeof DeclarationRoute
   EducationRoute: typeof EducationRoute
   HistoriqueRoute: typeof HistoriqueRoute
+  MesDonneesRoute: typeof MesDonneesRoute
   ParametresRoute: typeof ParametresRoute
   PremiumRoute: typeof PremiumRoute
   RapportRoute: typeof RapportRoute
@@ -294,6 +333,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CaptureRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/confidentialite': {
+      id: '/confidentialite'
+      path: '/confidentialite'
+      fullPath: '/confidentialite'
+      preLoaderRoute: typeof ConfidentialiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cookies': {
+      id: '/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof CookiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -320,6 +373,13 @@ declare module '@tanstack/react-router' {
       path: '/historique'
       fullPath: '/historique'
       preLoaderRoute: typeof HistoriqueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mes-donnees': {
+      id: '/mes-donnees'
+      path: '/mes-donnees'
+      fullPath: '/mes-donnees'
+      preLoaderRoute: typeof MesDonneesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/parametres': {
@@ -411,10 +471,13 @@ const rootRouteChildren: RootRouteChildren = {
   ActiviteRoute: ActiviteRoute,
   AuthRoute: AuthRoute,
   CaptureRoute: CaptureRoute,
+  ConfidentialiteRoute: ConfidentialiteRoute,
+  CookiesRoute: CookiesRoute,
   DashboardRoute: DashboardRoute,
   DeclarationRoute: DeclarationRoute,
   EducationRoute: EducationRoute,
   HistoriqueRoute: HistoriqueRoute,
+  MesDonneesRoute: MesDonneesRoute,
   ParametresRoute: ParametresRoute,
   PremiumRoute: PremiumRoute,
   RapportRoute: RapportRoute,

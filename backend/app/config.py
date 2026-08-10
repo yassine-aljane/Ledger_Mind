@@ -51,6 +51,25 @@ class Settings(BaseSettings):
     auth_secret: str = "ledgermind-dev-secret-change-me-32b"
     auth_token_days: int = 14
 
+    # Le jeton voyage dans un cookie `httpOnly` : inaccessible à JavaScript, donc hors de portée
+    # d'un script injecté dans la page. Les trois réglages ci-dessous dépendent du déploiement et
+    # ne peuvent pas être devinés depuis le code.
+    #
+    #   • AUTH_COOKIE_SECURE   — `true` en production (HTTPS). En HTTP local, un cookie `Secure`
+    #                            n'est jamais posé : la connexion échouerait silencieusement.
+    #   • AUTH_COOKIE_SAMESITE — `lax` convient tant que front et back partagent le même domaine
+    #                            (`app.exemple.fr` / `api.exemple.fr`, les ports n'entrent pas en
+    #                            compte). Si les deux sont sur des domaines DIFFÉRENTS, le
+    #                            navigateur n'enverra rien en `lax` : il faut alors `none`, qui
+    #                            exige `secure=true` — et la protection CSRF repose entièrement
+    #                            sur la vérification d'origine (voir `app/main.py`).
+    #   • AUTH_COOKIE_DOMAIN   — à renseigner uniquement pour partager le cookie entre
+    #                            sous-domaines. Vide = cookie limité à l'hôte qui l'a posé.
+    auth_cookie_name: str = "ledgermind_session"
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: str = "lax"
+    auth_cookie_domain: str = ""
+
     class Config:
         env_file = ENV_FILE
         extra = "ignore"

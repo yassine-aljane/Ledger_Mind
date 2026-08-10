@@ -4,7 +4,7 @@
 // site officiel restent des gestes humains. Aucun montant n'est calculé ici non plus — tout
 // vient du moteur d'impôt, côté serveur.
 
-import { authHeaders, clearAuth } from "@/lib/auth";
+import { AVEC_SESSION, authHeaders, clearAuth } from "@/lib/auth";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
@@ -16,6 +16,7 @@ async function parseError(response: Response): Promise<string> {
 
 async function json<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
+    ...AVEC_SESSION,
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),
@@ -255,7 +256,10 @@ export function genererDeclarations(
 }
 
 async function telecharger(chemin: string, nom: string): Promise<void> {
-  const response = await fetch(`${API_BASE}${chemin}`, { headers: authHeaders() });
+  const response = await fetch(`${API_BASE}${chemin}`, {
+    ...AVEC_SESSION,
+    headers: authHeaders(),
+  });
   if (!response.ok) throw new Error(await parseError(response));
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);

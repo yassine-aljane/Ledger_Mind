@@ -6,13 +6,14 @@
 // À ne pas confondre avec `/api/guidance/veille/*` : celle-ci rafraîchit le corpus RAG derrière
 // l'agent pédagogue. Les deux coexistent volontairement.
 
-import { authHeaders, clearAuth } from "@/lib/auth";
+import { AVEC_SESSION, authHeaders, clearAuth } from "@/lib/auth";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 const BASE = `${API_BASE}/api/veille`;
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
+    ...AVEC_SESSION,
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),

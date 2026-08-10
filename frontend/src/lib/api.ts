@@ -1,6 +1,6 @@
 // Real HTTP API client for the FastAPI backend.
 
-import { authHeaders, clearAuth } from "@/lib/auth";
+import { AVEC_SESSION, authHeaders, clearAuth } from "@/lib/auth";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
@@ -179,6 +179,7 @@ export async function startOrchestrator(
       : siretOrOptions;
 
   const response = await fetch(`${API_BASE}/api/orchestrator/start`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -233,6 +234,7 @@ export function loadCachedDiagnosticResult(): SessionDetail | null {
 
 export async function fetchSessionDetail(sessionId: string): Promise<SessionDetail> {
   const response = await fetch(`${API_BASE}/api/orchestrator/session/${sessionId}/detail`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (!response.ok) {
@@ -252,6 +254,7 @@ export async function orchestratorTurn(
   userAnswer?: string,
 ): Promise<OrchestratorTurnResponse> {
   const response = await fetch(`${API_BASE}/api/orchestrator/turn`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -269,6 +272,7 @@ export async function fetchMySessions(): Promise<
   { session_id: string; branch: string | null; phase: string | null; updated_at: string }[]
 > {
   const response = await fetch(`${API_BASE}/api/orchestrator/my-sessions`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (!response.ok) {
@@ -279,6 +283,7 @@ export async function fetchMySessions(): Promise<
 
 export async function fetchUserProfile(sessionId: string): Promise<UserProfile> {
   const response = await fetch(`${API_BASE}/api/orchestrator/session/${sessionId}`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (!response.ok) {
@@ -307,6 +312,7 @@ export async function uploadRegistryDocument(
   form.append("file", file);
 
   const response = await fetch(`${API_BASE}/api/verification/registry-document`, {
+    ...AVEC_SESSION,
     method: "POST",
     body: form,
   });
@@ -334,6 +340,7 @@ export async function uploadSireneAvis(
   form.append("file", file);
 
   const response = await fetch(`${API_BASE}/api/verification/sirene-avis`, {
+    ...AVEC_SESSION,
     method: "POST",
     body: form,
   });
@@ -349,6 +356,7 @@ export async function ocrExtractSiret(file: File): Promise<string> {
   form.append("file", file);
 
   const response = await fetch(`${API_BASE}/api/verification/ocr-siret`, {
+    ...AVEC_SESSION,
     method: "POST",
     body: form,
   });
@@ -411,6 +419,7 @@ export async function generateReferralEmails(
   demande: string,
 ): Promise<ReferralResponse> {
   const response = await fetch(`${API_BASE}/api/referral/generate`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ ville, demande }),
@@ -421,6 +430,7 @@ export async function generateReferralEmails(
 
 export async function fetchReferralHistory(): Promise<ReferralHistoryEntry[]> {
   const response = await fetch(`${API_BASE}/api/referral/history`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (!response.ok) throw new Error(await parseError(response));
@@ -677,6 +687,7 @@ export async function analyzeCapture(file: File, activite?: string): Promise<Cap
   if (activite) form.append("activite", activite);
 
   const response = await fetch(`${API_BASE}/api/capture/analyze`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: authHeaders(),
     body: form,
@@ -694,6 +705,7 @@ export async function answerCapture(threadId: string, answer: string): Promise<{
   error?: string | null;
 }> {
   const response = await fetch(`${API_BASE}/api/capture/answer`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ thread_id: threadId, answer }),
@@ -707,6 +719,7 @@ export async function askCaptureQuestion(
   question: string,
 ): Promise<{ status: string; document_id: string; answer?: string; error?: string }> {
   const response = await fetch(`${API_BASE}/api/capture/qa`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ document_id: documentId, question }),
@@ -717,6 +730,7 @@ export async function askCaptureQuestion(
 
 export async function fetchCaptureInvoices(): Promise<CaptureInvoiceItem[]> {
   const response = await fetch(`${API_BASE}/api/capture/invoices`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (!response.ok) throw new Error(await parseError(response));
@@ -725,6 +739,7 @@ export async function fetchCaptureInvoices(): Promise<CaptureInvoiceItem[]> {
 
 export async function fetchCaptureVirements(): Promise<CaptureVirementItem[]> {
   const response = await fetch(`${API_BASE}/api/capture/virements`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (!response.ok) throw new Error(await parseError(response));
@@ -733,6 +748,7 @@ export async function fetchCaptureVirements(): Promise<CaptureVirementItem[]> {
 
 export async function fetchCaptureContrats(): Promise<CaptureContratItem[]> {
   const response = await fetch(`${API_BASE}/api/capture/contrats`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (!response.ok) throw new Error(await parseError(response));
@@ -741,6 +757,7 @@ export async function fetchCaptureContrats(): Promise<CaptureContratItem[]> {
 
 export async function fetchCaptureCadeaux(): Promise<CaptureCadeauItem[]> {
   const response = await fetch(`${API_BASE}/api/capture/cadeaux`, {
+    ...AVEC_SESSION,
     headers: authHeaders(),
   });
   if (!response.ok) throw new Error(await parseError(response));
@@ -757,6 +774,7 @@ export async function estimerCadeau(photo: File): Promise<CaptureEstimationCadea
   const form = new FormData();
   form.append("file", photo);
   const response = await fetch(`${API_BASE}/api/capture/cadeau/estimer`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: authHeaders(),
     body: form,
@@ -808,6 +826,7 @@ export async function declarerCadeau(input: DeclarationCadeau): Promise<CadeauDe
   }
 
   const response = await fetch(`${API_BASE}/api/capture/cadeau`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: authHeaders(),
     body: form,
@@ -819,7 +838,10 @@ export async function declarerCadeau(input: DeclarationCadeau): Promise<CadeauDe
 export async function fetchCaptureDocument(documentId: string): Promise<CaptureDocumentDetail> {
   const response = await fetch(
     `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}`,
-    { headers: authHeaders() },
+    {
+      ...AVEC_SESSION,
+      headers: authHeaders(),
+    },
   );
   if (!response.ok) throw new Error(await parseError(response));
   return response.json();
@@ -843,6 +865,7 @@ export async function updateCaptureDocument(
   const response = await fetch(
     `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}`,
     {
+      ...AVEC_SESSION,
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ updates }),
@@ -856,7 +879,11 @@ export async function updateCaptureDocument(
 export async function deleteCaptureDocument(documentId: string): Promise<void> {
   const response = await fetch(
     `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}`,
-    { method: "DELETE", headers: authHeaders() },
+    {
+      ...AVEC_SESSION,
+      method: "DELETE",
+      headers: authHeaders(),
+    },
   );
   if (!response.ok) throw new Error(await parseError(response));
 }
@@ -868,7 +895,10 @@ export async function deleteCaptureDocument(documentId: string): Promise<void> {
 export async function fetchCaptureDocumentFile(documentId: string): Promise<Blob> {
   const response = await fetch(
     `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}/file`,
-    { headers: authHeaders() },
+    {
+      ...AVEC_SESSION,
+      headers: authHeaders(),
+    },
   );
   if (!response.ok) throw new Error(await parseError(response));
   return response.blob();
@@ -879,7 +909,10 @@ export async function fetchCaptureDocumentMessages(
 ): Promise<CaptureDocumentMessage[]> {
   const response = await fetch(
     `${API_BASE}/api/capture/documents/${encodeURIComponent(documentId)}/messages`,
-    { headers: authHeaders() },
+    {
+      ...AVEC_SESSION,
+      headers: authHeaders(),
+    },
   );
   if (!response.ok) throw new Error(await parseError(response));
   return response.json();

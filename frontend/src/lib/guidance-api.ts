@@ -1,7 +1,7 @@
 // Client de l'espace « pas encore immatriculé » : chat conversationnel, mémoire, feuille de route.
 // Complète `api.ts` (orchestrateur de la branche SIREN) — même base d'URL, même auth.
 
-import { authHeaders, clearAuth } from "@/lib/auth";
+import { AVEC_SESSION, authHeaders, clearAuth } from "@/lib/auth";
 import { getAnonId } from "@/lib/anon";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
@@ -15,6 +15,7 @@ async function parseError(response: Response): Promise<string> {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
+    ...AVEC_SESSION,
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),
@@ -223,6 +224,7 @@ export function fetchRoadmapState(sessionId: string): Promise<{
 /** Télécharge le PDF de la feuille de route affichée (identique à l'écran). */
 export async function downloadRoadmapPdf(sessionId: string | null, profil?: GuidanceProfile) {
   const response = await fetch(`${BASE}/roadmap/pdf`, {
+    ...AVEC_SESSION,
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ session_id: sessionId, profil: profil ?? null }),
