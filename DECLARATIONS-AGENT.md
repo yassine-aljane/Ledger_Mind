@@ -37,6 +37,7 @@ Six sources, chacune avec un rôle distinct :
 | Source | Alimente | Entre dans une case ? |
 |---|---|---|
 | Factures **émises** | CA encaissé (via rapprochement) + **TVA collectée** | oui |
+| **Cadeaux reçus** | avantages en nature, à leur valeur marchande | **oui**, sans flux bancaire |
 | Factures **reçues** (capture) | **TVA déductible** | oui, sur le CA3 |
 | Virements | encaissements + détection des revenus UE | oui |
 | Contrats | cohérence : prestation exécutée non facturée ? | **jamais** |

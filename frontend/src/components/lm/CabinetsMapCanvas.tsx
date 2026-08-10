@@ -8,7 +8,9 @@
  * `lazy()` côté client — l'import n'est jamais évalué sur le serveur.
  *
  * Corollaire : ne rien importer d'ici depuis un module rendu côté serveur. Les types
- * partagés et les briques sans Leaflet restent dans `CabinetsMap.tsx`.
+ * partagés et les briques sans Leaflet vivent dans `cabinets.tsx` — c'est bien de là
+ * qu'ils s'importent, pas de `CabinetsMap.tsx`, qui ne fait qu'aiguiller vers le rendu
+ * différé.
  */
 import { useEffect, useMemo } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";

@@ -12,10 +12,12 @@ from app.api import (
     facture,
     guidance,
     orchestrator,
+    product_assistant,
     rapport,
     declarations as declarations_api,
     rapport_fiscal,
     referral,
+    simulation,
     verification,
 )
 
@@ -54,6 +56,8 @@ app.include_router(verification.router)
 app.include_router(orchestrator.router)
 # Espace « pas encore immatriculé » : chat conversationnel, mémoire, feuille de route.
 app.include_router(guidance.router)
+# Assistant public de la landing page : documentation produit Pinecone, distincte du RAG fiscal.
+app.include_router(product_assistant.router)
 # Espace immatriculé (SIREN vérifié) : facture, rapport d'activité, déclaration préparée,
 # recherche d'expert-comptable (déclenchée depuis la déclaration).
 app.include_router(facture.router)
@@ -64,6 +68,8 @@ app.include_router(declaration.router)
 app.include_router(expert_comptable.router)
 app.include_router(echeancier.router)
 app.include_router(veille.router)
+# Scénarios « et si… » : expose le moteur `app.agents.impots` à l'écran de simulation.
+app.include_router(simulation.router)
 
 
 _scheduler = None

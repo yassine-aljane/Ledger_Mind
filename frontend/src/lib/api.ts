@@ -38,6 +38,23 @@ export function storeSessionId(id: string): void {
   }
 }
 
+/**
+ * Oublie l'identifiant de session mémorisé.
+ *
+ * Indispensable après un 403 : la session appartient à un AUTRE compte. Sans cet oubli, elle
+ * survit à la déconnexion, au changement de compte et à toute expiration de jeton — et chaque
+ * rechargement la redemande, reçoit le même 403, et laisse l'écran vide sans rien expliquer.
+ */
+export function clearSessionId(): void {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(SESSION_ID_KEY);
+    sessionStorage.removeItem(SESSION_ID_KEY);
+  } catch {
+    // ignore private-mode failures
+  }
+}
+
 // -------- Orchestrator --------
 
 export type Mismatch = {
@@ -219,6 +236,12 @@ export async function fetchSessionDetail(sessionId: string): Promise<SessionDeta
     headers: authHeaders(),
   });
   if (!response.ok) {
+    // 403 = la session appartient à un autre compte ; 404 = elle n'existe plus. Dans les deux
+    // cas l'identifiant mémorisé est mort : le garder condamnerait chaque rechargement à
+    // rejouer le même échec. On l'oublie pour que l'appelant puisse en résoudre un valide.
+    if (response.status === 403 || response.status === 404) {
+      if (getStoredSessionId() === sessionId) clearSessionId();
+    }
     throw new Error(await parseError(response));
   }
   return response.json();

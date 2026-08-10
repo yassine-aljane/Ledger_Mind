@@ -14,10 +14,12 @@ import { Route as ActiviteRouteImport } from './routes/activite'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CaptureRouteImport } from './routes/capture'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DeclarationRouteImport } from './routes/declaration'
 import { Route as EducationRouteImport } from './routes/education'
 import { Route as HistoriqueRouteImport } from './routes/historique'
 import { Route as ParametresRouteImport } from './routes/parametres'
 import { Route as PremiumRouteImport } from './routes/premium'
+import { Route as RapportRouteImport } from './routes/rapport'
 import { Route as ReferralRouteImport } from './routes/referral'
 import { Route as SimulateurRouteImport } from './routes/simulateur'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding.index'
@@ -51,6 +53,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeclarationRoute = DeclarationRouteImport.update({
+  id: '/declaration',
+  path: '/declaration',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EducationRoute = EducationRouteImport.update({
   id: '/education',
   path: '/education',
@@ -69,6 +76,11 @@ const ParametresRoute = ParametresRouteImport.update({
 const PremiumRoute = PremiumRouteImport.update({
   id: '/premium',
   path: '/premium',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RapportRoute = RapportRouteImport.update({
+  id: '/rapport',
+  path: '/rapport',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReferralRoute = ReferralRouteImport.update({
@@ -114,10 +126,12 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
+  '/declaration': typeof DeclarationRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
   '/premium': typeof PremiumRoute
+  '/rapport': typeof RapportRoute
   '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
@@ -132,10 +146,12 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
+  '/declaration': typeof DeclarationRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
   '/premium': typeof PremiumRoute
+  '/rapport': typeof RapportRoute
   '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
@@ -151,10 +167,12 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
+  '/declaration': typeof DeclarationRoute
   '/education': typeof EducationRoute
   '/historique': typeof HistoriqueRoute
   '/parametres': typeof ParametresRoute
   '/premium': typeof PremiumRoute
+  '/rapport': typeof RapportRoute
   '/referral': typeof ReferralRoute
   '/simulateur': typeof SimulateurRoute
   '/onboarding/diagnostic': typeof OnboardingDiagnosticRouteWithChildren
@@ -171,10 +189,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/capture'
     | '/dashboard'
+    | '/declaration'
     | '/education'
     | '/historique'
     | '/parametres'
     | '/premium'
+    | '/rapport'
     | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
@@ -189,10 +209,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/capture'
     | '/dashboard'
+    | '/declaration'
     | '/education'
     | '/historique'
     | '/parametres'
     | '/premium'
+    | '/rapport'
     | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
@@ -207,10 +229,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/capture'
     | '/dashboard'
+    | '/declaration'
     | '/education'
     | '/historique'
     | '/parametres'
     | '/premium'
+    | '/rapport'
     | '/referral'
     | '/simulateur'
     | '/onboarding/diagnostic'
@@ -226,10 +250,12 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CaptureRoute: typeof CaptureRoute
   DashboardRoute: typeof DashboardRoute
+  DeclarationRoute: typeof DeclarationRoute
   EducationRoute: typeof EducationRoute
   HistoriqueRoute: typeof HistoriqueRoute
   ParametresRoute: typeof ParametresRoute
   PremiumRoute: typeof PremiumRoute
+  RapportRoute: typeof RapportRoute
   ReferralRoute: typeof ReferralRoute
   SimulateurRoute: typeof SimulateurRoute
   OnboardingDiagnosticRoute: typeof OnboardingDiagnosticRouteWithChildren
@@ -275,6 +301,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/declaration': {
+      id: '/declaration'
+      path: '/declaration'
+      fullPath: '/declaration'
+      preLoaderRoute: typeof DeclarationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/education': {
       id: '/education'
       path: '/education'
@@ -301,6 +334,13 @@ declare module '@tanstack/react-router' {
       path: '/premium'
       fullPath: '/premium'
       preLoaderRoute: typeof PremiumRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rapport': {
+      id: '/rapport'
+      path: '/rapport'
+      fullPath: '/rapport'
+      preLoaderRoute: typeof RapportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/referral': {
@@ -372,10 +412,12 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CaptureRoute: CaptureRoute,
   DashboardRoute: DashboardRoute,
+  DeclarationRoute: DeclarationRoute,
   EducationRoute: EducationRoute,
   HistoriqueRoute: HistoriqueRoute,
   ParametresRoute: ParametresRoute,
   PremiumRoute: PremiumRoute,
+  RapportRoute: RapportRoute,
   ReferralRoute: ReferralRoute,
   SimulateurRoute: SimulateurRoute,
   OnboardingDiagnosticRoute: OnboardingDiagnosticRouteWithChildren,

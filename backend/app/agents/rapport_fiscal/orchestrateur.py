@@ -26,6 +26,7 @@ from . import sources
 from . import tva as tva_flag
 from .schemas import (
     Alerte,
+    CadeauRecu,
     ContexteFiscalRapport,
     DemandeRapport,
     RapportFiscal,
@@ -339,6 +340,29 @@ def _alertes_pieces(pieces: SourcesRapport) -> List[Alerte]:
             ),
         ))
 
+    if pieces.cadeaux:
+        alertes.append(Alerte(
+            niveau="vigilance",
+            titre=f"{_eur(pieces.total_cadeaux_eur)} d'avantages en nature comptés dans le CA",
+            message=(
+                f"{len(pieces.cadeaux)} cadeau(x) reçu(s) en contrepartie d'un service. "
+                "Fiscalement ce ne sont pas des cadeaux : un partenariat rémunéré en produits "
+                "est un revenu en nature, déclarable à sa valeur marchande. Ces montants "
+                "n'apparaissent sur AUCUN relevé bancaire — vérifiez chaque valeur retenue."
+            ),
+        ))
+
+    if pieces.cadeaux_a_valoriser:
+        alertes.append(Alerte(
+            niveau="critique",
+            titre=f"{len(pieces.cadeaux_a_valoriser)} cadeau(x) sans valeur retenue",
+            message=(
+                "Ces avantages en nature ne sont PAS comptés faute de valeur marchande, ce qui "
+                "minore votre chiffre d'affaires déclaré. Renseignez leur valeur dans vos "
+                "justificatifs avant de déclarer."
+            ),
+        ))
+
     if pieces.depenses:
         alertes.append(Alerte(
             niveau="info",
@@ -420,10 +444,14 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
         virements_analyses=len(tous_virements),
         contrats_en_cours=len(contrats),
         depenses_capturees=len(depenses),
+        cadeaux_recus=len(cadeaux),
         profil_onboarding=profil is not None,
         contrats=contrats,
         depenses=depenses,
+        cadeaux=[CadeauRecu(**c) for c in cadeaux],
+        cadeaux_a_valoriser=a_valoriser,
         total_depenses_eur=sources.total_eur(depenses),
+        total_cadeaux_eur=ca_cadeaux,
         revenu_contractuel_engage_eur=sources.total_eur(commerciaux),
         cadeaux_declares=collecte_cadeaux.nb_retenus,
         cadeaux=collecte_cadeaux.retenus,
@@ -508,6 +536,8 @@ def generer(uid: str, demande: DemandeRapport, profil: UserProfile | None = None
         date_fin=demande.date_fin,
         genere_le=datetime.now(timezone.utc).isoformat(),
         ca_retenu=ca_retenu,
+        ca_encaisse_bancaire=ca_bancaire,
+        ca_avantages_en_nature=ca_cadeaux,
         base_de_calcul=base,
         ca_encaisse_numeraire=ca_encaisse_numeraire,
         recettes_en_nature=recettes_nature,

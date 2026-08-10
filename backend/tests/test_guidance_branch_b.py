@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.agents.guidance.agent import ask_next_question, finalize_diagnostic
+from app.agents.guidance.chat import _accompagnement_repli, accompagnement_valide
 from app.agents.guidance.questions import next_missing_field
 from app.agents.guidance.understand import extraire_profil_regex
 from app.schemas.orchestrator import DiagnosticProfile, OrchestratorState, UserProfile
@@ -39,6 +40,30 @@ def test_ask_complete_when_profile_ready():
     )
     result = ask_next_question(diag)
     assert result.is_complete is True
+
+
+def test_accompagnement_repli_est_personnalise_et_actionnable():
+    roadmap = {
+        "bandeau": {"titre": "Micro-entreprise"},
+        "etapes": [{"titre": "Vérifier la nature de l'activité et le code APE"}],
+    }
+
+    texte = _accompagnement_repli(
+        {"activite": "création de contenu", "situation_actuelle": "salarié"},
+        roadmap,
+    )
+
+    assert "création de contenu" in texte
+    assert "Micro-entreprise" in texte
+    assert "Vérifier la nature de l'activité et le code APE" in texte
+    assert accompagnement_valide(texte) == (True, "")
+
+
+def test_accompagnement_trop_generique_est_refuse():
+    assert accompagnement_valide("Voici votre feuille de route. Avancez à votre rythme.") == (
+        False,
+        "moins de 3 phrases",
+    )
 
 
 @pytest.mark.asyncio

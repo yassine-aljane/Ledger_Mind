@@ -27,6 +27,17 @@ class Settings(BaseSettings):
     # Aucune base vectorielle ni modèle local à installer.
     embedding_model: str = "mistral-embed"
 
+    # Assistant produit de la landing page — corpus dédié dans Pinecone. Il reste séparé du
+    # corpus fiscal MongoDB : une question sur le prix ne doit jamais remonter un article BOFiP,
+    # et une question fiscale ne doit jamais prendre une page marketing pour source juridique.
+    pinecone_api_key: str | None = None
+    pinecone_index_name: str = "ledgermind-product"
+    pinecone_namespace: str = "product-docs"
+    pinecone_cloud: str = "aws"
+    pinecone_region: str = "us-east-1"
+    product_rag_top_k: int = 6
+    product_rag_min_score: float = 0.45
+
     # Veille réglementaire (Légifrance/PISTE, BOFiP, sources officielles via MCP).
     # Sans clés PISTE, la veille fonctionne quand même : les autres sources restent accessibles.
     piste_client_id: str = ""

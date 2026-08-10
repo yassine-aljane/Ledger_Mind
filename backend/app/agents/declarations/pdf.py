@@ -1,77 +1,44 @@
-"""Document de déclaration — destiné à la signature d'un expert-comptable.
+"""Rendu PDF d'une déclaration — le formulaire officiel, et rien d'autre.
 
-Ce n'est ni une liste de champs ni un lien vers un téléservice : c'est une PIÈCE, qui identifie
-l'entreprise, énonce la période, reprend les cases officielles du formulaire, détaille les
-prélèvements et se termine par un **bloc de signature** — attestation du déclarant, puis visa
-de l'expert-comptable avec date, cachet et signature.
+Une déclaration tient sur UNE page : celle de l'imprimé ou du téléservice officiel, remplie
+avec les montants calculés par le moteur d'impôt. C'est cette page que l'expert-comptable
+reconnaît, compare et vise. Toute mise en page ajoutée par-dessus l'obligerait à retrouver
+chaque rubrique au lieu de la lire à sa place habituelle.
 
-Ce que le document dit de lui-même, en toutes lettres :
+Ce module ne dessine donc rien lui-même : il ouvre le document, installe la police, choisit le
+gabarit qui convient (`templates.py`) et le laisse remplir la page. Les gabarits couvrent les
+cinq déclarations, plus le cas de la déclaration sans objet — aucune ne retombe sur une
+présentation libre.
 
-  * il n'a **pas été transmis** à l'administration ;
-  * chaque montant porte sa **provenance**, pour que le visa engage sur des chiffres vérifiables
-    et non sur une confiance aveugle ;
-  * une référence de case **non recoupée** est marquée comme telle plutôt que présentée comme
-    fiable.
+Ce que la page dit d'elle-même, en toutes lettres :
+
+  * elle n'a **pas été transmise** à l'administration ;
+  * une référence de case **non recoupée** est signalée plutôt que présentée comme fiable ;
+  * un numéro que l'administration seule attribue reste **à compléter**, jamais reconstitué.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from app.agents.facture.pdf import (
-    BORDER,
-    BUTTER_BG,
-    BUTTER_INK,
-    CREME,
-    INK,
-    MUTED,
-    NAVY,
-    NAVY_BG,
-    _eur,
-    _LATIN1_REPL,
-    _setup_font,
-)
+from app.agents.facture.pdf import _LATIN1_REPL, _setup_font
 
+from . import templates
 from .schemas import Brouillon, JeuDeclarations
-
-ALERTE_INK = (150, 42, 42)
-ALERTE_BG = (252, 238, 238)
-
-_MENTION_PIED = (
-    "Document préparé automatiquement à partir des pièces de l'entreprise. NON TRANSMIS à "
-    "l'administration. Il ne vaut ni déclaration déposée ni conseil fiscal."
-)
-
-
-def _fr_date(iso: Optional[str]) -> str:
-    if not iso:
-        return "—"
-    p = str(iso)[:10].split("-")
-    return f"{p[2]}/{p[1]}/{p[0]}" if len(p) == 3 else str(iso)
-
-
-def _pct(taux: Optional[float]) -> str:
-    if taux is None:
-        return "—"
-    valeur = taux * 100
-    decimales = 0 if abs(valeur - round(valeur)) < 0.005 else (1 if valeur >= 1 else 3)
-    return f"{valeur:.{decimales}f} %".replace(".", ",")
 
 
 def _classe_document():
     from fpdf import FPDF
 
     class Document(FPDF):
+        """Document sans en-tête ni pied automatiques.
+
+        Chaque gabarit officiel porte les siens, aux emplacements de l'imprimé : un pied
+        ajouté par fpdf viendrait s'y superposer.
+        """
+
         police = "Helvetica"
         rendre_texte = staticmethod(lambda s: s)
-
-        def footer(self) -> None:  # noqa: D102 - contrat fpdf2
-            self.set_y(-15)
-            self.set_font(self.police, "", 7)
-            self.set_text_color(*MUTED)
-            self.multi_cell(178, 3.4, self.rendre_texte(_MENTION_PIED), align="C")
-            self.set_y(-6)
-            self.cell(0, 4, self.rendre_texte(f"page {self.page_no()}"), align="R")
 
     return Document
 
@@ -81,12 +48,14 @@ def brouillon_to_pdf(
     jeu: JeuDeclarations,
     emetteur: Optional[Dict[str, Any]] = None,
 ) -> bytes:
-    """Rend UNE déclaration en document signable."""
+    """Rend UNE déclaration sur son formulaire officiel."""
     emetteur = emetteur or {}
     pdf = _classe_document()(format="A4", unit="mm")
-    pdf.set_auto_page_break(auto=True, margin=24)
+    # Pas de saut de page automatique : un formulaire officiel tient sur sa page, et un
+    # débordement silencieux sur une deuxième page passerait inaperçu à la relecture.
+    pdf.set_auto_page_break(auto=False)
     pdf.add_page()
-    pdf.set_margins(16, 14, 16)
+    pdf.set_margins(8, 8, 8)
     font, unicode_ok = _setup_font(pdf)
 
     def texte(s: str) -> str:
@@ -230,6 +199,39 @@ def brouillon_to_pdf(
             "Identifiez laquelle avant de viser ce document."
         )
 
+    # --- Avantages en nature : dans les cases, hors de tout relevé ----------
+    if brouillon.type in ("ca_urssaf", "revenus_2042") and jeu.cadeaux_recus:
+        titre_section("Avantages en nature inclus dans les montants déclarés")
+        paragraphe(
+            "Fiscalement, ce ne sont PAS des cadeaux : un partenariat rémunéré en produits "
+            "est un revenu en nature, déclarable à sa valeur marchande. Ces montants sont "
+            "compris dans les cases ci-dessus, alors qu'ils n'apparaissent sur AUCUN relevé "
+            "bancaire — leur justification tient aux pièces jointes, pas à un virement."
+        )
+        pdf.ln(1)
+        _tableau(
+            pdf, font, texte,
+            largeurs=(24, 54, 40, 28, 32),
+            entetes=("Date", "Objet reçu", "Marque", "Contrepartie", "Valeur"),
+            alignements=("L", "L", "L", "L", "R"),
+            lignes=[
+                (_fr_date(c.get("date")), (c.get("description") or "—")[:30],
+                 (c.get("marque") or "—")[:22], (c.get("contrepartie") or "—")[:16],
+                 eur(c.get("valeur_eur")))
+                for c in jeu.cadeaux_recus
+            ],
+        )
+        pdf.ln(1)
+        cle_valeur("Total des avantages en nature", eur(jeu.total_cadeaux_eur), gras=True)
+
+    if brouillon.type == "ca_urssaf" and jeu.cadeaux_a_valoriser:
+        titre_section("Cadeaux reçus sans valeur retenue")
+        paragraphe(
+            f"{len(jeu.cadeaux_a_valoriser)} avantage(s) en nature ne sont PAS compris dans "
+            "les montants ci-dessus, faute de valeur marchande retenue. Le chiffre d'affaires "
+            "déclaré s'en trouve minoré : valorisez-les avant de transmettre."
+        )
+
     # --- Contrats en cours : contexte, jamais une case ----------------------
     if brouillon.type == "ca_urssaf" and jeu.contrats_actifs:
         titre_section("Contrats en cours sur la période")
@@ -265,170 +267,6 @@ def brouillon_to_pdf(
 
     _bloc_signature(pdf, font, texte, titre_section)
     return bytes(pdf.output())
-
-
-def _tableau(pdf, font, texte, *, largeurs, entetes, alignements, lignes) -> None:
-    """Tableau générique, avec en-tête répété après un saut de page."""
-    def en_tete() -> None:
-        pdf.set_fill_color(*NAVY_BG)
-        pdf.set_text_color(*NAVY)
-        pdf.set_font(font, "B", 8)
-        for largeur, entete, align in zip(largeurs, entetes, alignements):
-            pdf.cell(largeur, 6.5, texte(entete), fill=True, align=align)
-        pdf.ln(6.5)
-        pdf.set_text_color(*INK)
-        pdf.set_font(font, "", 8)
-
-    en_tete()
-    for ligne in lignes:
-        if pdf.get_y() > 252:
-            pdf.add_page()
-            en_tete()
-        for largeur, valeur, align in zip(largeurs, ligne, alignements):
-            pdf.cell(largeur, 5.6, texte(str(valeur)), align=align)
-        pdf.ln(5.6)
-
-
-def _tableau_champs(pdf, font, texte, eur, brouillon: Brouillon) -> None:
-    """Les cases officielles. Une référence non recoupée est marquée, jamais tue."""
-    largeurs = (18, 96, 34, 30)
-    entetes = ("Case", "Libellé officiel", "Montant", "Fiabilité")
-
-    pdf.set_fill_color(*NAVY_BG)
-    pdf.set_text_color(*NAVY)
-    pdf.set_font(font, "B", 8)
-    for largeur, entete in zip(largeurs, entetes):
-        pdf.cell(largeur, 6.5, texte(entete), fill=True,
-                 align="R" if entete == "Montant" else "L")
-    pdf.ln(6.5)
-
-    pdf.set_text_color(*INK)
-    pdf.set_font(font, "", 8)
-    for champ in brouillon.champs:
-        if pdf.get_y() > 250:
-            pdf.add_page()
-        if isinstance(champ.valeur, bool):
-            valeur = "Oui" if champ.valeur else "Non"
-        elif isinstance(champ.valeur, (int, float)):
-            valeur = eur(champ.valeur) if champ.unite == "EUR" else str(champ.valeur)
-        else:
-            valeur = str(champ.valeur) if champ.valeur else "à compléter"
-
-        pdf.cell(largeurs[0], 5.6, texte(champ.case or "—"))
-        pdf.cell(largeurs[1], 5.6, texte(champ.libelle[:58]))
-        pdf.cell(largeurs[2], 5.6, texte(valeur), align="R")
-        pdf.set_text_color(*(BUTTER_INK if champ.fiabilite == "a_verifier" else MUTED))
-        pdf.cell(largeurs[3], 5.6,
-                 texte("À VÉRIFIER" if champ.fiabilite == "a_verifier" else "confirmée"))
-        pdf.set_text_color(*INK)
-        pdf.ln(5.6)
-        pdf.set_draw_color(*BORDER)
-        pdf.line(16, pdf.get_y(), 194, pdf.get_y())
-
-
-def _tableau_prelevements(pdf, font, texte, eur, prelevements: Dict[str, Any]) -> None:
-    largeurs = (74, 34, 34, 36)
-    entetes = ("Prélèvement", "Assiette", "Taux", "Montant")
-
-    pdf.set_fill_color(*NAVY_BG)
-    pdf.set_text_color(*NAVY)
-    pdf.set_font(font, "B", 8)
-    for largeur, entete in zip(largeurs, entetes):
-        pdf.cell(largeur, 6.5, texte(entete), fill=True,
-                 align="L" if entete == "Prélèvement" else "R")
-    pdf.ln(6.5)
-    pdf.set_text_color(*INK)
-    pdf.set_font(font, "", 8)
-
-    def ligne(libelle: str, assiette: float, taux: Optional[float], montant: float) -> None:
-        if pdf.get_y() > 250:
-            pdf.add_page()
-        pdf.cell(largeurs[0], 5.6, texte(libelle))
-        pdf.cell(largeurs[1], 5.6, texte(eur(assiette)), align="R")
-        pdf.cell(largeurs[2], 5.6, texte(_pct(taux)), align="R")
-        pdf.cell(largeurs[3], 5.6, texte(eur(montant)), align="R")
-        pdf.ln(5.6)
-
-    for poste in prelevements.get("postes") or []:
-        ligne(f"Cotisations sociales — {poste['categorie']}", poste["ca"],
-              poste.get("taux_cotisations"), poste["cotisations_sociales"])
-        libelle_cfp = "Formation professionnelle (CFP)"
-        if poste.get("cfp_exoneree"):
-            libelle_cfp += " — exonérée"
-        ligne(libelle_cfp, poste["ca"], poste.get("taux_cfp"), poste["cfp"])
-        if poste.get("tfcc_applicable"):
-            ligne("Chambre consulaire (TFCC)", poste["ca"], poste.get("taux_tfcc"),
-                  poste["tfcc"])
-        if poste.get("versement_liberatoire") is not None:
-            ligne("Versement libératoire de l'impôt", poste["ca"],
-                  poste.get("taux_versement_liberatoire"), poste["versement_liberatoire"])
-
-
-def _encadre(pdf, font, texte, encre, fond, titre: str, message: str) -> None:
-    if pdf.get_y() > 240:
-        pdf.add_page()
-    pdf.set_fill_color(*fond)
-    pdf.set_draw_color(*fond)
-    pdf.set_x(16)
-    pdf.set_text_color(*encre)
-    if titre:
-        pdf.set_font(font, "B", 9)
-        pdf.multi_cell(178, 5, texte(titre), fill=True)
-        pdf.set_x(16)
-    pdf.set_font(font, "", 7.5)
-    pdf.multi_cell(178, 4, texte(message), fill=True)
-    pdf.set_text_color(*INK)
-    pdf.ln(2)
-
-
-def _bloc_signature(pdf, font, texte, titre_section, sans_montant: bool = False) -> None:
-    """Attestation du déclarant puis visa de l'expert-comptable.
-
-    Deux signatures distinctes, et c'est le fond du document : le déclarant atteste de
-    l'exactitude de ses pièces, l'expert-comptable vise ce qu'il a vérifié. Confondre les
-    deux ferait porter à l'un la responsabilité de l'autre.
-    """
-    if pdf.get_y() > 195:
-        pdf.add_page()
-
-    titre_section("Attestation et visa")
-    pdf.set_font(font, "", 7.5)
-    pdf.set_text_color(*MUTED)
-    pdf.multi_cell(178, 4, texte(
-        "Le déclarant atteste de l'exactitude et de l'exhaustivité des pièces transmises. "
-        "L'expert-comptable appose son visa sur les montants qu'il a vérifiés. Ce visa ne vaut "
-        "pas dépôt : la transmission à l'administration reste à la charge du déclarant."
-    ))
-    pdf.set_text_color(*INK)
-    pdf.ln(3)
-
-    y = pdf.get_y()
-    largeur = 86
-    for index, (titre, lignes) in enumerate([
-        ("LE DÉCLARANT", ["Nom et qualité", "Fait à", "Le", "Signature"]),
-        ("L'EXPERT-COMPTABLE", ["Nom et n° d'inscription à l'Ordre",
-                                "Cabinet", "Le", "Signature et cachet"]),
-    ]):
-        x = 16 + index * (largeur + 6)
-        pdf.set_xy(x, y)
-        pdf.set_draw_color(*BORDER)
-        pdf.rect(x, y, largeur, 52)
-        pdf.set_xy(x + 4, y + 4)
-        pdf.set_font(font, "B", 8)
-        pdf.set_text_color(*NAVY)
-        pdf.cell(largeur - 8, 5, texte(titre), ln=2)
-        pdf.set_font(font, "", 7.5)
-        pdf.set_text_color(*MUTED)
-        for libelle in lignes:
-            pdf.set_x(x + 4)
-            pdf.cell(largeur - 8, 4.5, texte(libelle), ln=2)
-            # Ligne à remplir à la main.
-            trait_y = pdf.get_y() + 3
-            pdf.set_draw_color(210, 214, 222)
-            pdf.line(x + 4, trait_y, x + largeur - 4, trait_y)
-            pdf.set_y(trait_y + 2)
-    pdf.set_y(y + 56)
-    pdf.set_text_color(*INK)
 
 
 def jeu_to_pdf(jeu: JeuDeclarations, emetteur: Optional[Dict[str, Any]] = None) -> bytes:
