@@ -217,8 +217,9 @@ class SourcesRapport(BaseModel):
     # -- Avantages en nature --------------------------------------------------
     # Contrairement aux contrats et aux dépenses, ceux-ci ENTRENT dans l'assiette :
     # un produit reçu en contrepartie d'un post est une recette, pas un contexte.
+    # Le détail pièce par pièce est celui de `cadeaux` ci-dessus : une seule liste, pour que
+    # ce qui est affiché ne puisse jamais contredire le total entré dans l'assiette.
     cadeaux_declares: int = 0
-    cadeaux: List[CadeauRecette] = Field(default_factory=list)
     recettes_en_nature_eur: float = 0.0
     # Cadeaux connus mais non comptés (devise non convertie, date manquante) : ils sont
     # exposés pour que l'écart avec l'espace Justificatifs soit explicable.

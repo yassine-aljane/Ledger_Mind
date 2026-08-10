@@ -14,7 +14,7 @@
  *    couleur, et une confiance basse ne pré-remplit pas le montant.
  */
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   Camera,
   Check,
@@ -22,6 +22,7 @@ import {
   Gift,
   Info,
   Loader2,
+  Pencil,
   TriangleAlert,
   X,
   XCircle,
@@ -166,6 +167,10 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
   const [dateReception, setDateReception] = useState(todayIso());
   const [valeur, setValeur] = useState("");
   const [contrepartie, setContrepartie] = useState("");
+  // Repliée par défaut : ce qui vient de la machine se relit d'abord, et ne s'ouvre à la
+  // correction que sur demande — ou d'office quand l'extraction est trop incomplète pour
+  // qu'on puisse déclarer en l'état.
+  const [corriger, setCorriger] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +187,6 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
     setDateReception(todayIso());
     setValeur("");
     setContrepartie("");
-    if (photoRef.current) photoRef.current.value = "";
   }
 
   async function handlePhoto(fichier: File | null) {
@@ -287,40 +291,30 @@ export function CadeauDeclaration({ onDeclare }: { onDeclare: () => void }) {
           </p>
         </div>
 
-      {/* Photo : point de départ facultatif. Sans elle, le formulaire reste saisissable. */}
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          ref={photoRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
+      {/* Photo : point de départ facultatif. Sans elle, le formulaire reste saisissable.
+          La scène cadeau porte elle-même son input, l'aperçu, le nom du fichier et l'état
+          d'analyse — dupliquer l'aperçu ici afficherait deux fois la même photo. */}
+      <div className="px-5 pt-4">
+        <GiftCadeauDrop
+          variant="panel"
+          onFiles={(fichiers) => void handlePhoto(Array.from(fichiers)[0] ?? null)}
+          preview={apercu}
+          fileName={photo?.name ?? null}
+          busy={estimating}
+          disabled={saving}
         />
 
-        {(apercu || photo) && (
-          <div className="flex flex-wrap items-center gap-3 border-t border-border px-5 py-4">
-            {apercu && (
-              <img
-                src={apercu}
-                alt="Aperçu du cadeau déposé"
-                className="max-h-28 rounded-xl border border-border object-contain"
-              />
-            )}
-            {photo && (
-              <span className="flex min-w-0 items-center gap-2 text-[0.8125rem] text-muted-foreground">
-                <span className="max-w-56 truncate">{photo.name}</span>
-                <button
-                  type="button"
-                  onClick={reinitialiser}
-                  disabled={estimating || saving}
-                  className="text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
-                  aria-label="Retirer la photo"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </span>
-            )}
+        {photo && (
+          <div className="flex justify-end pt-3">
+            <button
+              type="button"
+              onClick={reinitialiser}
+              disabled={estimating || saving}
+              className="inline-flex items-center gap-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+            >
+              <X className="size-3.5" />
+              Retirer la photo
+            </button>
           </div>
         )}
       </div>
