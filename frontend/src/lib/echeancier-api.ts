@@ -1,7 +1,7 @@
 // Client du Centre d'Actions : agenda fiscal, confirmation de paiement, historique.
 // Même base d'URL et même authentification que api.ts / guidance-api.ts / facturation-api.ts.
 
-import { authHeaders, clearAuth } from "@/lib/auth";
+import { AVEC_SESSION, authHeaders, clearAuth } from "@/lib/auth";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 const BASE = `${API_BASE}/api/echeancier`;
@@ -14,6 +14,7 @@ async function parseError(response: Response): Promise<string> {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
+    ...AVEC_SESSION,
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),

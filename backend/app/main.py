@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+import re
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.core import ai_act
@@ -41,21 +44,44 @@ def _cors_origins() -> list[str]:
     return sorted(origins)
 
 
+_LOCALHOST_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+# Méthodes qui modifient un état : ce sont elles, et elles seules, qu'une requête forgée depuis un
+# autre site chercherait à déclencher. Une lecture ne présente pas le même risque.
+_METHODES_ECRITURE = {"POST", "PUT", "PATCH", "DELETE"}
+
+# Calculées une fois : la liste est figée au démarrage, la relire à chaque requête ne servirait
+# qu'à reparser la configuration.
+_ORIGINES = frozenset(_cors_origins())
+_LOCALHOST = re.compile(_LOCALHOST_REGEX)
+
+
+def _origine_autorisee(origine: str) -> bool:
+    return origine in _ORIGINES or _LOCALHOST.match(origine) is not None
+
+
 @app.middleware("http")
-async def marquage_ia(request, call_next):
-    """Pose les en-têtes de transparence IA sur toute réponse de l'API.
+async def verifier_origine(request: Request, call_next):
+    """Rejette les écritures venues d'une origine non autorisée (protection CSRF).
 
-    Tout ce que ce backend renvoie est produit par des systèmes d'IA. Un client qui
-    consomme l'API sans passer par notre interface — intégration tierce, robot d'indexation,
-    agrégateur — n'a que ces en-têtes pour savoir que la charge utile est synthétique : le
-    marquage visible, lui, vit dans le frontend et ne l'atteint jamais.
+    Depuis que la session vit dans un cookie, le navigateur l'attache TOUT SEUL à chaque appel —
+    y compris à un appel déclenché par un site malveillant. C'est le revers du cookie : il
+    supprime le vol de jeton par script injecté, mais ouvre la porte à la requête forgée.
 
-    `/health` en est exclu : ce n'est pas du contenu, et un moniteur n'a rien à en déduire.
+    L'attribut `SameSite` est la première barrière ; elle disparaît si le déploiement impose
+    `samesite=none` (front et back sur des domaines différents). Cette vérification, elle, tient
+    dans les deux cas et ne coûte rien : le navigateur pose `Origin` sur toute requête d'écriture
+    et interdit à une page de le falsifier.
+
+    Une requête sans `Origin` n'est pas bloquée : ce sont les appels hors navigateur (scripts,
+    tests, `curl`), qui ne peuvent pas être forgés à l'insu de quelqu'un — il n'y a pas de session
+    ambiante à détourner.
     """
-    reponse = await call_next(request)
-    if request.url.path != "/health":
-        reponse.headers.update(ai_act.entetes_http())
-    return reponse
+    if request.method in _METHODES_ECRITURE:
+        origine = request.headers.get("origin")
+        if origine and not _origine_autorisee(origine):
+            return JSONResponse(status_code=403, content={"detail": "Origine non autorisée."})
+    return await call_next(request)
 
 
 app.add_middleware(
@@ -63,12 +89,14 @@ app.add_middleware(
     allow_origins=_cors_origins(),
     # Vite may bind :3001/:5173/… when :3000 is taken; browsers also treat
     # localhost and 127.0.0.1 as different origins.
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origin_regex=_LOCALHOST_REGEX,
     allow_methods=["*"],
     allow_headers=["*"],
-    # Sans cette liste, le navigateur masque les en-têtes de transparence au JavaScript de
-    # la page : `allow_headers` couvre la requête, pas la lecture de la réponse.
-    expose_headers=list(ai_act.entetes_http().keys()),
+    # Sans ceci, le navigateur refuse d'envoyer le cookie de session sur un appel inter-origine —
+    # front et back n'étant pas sur le même port, c'est le cas de TOUS les appels authentifiés.
+    # À noter : `allow_credentials` est incompatible avec une origine `*`, d'où la liste explicite
+    # ci-dessus, qu'il faut tenir à jour en production (FRONTEND_ORIGIN).
+    allow_credentials=True,
 )
 
 app.include_router(ai_act_api.router)

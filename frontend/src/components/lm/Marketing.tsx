@@ -121,7 +121,21 @@ export function SiteFooter() {
             <Sparkles className="size-3.5 shrink-0 text-safran" aria-hidden />
             Conçu avec l&apos;IA en toute transparence · Les réponses importantes restent à vérifier.
           </p>
-          <p className="shrink-0">© 2026 LedgerMind</p>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Link to="/confidentialite" className="transition-colors hover:text-ink-foreground/80">
+              Confidentialité
+            </Link>
+            <span aria-hidden>·</span>
+            <Link to="/cookies" className="transition-colors hover:text-ink-foreground/80">
+              Cookies
+            </Link>
+            <span aria-hidden>·</span>
+            <Link to="/mes-donnees" className="transition-colors hover:text-ink-foreground/80">
+              Mes données
+            </Link>
+            <span aria-hidden>·</span>
+            <span>© 2026 LedgerMind</span>
+          </p>
         </div>
       </div>
     </footer>

@@ -33,7 +33,8 @@ lecture des pièces reçues et le calcul de l'impôt.
 15. [Conventions et pièges](#15-conventions-et-pièges)
 16. [Intégrations externes](#16-intégrations-externes)
 17. [Documents de référence](#17-documents-de-référence)
-18. [Aide-mémoire](#18-aide-mémoire)
+18. [RGPD, confidentialité et sécurité des sessions](#18-rgpd-confidentialité-et-sécurité-des-sessions)
+19. [Aide-mémoire](#19-aide-mémoire)
 
 ---
 
@@ -319,7 +320,11 @@ Définies dans `backend/.env` (modèle complet et commenté dans `backend/.env.e
 | `MONGO_DB_NAME` | Nom de la base | `ledgermind` |
 | `AUTH_SECRET` | Clé de signature JWT (**≥ 32 caractères**) | à changer en production |
 | `AUTH_TOKEN_DAYS` | Durée de vie du jeton | `14` |
-| `FRONTEND_ORIGIN` | Liste CORS, séparée par des virgules | `http://localhost:3000` |
+| `FRONTEND_ORIGIN` | Liste CORS, séparée par des virgules — **pas de `*`**, les identifiants sont activés | `http://localhost:3000` |
+| `AUTH_COOKIE_NAME` | Nom du cookie de session | `ledgermind_session` |
+| `AUTH_COOKIE_SECURE` | **`true` en production** — un cookie `Secure` n'est jamais posé en HTTP | `false` |
+| `AUTH_COOKIE_SAMESITE` | `lax` si front et back partagent le domaine ; **`none` sinon**, voir §18 | `lax` |
+| `AUTH_COOKIE_DOMAIN` | Uniquement pour partager le cookie entre sous-domaines ; vide = hôte seul | *(vide)* |
 | `PINECONE_API_KEY` | Chatbot produit (facultatif) | votre clé |
 | `PINECONE_INDEX_NAME` / `_NAMESPACE` | Index et namespace produit | `ledgermind-product` / `product-docs` |
 | `PRODUCT_RAG_TOP_K` / `_MIN_SCORE` | Réglage de la recherche produit | `6` / `0.45` |
@@ -387,7 +392,11 @@ MongoDB + JWT, sans dépendance externe.
 
 - Inscription → `POST /api/auth/register` (utilisateur créé dans la collection `users`)
 - Connexion → `POST /api/auth/login`
-- Le jeton vit dans `localStorage` (`ledgermind_access_token`) et part en `Authorization: Bearer …`
+- Déconnexion → `POST /api/auth/logout` — le serveur seul peut retirer le cookie, pas le navigateur
+- **Le jeton vit dans un cookie `httpOnly`**, illisible par JavaScript. Il n'est ni dans le corps
+  de la réponse ni dans `localStorage`. Les appels navigateur portent `credentials: "include"`
+- `isAuthed()` côté client est un **indice d'affichage** (une identité est-elle mémorisée ?), pas
+  un contrôle d'accès : chaque route protégée revérifie le cookie côté serveur
 - Le bouton Google OAuth est désactivé (non implémenté)
 
 ### Mise en route — `/onboarding/`
@@ -807,10 +816,17 @@ Sauf mention contraire, tous les endpoints exigent un JWT (`Authorization: Beare
 
 | Méthode | Chemin | Description |
 |---|---|---|
-| `POST` | `/register` | Création du compte dans Mongo + JWT |
-| `POST` | `/login` | Connexion + JWT |
+| `POST` | `/register` | Création du compte dans Mongo, **pose le cookie de session `httpOnly`** |
+| `POST` | `/login` | Connexion, **pose le cookie de session `httpOnly`** |
+| `POST` | `/logout` | Retire le cookie — seul le serveur peut effacer un cookie `httpOnly` |
 | `GET` | `/me` | Compte courant + `agent_context` |
 | `GET` | `/context` | Instantanés intake / guidance / capture / referral |
+
+> Le JWT voyage dans un cookie `httpOnly` et **n'est plus renvoyé dans le corps de la réponse** :
+> l'exposer à JavaScript annulerait le bénéfice. `deps.py` lit le cookie d'abord et se rabat sur
+> l'en-tête `Authorization`, si bien que scripts et tests continuent de fonctionner. Les appels
+> navigateur doivent donc porter `credentials: "include"` (`AVEC_SESSION` dans `lib/auth.ts`).
+> Voir §18.
 
 ### Orchestrateur — `/api/orchestrator`
 
@@ -1159,15 +1175,25 @@ Recharts · Leaflet · TanStack Query · Sonner.
 
 ### Stockage navigateur
 
+L'inventaire complet — **13 entrées** entre cookies, `localStorage` et `sessionStorage` — vit dans
+**[`frontend/src/lib/traceurs.ts`](frontend/src/lib/traceurs.ts)**, qui alimente aussi la politique
+cookies publiée. Le tableau ci-dessous n'en donne que les principales.
+
 | Clé | Contenu |
 |---|---|
-| `ledgermind_access_token` · `ledgermind_user` | Jeton JWT et compte en cache |
+| `ledgermind_session` | **Cookie `httpOnly`** — le jeton de session. Illisible par JavaScript |
+| `ledgermind_user` | Compte en cache (identité affichable uniquement) |
+| `ledgermind_access_token` | Reliquat d'avant la bascule en cookie. Plus rien ne l'écrit |
 | `ledgermind_session_id` | Session d'orchestrateur courante |
 | `ledgermind_diagnostic_result` | Cache de la page de résultat (sessionStorage) |
 | `ledgermind_scenarios_brouillon` | Brouillon de scénarios |
 | `lm.anon_id` | Identité anonyme (en-tête `X-Anon-Id`) |
 | `lm.plan.<uid>` | Formule du compte (démo) |
-| `lm.theme` | Thème clair / sombre |
+| `lm.theme` · `sidebar_state` | Thème clair / sombre, volet de navigation |
+
+> **Ajouter une clé de stockage impose de l'ajouter à `traceurs.ts` dans le même commit** — c'est
+> la source de la politique cookies, et un traceur non documenté est un manquement, pas un détail.
+> Voir §18.
 
 ---
 
@@ -1288,6 +1314,13 @@ prompt. Si la valeur n'a pas été recoupée avec la source officielle, la marqu
 11. **Petites PR** : agent, API et interface dans des commits distincts. Voir
     [CONTRIBUTING.md](CONTRIBUTING.md) et [.github/CODEOWNERS](.github/CODEOWNERS) — la relecture
     du propriétaire d'un dossier est demandée automatiquement.
+12. **Tout nouvel appel `fetch` authentifié porte `...AVEC_SESSION`** — sans cette option le cookie
+    de session ne part pas sur un appel inter-origine, et la route répond 401. Voir §18.
+13. **Toute nouvelle clé de stockage navigateur va dans `lib/traceurs.ts`, dans le même commit** —
+    elle alimente la politique cookies publiée ; un traceur non documenté est un manquement de
+    conformité, pas un détail.
+14. **Un écran qui annonce une déconnexion appelle `logout()` ou `revoquerSession()`** : effacer le
+    stockage local ne ferme pas la session, puisque le cookie est `httpOnly`.
 
 ---
 
@@ -1353,6 +1386,7 @@ what is inside them, and signs a real image to read its manifest back.
 | [docs/ARCHITECTURE-BASE-DE-DONNEES.md](docs/ARCHITECTURE-BASE-DE-DONNEES.md) | Vous ajoutez une collection ou déboguez un index / un doublon |
 | [docs/FACTURATION-VALEURS-REGLEMENTAIRES.md](docs/FACTURATION-VALEURS-REGLEMENTAIRES.md) | Vous révisez `data/facturation.yaml` après une loi de finances |
 | [docs/veille-personnalisee.md](docs/veille-personnalisee.md) | Vous travaillez sur la veille — ce qui est garanti, ce qui ne l'est pas, points ouverts |
+| [docs/RGPD-ET-SECURITE.md](docs/RGPD-ET-SECURITE.md) | Vous touchez au stockage navigateur, à l'authentification, aux pages de confidentialité — ou vous préparez une mise en production. Voir §18 |
 | [docs/AGENT2-INSIGHTS.md](docs/AGENT2-INSIGHTS.md) | Conception de l'agent d'insights post-immatriculation |
 | `NOTE-CALCULS-FISCAUX.pdf` | Vous voulez la note de calcul, générée depuis le moteur |
 | `docs/Guide_LedgerMind_Rapport_Fiscal.pdf` | Guide utilisateur du rapport fiscal |
@@ -1360,7 +1394,90 @@ what is inside them, and signs a real image to read its manifest back.
 
 ---
 
-## 18. Aide-mémoire
+## 18. RGPD, confidentialité et sécurité des sessions
+
+Détail complet : **[`docs/RGPD-ET-SECURITE.md`](docs/RGPD-ET-SECURITE.md)**. Ci-dessous la version courte.
+
+### Les trois pages publiques
+
+| Route | Fichier | Rôle |
+|---|---|---|
+| `/confidentialite` | `routes/confidentialite.tsx` | Politique de confidentialité (RGPD art. 13) — le document réellement **obligatoire** |
+| `/cookies` | `routes/cookies.tsx` | Politique cookies et traceurs |
+| `/mes-donnees` | `routes/mes-donnees.tsx` | Inventaire en direct de ce qui est stocké dans le navigateur, avec effacement |
+
+Les trois sont liées depuis le pied de page du site public (`components/lm/Marketing.tsx`).
+
+### Deux réglementations, deux déclencheurs
+
+ePrivacy se déclenche sur **l'écriture sur l'appareil** du visiteur ; le RGPD sur **le traitement
+de données personnelles**. La sensibilité de ce que traite LedgerMind (SIREN, KBIS, factures)
+relève de la seconde colonne uniquement — elle **ne crée pas** d'obligation de bandeau cookies.
+
+**Il n'y a volontairement aucun bandeau de consentement** : tous les traceurs sont strictement
+nécessaires au service demandé, donc exemptés. Demander une autorisation que l'utilisateur ne peut
+pas refuser sans casser l'application serait un consentement de façade — la page `/cookies` assume
+et explique ce choix. **Un bandeau deviendra obligatoire le jour où une mesure d'audience sera
+ajoutée.**
+
+### Catalogue des traceurs — `lib/traceurs.ts`
+
+Source unique de vérité des **13 entrées** réellement posées sur l'appareil, partagée entre
+`/cookies` (qui les publie) et `/mes-donnees` (qui les inspecte et les efface). Deux listes
+séparées auraient dérivé, et une politique qui décrit des traceurs inexistants — ou qui en oublie
+— est aussi fautive qu'une politique absente.
+
+> **Règle** : une nouvelle clé de stockage entre dans `traceurs.ts` **dans le même commit**.
+> `/mes-donnees` signale les clés non répertoriées, mais le filet ne remplace pas la règle.
+
+**Le cookie `httpOnly` est l'exception qui confirme la règle.** JavaScript ne peut ni le lire ni
+l'effacer, ce qui entraîne trois obligations — en manquer une fait dire au produit quelque chose de
+faux :
+
+1. Il est **quand même catalogué** (`observable: false`). Un cookie non documenté est un manquement
+   de conformité, qu'on puisse le lire ou non.
+2. `/mes-donnees` affiche **« Non lisible depuis cette page »**, jamais « Absent » — « Absent »
+   laisserait croire qu'aucune session n'est ouverte.
+3. **« Tout effacer » appelle `revoquerSession()`** (`lib/auth.ts` → `POST /api/auth/logout`) en
+   plus de `effacer("tout")`. Une écriture dans `document.cookie` est ignorée en silence pour un
+   cookie `httpOnly` : sans l'appel serveur, l'interface repasse en visiteur pendant que la session
+   reste valide — une promesse de sécurité fausse, sur l'écran même qui la formule.
+
+### Sécurité des sessions — cookie `httpOnly`
+
+Le JWT vivait dans `localStorage`, lisible par tout script de la page : une injection suffisait à
+emporter la session, et avec elle les justificatifs fiscaux du compte. Il voyage désormais dans un
+cookie `httpOnly` et n'est plus renvoyé dans le corps de la réponse.
+
+Un cookie étant attaché **automatiquement** par le navigateur, cela supprime le vol de jeton mais
+ouvre la porte à la requête forgée. `SameSite` couvre le cas courant et disparaît sous
+`samesite=none` ; un **contrôle d'origine sur les méthodes d'écriture** (`app/main.py`) tient dans
+les deux cas.
+
+**La déconnexion est désormais un aller-retour serveur** (`POST /api/auth/logout`) : seul le
+serveur qui a posé un cookie `httpOnly` peut le retirer.
+
+⚠️ **Piège de déploiement** — si le front et le back sont sur des domaines **différents**,
+`AUTH_COOKIE_SAMESITE` doit valoir `none` (avec `AUTH_COOKIE_SECURE=true`). Laissé à `lax`, le
+navigateur n'enverra jamais le cookie et **toutes les routes protégées répondront 401**. Poser
+aussi `AUTH_COOKIE_SECURE=true` en HTTPS. À noter : les sessions en cours sont invalidées au
+déploiement, chaque utilisateur se reconnecte une fois.
+
+### Manques connus
+
+| Manque | État |
+|---|---|
+| Endpoint de suppression de compte | **Absent** — honorer une demande impose de supprimer à la main dans plusieurs collections *et* GridFS |
+| Export des données (portabilité) | **Absent** — manuel |
+| Adresse de contact, identité du responsable de traitement | Placeholders dans les deux pages |
+| Clauses contractuelles types pour Gemini / Pinecone | **Affirmées dans `/confidentialite` §5, invérifiables depuis le code** — à contrôler avant publication |
+
+Le RGPD impose de **répondre** sous un mois, pas de fournir un bouton : les deux premiers points
+sont donc légalement satisfaisables aujourd'hui, mais ne passent pas à l'échelle.
+
+---
+
+## 19. Aide-mémoire
 
 ```bash
 # Terminal 1 — MongoDB doit tourner

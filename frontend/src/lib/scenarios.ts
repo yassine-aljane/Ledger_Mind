@@ -15,7 +15,7 @@
  *    lirait « vous ne paierez rien », ce qui est faux et coûteux.
  */
 
-import { authHeaders, clearAuth } from "@/lib/auth";
+import { AVEC_SESSION, authHeaders, clearAuth } from "@/lib/auth";
 import { formatEuros, formatPct, type PointMensuel } from "@/lib/finance";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
@@ -239,6 +239,7 @@ async function parseError(response: Response): Promise<string> {
 
 async function requete<T>(chemin: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${chemin}`, {
+    ...AVEC_SESSION,
     ...init,
     headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
   });

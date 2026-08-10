@@ -6,7 +6,7 @@
 // Aucun calcul fiscal n'est fait côté navigateur : tout vient du moteur d'impôt, y compris
 // les montants et leur provenance. Le front n'est qu'un afficheur.
 
-import { authHeaders, clearAuth } from "@/lib/auth";
+import { AVEC_SESSION, authHeaders, clearAuth } from "@/lib/auth";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
@@ -335,6 +335,7 @@ export type ContextePrerempli = {
 
 async function json<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
+    ...AVEC_SESSION,
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),
@@ -385,7 +386,10 @@ export async function telechargerRapportFiscalPdf(
 ): Promise<void> {
   const response = await fetch(
     `${API_BASE}/api/rapport-fiscal/${encodeURIComponent(id)}/pdf`,
-    { headers: authHeaders() },
+    {
+      ...AVEC_SESSION,
+      headers: authHeaders(),
+    },
   );
   if (!response.ok) throw new Error(await parseError(response));
   const blob = await response.blob();

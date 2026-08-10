@@ -1,7 +1,7 @@
 // Client de l'espace immatriculé « activité » : facture, rapport, déclaration, expert-comptable.
 // Même base d'URL et même authentification que api.ts / guidance-api.ts.
 
-import { authHeaders, clearAuth } from "@/lib/auth";
+import { AVEC_SESSION, authHeaders, clearAuth } from "@/lib/auth";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
@@ -13,6 +13,7 @@ async function parseError(response: Response): Promise<string> {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
+    ...AVEC_SESSION,
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),
@@ -25,7 +26,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 async function downloadPdf(path: string, filename: string): Promise<void> {
-  const response = await fetch(`${API_BASE}${path}`, { headers: authHeaders() });
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...AVEC_SESSION,
+    headers: authHeaders(),
+  });
   if (!response.ok) throw new Error(await parseError(response));
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
@@ -148,7 +152,11 @@ export function modifierBrouillon(
 export async function supprimerBrouillon(factureId: string): Promise<void> {
   const response = await fetch(
     `${API_BASE}/api/facture/brouillon/${encodeURIComponent(factureId)}`,
-    { method: "DELETE", headers: authHeaders() },
+    {
+      ...AVEC_SESSION,
+      method: "DELETE",
+      headers: authHeaders(),
+    },
   );
   if (!response.ok) throw new Error(await parseError(response));
 }
