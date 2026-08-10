@@ -138,6 +138,23 @@ class RevenuUE(BaseModel):
     indice: Optional[str] = None
 
 
+class MoisAttestation(BaseModel):
+    """Une ligne du tableau de l'attestation URSSAF de chiffres d'affaires.
+
+    Les quatre natures y sont distinguées parce que l'URSSAF les distingue : elles n'ont ni
+    le même taux de cotisations ni le même abattement. `None` = mois non échu (« - » sur
+    l'attestation), à ne pas confondre avec 0,00 € qui est un mois clos sans recette.
+    """
+
+    mois: int
+    libelle: str
+    prestations_bnc: Optional[float] = None
+    ventes: Optional[float] = None
+    prestations_bic: Optional[float] = None
+    lmtc: Optional[float] = None
+    periode_en_cours: bool = False
+
+
 class JeuDeclarations(BaseModel):
     """Ensemble des brouillons et rappels produits pour une période."""
 
@@ -150,6 +167,11 @@ class JeuDeclarations(BaseModel):
 
     ca_encaisse: float
     ca_par_categorie: Dict[str, float] = Field(default_factory=dict)
+    # Ventilation MENSUELLE de l'année civile, telle que l'attestation URSSAF la présente :
+    # une ligne par mois, une colonne par nature. Un mois non échu vaut `None` et non zéro —
+    # l'attestation officielle y porte « - » (période en cours), ce qui n'a pas le même sens
+    # qu'un mois clos sans recette.
+    ca_mensuel: List["MoisAttestation"] = Field(default_factory=list)
 
     brouillons: List[Brouillon] = Field(default_factory=list)
     rappels: List[Rappel] = Field(default_factory=list)
