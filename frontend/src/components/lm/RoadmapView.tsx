@@ -32,6 +32,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { AiLabel } from "@/components/lm/AiLabel";
 import { Markdown, stripEmoji } from "@/components/lm/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -595,6 +596,10 @@ export function RoadmapView({
                   Seuil proratisé · 1re année
                 </span>
               )}
+              {/* Étiquette au contact du contenu, dans l'en-tête que l'utilisateur voit en
+                  premier. `detail` ouvre le second niveau : la feuille de route sert à
+                  décider, savoir d'où elle sort change la façon de la lire. */}
+              <AiLabel taille="sm" detail />
             </div>
             <p className="mt-5 text-sm text-primary-foreground/65">Cap recommandé</p>
             <h2 id="roadmap-title" className="mt-1 max-w-3xl text-3xl leading-tight sm:text-4xl">

@@ -56,7 +56,13 @@ _MOIS_FR = (
 _MENTION_REPRODUCTION = (
     "Reproduction de travail du formulaire officiel, établie à partir des pièces de "
     "l'entreprise. Ce document N'A PAS été transmis à l'administration et ne vaut pas "
-    "déclaration déposée."
+    "déclaration déposée. "
+    # Divulgation IA (art. 50 du règlement (UE) 2024/1689). Elle est adossée à la mention
+    # de reproduction plutôt qu'ajoutée en pied séparé : c'est le seul emplacement de la
+    # page qui n'appartienne pas à l'imprimé officiel, et il est déjà rendu sur CHAQUE
+    # gabarit. Un second pied viendrait se superposer aux cadres de signature.
+    "[IA] Établi automatiquement par LedgerMind (intelligence artificielle) - "
+    "à vérifier avant tout dépôt."
 )
 
 

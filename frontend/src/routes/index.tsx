@@ -15,6 +15,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
+import { AiMediaBadge } from "@/components/lm/AiLabel";
 import { HeroVideo } from "@/components/lm/HeroVideo";
 import { MarketingLayout } from "@/components/lm/Marketing";
 import { ProductAssistant } from "@/components/lm/ProductAssistant";
@@ -280,6 +281,9 @@ function Landing() {
       {/* ---------- Héros plein cadre (vidéo seule ici) ---------- */}
       <section className="relative min-h-[92vh] overflow-hidden text-ink-foreground">
         <HeroVideo className="absolute inset-0 size-full object-cover brightness-110 saturate-110" />
+        {/* Étiquette du média, au-dessus des deux calques de dégradé posés juste après —
+            sans quoi elle passerait sous eux et perdrait sa lisibilité. */}
+        <AiMediaBadge className="absolute bottom-4 right-4 z-20" />
         <div
           className="absolute inset-0"
           style={{

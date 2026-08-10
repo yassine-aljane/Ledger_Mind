@@ -6,6 +6,7 @@ import {
   type CaptureDocumentMessage,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { AiChatNotice } from "@/components/lm/AiLabel";
 import { Markdown } from "@/components/lm/Markdown";
 import {
   Sheet,
@@ -96,6 +97,10 @@ export function DocumentChatDrawer({ documentId, label, onClose }: Props) {
           </SheetDescription>
           <SheetTitle className="truncate font-display text-base font-medium">{label}</SheetTitle>
         </SheetHeader>
+
+        {/* Divulgation art. 50(1) — le tiroir est une surface d'entrée à part entière dans
+            la conversation, elle a donc son propre premier point de contact. */}
+        <AiChatNotice compact className="mx-6 mt-1" />
 
         <div ref={scrollRef} className="chat-scroll flex-1 space-y-4 overflow-y-auto px-6 py-6">
           {loading ? (

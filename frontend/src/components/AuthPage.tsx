@@ -12,6 +12,7 @@ import {
 import { accessState, isParcoursDone, landingPathFor } from "@/lib/entitlements";
 import { consumePremiumPending, getPlan } from "@/lib/plan";
 import { Wordmark } from "@/components/lm/Logo";
+import { AiMediaBadge } from "@/components/lm/AiLabel";
 import { cn } from "@/lib/utils";
 import authVisual from "@/assets/auth-visual.png";
 
@@ -97,6 +98,13 @@ export function AuthPage() {
           aria-hidden
           className="absolute inset-0 bg-linear-to-b from-black/50 via-black/5 to-black/45"
         />
+
+        {/*
+          Le visuel occupe tout le panneau en position absolue : on ne peut pas l'envelopper
+          dans `AiVisual` sans casser la mise en page. `z-10` place l'étiquette au-dessus du
+          dégradé qui recouvre l'image.
+        */}
+        <AiMediaBadge className="absolute bottom-3 right-3 z-10" />
 
         <Link to="/" className="relative w-fit shrink-0" aria-label="LedgerMind, accueil">
           <Wordmark onInk />

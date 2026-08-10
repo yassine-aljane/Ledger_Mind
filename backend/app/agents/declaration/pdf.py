@@ -7,6 +7,11 @@ Même palette que facture/pdf.py et rapport/pdf.py. Rien n'est composé ici : l'
 from __future__ import annotations
 
 from app.agents.declaration.schemas import Declaration
+from app.core import ai_act
+
+# Brouillon entièrement composé par la machine à partir des montants calculés : aucune
+# rédaction humaine n'entre dans la page.
+_NIVEAU_IA = "genere"
 
 NAVY = (27, 58, 95)
 NAVY_BG = (237, 242, 248)
@@ -139,4 +144,7 @@ def declaration_to_pdf(declaration: Declaration) -> bytes:
         + declaration.avertissement
     ))
 
+    # Transparence IA (art. 50) : mention dans la page + métadonnées dans le fichier.
+    ai_act.filigrane_pdf(pdf, texte, niveau=_NIVEAU_IA)
+    ai_act.marquer_pdf(pdf, niveau=_NIVEAU_IA)
     return bytes(pdf.output())

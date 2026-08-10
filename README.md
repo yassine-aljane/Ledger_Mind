@@ -718,6 +718,39 @@ Official sites referenced in UX copy (not always API-called): avis de situation 
 
 ---
 
+## 13 bis. AI transparency (EU AI Act, Article 50)
+
+Everything this product shows is produced by AI systems, so Article 50 of Regulation (EU)
+2024/1689 applies throughout. It requires **two separate markings** — one is not a
+substitute for the other:
+
+| | What it is | Where it lives |
+|---|---|---|
+| **Visible** — art. 50(1), 50(4) | A human can tell AI was involved | `frontend/src/components/lm/AiLabel.tsx`, `lib/ai-act.ts`; in-page mention printed by `ai_act.filigrane_pdf()` |
+| **Machine-readable** — art. 50(2) | Software can detect it after download or reshare | `backend/app/core/ai_act.py` — PDF document metadata, C2PA signature, HTTP headers, page `<meta>` + JSON-LD |
+
+**The rule that shapes the design:** a marking that only exists in the page's DOM
+disappears on export and is worth nothing. Anything the backend emits is written *into the
+file*, not around it.
+
+- **Chat surfaces** carry a first-contact disclosure before the first exchange (`AiChatNotice`).
+  Voice mode also speaks it aloud — on that surface the user may not be looking at the screen.
+- **Generated documents** carry both an in-page mention and metadata. C2PA does **not**
+  cover PDF, so their machine-readable marking is metadata only — see
+  [`backend/certs/README.md`](backend/certs/README.md).
+- **Images, audio, video** can carry a signed C2PA manifest once a signing chain exists:
+  `python backend/scripts/generer_cles_signature.py`.
+- **Every API response** carries `X-AI-Generated` and friends, for clients that never touch
+  our UI.
+- `GET /api/ai-act/transparence` returns the live state of the whole mechanism — it is the
+  audit documentation the guidance asks for, produced by the code rather than written
+  alongside it, so it cannot drift.
+
+Tests: `backend/tests/test_ai_act.py` opens the PDFs the product actually exports and checks
+what is inside them, and signs a real image to read its manifest back.
+
+---
+
 ## 14. Conventions & pitfalls
 
 1. **Orchestrator is the source of truth** for phase transitions — don’t invent parallel session machines in the frontend.  

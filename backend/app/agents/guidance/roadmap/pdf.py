@@ -14,6 +14,12 @@ import os
 from datetime import date
 from html import escape
 
+from app.core import ai_act
+
+# Feuille de route composée intégralement par la machine (parcours, étapes, formulations).
+_NIVEAU_IA = "genere"
+_MENTION_IA_VISIBLE = f"[IA] {ai_act.MARQUAGES[_NIVEAU_IA].libelle_court} — {ai_act.MENTION_DOCUMENT}"
+
 # --- Palette produit (RGB) ---
 NAVY = (27, 58, 95)
 NAVY2 = (46, 92, 138)
@@ -225,7 +231,17 @@ def roadmap_to_html(roadmap: dict) -> str:
     src_html = (f'<div class="sources"><div class="src-title">Sources légales officielles</div>'
                 f'<ul>{src_items}</ul></div>' if src_items else "")
 
-    return f"""<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><style>
+    # Les <meta> author/description/keywords sont repris par WeasyPrint dans les métadonnées
+    # du PDF produit : c'est par là que le marquage lisible par machine entre sur ce chemin
+    # de rendu, l'objet FPDF n'existant pas ici.
+    _meta_ia = ai_act.metadonnees_document(_NIVEAU_IA)
+    return f"""<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<title>{escape(_titre_document(roadmap))}</title>
+<meta name="author" content="{escape(_meta_ia['creator'])}">
+<meta name="generator" content="{escape(_meta_ia['producer'])}">
+<meta name="description" content="{escape(_meta_ia['subject'])}">
+<meta name="keywords" content="{escape(_meta_ia['keywords'])}">
+<style>
   @page {{ size:A4; margin:16mm;
     @bottom-left {{ content:'LEDGERMIND · FEUILLE DE ROUTE'; color:#8A8A91; font-size:8px; }}
     @bottom-right {{ content:counter(page) ' / ' counter(pages); color:#8A8A91; font-size:8px; }}
@@ -341,6 +357,9 @@ def roadmap_to_html(roadmap: dict) -> str:
   .detail {{ font-size:11.5px; color:#44403c; margin:5px 0 3px; line-height:1.45; }}
   .lien {{ font-size:10.5px; color:#2E5C8A; text-decoration:none; }}
   .foot {{ margin-top:20px; font-size:9.5px; color:#6B6B75; border-top:1px solid #E8E3D9; padding-top:9px; }}
+  /* Divulgation IA — même poids typographique que le reste du pied : la rendre plus
+     discrète que l'avertissement voisin la ferait passer pour une mention décorative. */
+  .foot-ia {{ margin-top:8px; font-size:9.5px; color:#44403c; font-weight:600; }}
 </style></head><body>
   <div class="cover">
     <div class="brand">LEDGERMIND</div>
@@ -360,6 +379,7 @@ def roadmap_to_html(roadmap: dict) -> str:
   {''.join(sections)}
   {src_html}
   <div class="foot">{escape(_DISCLAIMER)}</div>
+  <div class="foot-ia">{escape(_MENTION_IA_VISIBLE)}</div>
 </body></html>"""
 
 
@@ -871,12 +891,15 @@ def _pdf_fpdf(roadmap: dict) -> bytes:
     pdf.set_font(fam, "", 7.5)
     color(pdf.set_text_color, MUTED)
     pdf.multi_cell(0, 4, s(_DISCLAIMER), border="T")
+    ai_act.filigrane_pdf(pdf, s, niveau=_NIVEAU_IA, x=L, police=fam)
+    ai_act.marquer_pdf(pdf, niveau=_NIVEAU_IA)
     return bytes(pdf.output())
 
 
 def roadmap_to_pdf(roadmap: dict) -> bytes:
     """Rend la roadmap en PDF. WeasyPrint si disponible (GTK), sinon repli fpdf2 (pur Python)."""
     try:
-        return _pdf_weasyprint(roadmap)
+        donnees = _pdf_weasyprint(roadmap)
     except Exception:
-        return _pdf_fpdf(roadmap)
+        donnees = _pdf_fpdf(roadmap)
+    return donnees

@@ -21,6 +21,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AiMediaBadge } from "@/components/lm/AiLabel";
 import { Wordmark } from "@/components/lm/Logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -509,6 +510,9 @@ export function FactureCycleVie() {
                                 <Check className="size-3.5" />
                               </span>
                             )}
+                            {/* Aperçus de gabarits produits par un modèle d'images :
+                                étiquetés comme tels, même en vignette. */}
+                            <AiMediaBadge className="absolute bottom-1.5 left-1.5 scale-90 origin-bottom-left" />
                           </div>
                           <span className="block px-3 py-2.5">
                             <span className="block text-sm font-semibold">{modele.nom}</span>

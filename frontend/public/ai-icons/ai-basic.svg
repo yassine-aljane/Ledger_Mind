@@ -1,0 +1,15 @@
+<!--
+  Icône de base du jeu publié par la Commission européenne pour le marquage des contenus
+  générés ou manipulés par IA (Code de conduite sur le marquage et l'étiquetage).
+
+  Fichier autonome : il part avec le contenu quand on l'exporte ou qu'on le repartage, ce
+  qu'un pictogramme composé en CSS ne ferait pas. `currentColor` n'est PAS utilisé ici pour
+  la même raison — hors de la page, il n'y a plus de couleur héritée à reprendre.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"
+     role="img" aria-label="Contenu impliquant une intelligence artificielle">
+  <title>IA</title>
+  <circle cx="32" cy="32" r="32" fill="#1D1D1B"/>
+  <path fill="#FFFFFF" d="M19.86 45h-5.4l9.02-26h6.36l9.02 26h-5.4l-1.9-5.8H21.76l-1.9 5.8Zm3.34-10.2h8.24l-4.06-12.4h-.12l-4.06 12.4Z"/>
+  <path fill="#FFFFFF" d="M43.6 45V19h5.1v26h-5.1Z"/>
+</svg>
