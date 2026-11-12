@@ -61,6 +61,23 @@ def _origine_autorisee(origine: str) -> bool:
 
 
 @app.middleware("http")
+async def marquage_ia(request: Request, call_next):
+    """Pose les en-têtes de transparence IA sur toute réponse de l'API.
+
+    Tout ce que ce backend renvoie est produit par des systèmes d'IA. Un client qui
+    consomme l'API sans passer par notre interface — intégration tierce, robot d'indexation,
+    agrégateur — n'a que ces en-têtes pour savoir que la charge utile est synthétique : le
+    marquage visible, lui, vit dans le frontend et ne l'atteint jamais.
+
+    `/health` en est exclu : ce n'est pas du contenu, et un moniteur n'a rien à en déduire.
+    """
+    reponse = await call_next(request)
+    if request.url.path != "/health":
+        reponse.headers.update(ai_act.entetes_http())
+    return reponse
+
+
+@app.middleware("http")
 async def verifier_origine(request: Request, call_next):
     """Rejette les écritures venues d'une origine non autorisée (protection CSRF).
 
@@ -97,6 +114,9 @@ app.add_middleware(
     # À noter : `allow_credentials` est incompatible avec une origine `*`, d'où la liste explicite
     # ci-dessus, qu'il faut tenir à jour en production (FRONTEND_ORIGIN).
     allow_credentials=True,
+    # Sans cette liste, le navigateur masque les en-têtes de transparence au JavaScript de
+    # la page : `allow_headers` couvre la requête, pas la lecture de la réponse.
+    expose_headers=list(ai_act.entetes_http().keys()),
 )
 
 app.include_router(ai_act_api.router)
